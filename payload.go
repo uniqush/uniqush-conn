@@ -17,37 +17,8 @@
 
 package main
 
-import (
-	"labix.org/v2/mgo/bson"
-)
-
-const (
-	/*
-	 * Sent from client.
-	 */
-	MSGCMD_SUBSCRIBE = iota
-	MSGCMD_UNSUBSCRIBE
-	MSGCMD_ADDUSER
-	MSGCMD_RMUSER
-	MSGCMD_AUTH
-	MSGCMD_REDIRECT
-	MSGCMD_NORMAL_DATA
-	MSGCMD_CONTROL
-	MSGCMD_CLOSE
-)
-
-/*
- * Each message has three parts:
- * command, header and body.
- * They can be arbitrary values. The representation
- * of a message in underlying layers may be different.
- *
- */
-type Message struct {
-	Command uint32
-	Header  map[string]string
-	Body    []byte
+type Payload struct {
+	Header map[string]string
+	Body []byte
 }
 
-func (self *Message) ToBytes() []byte {
-}
