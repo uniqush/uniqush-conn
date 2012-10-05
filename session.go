@@ -19,19 +19,24 @@ package main
 
 import (
 	"io"
-	"time"
-	"encoding.binary"
+	//"time"
+	"encoding/binary"
+)
+
+const (
+	PROTOCOL_VERSION = 1
 )
 
 const (
 	sessionState_UNAUTH = iota
 	sessionState_AUTHED
+	sessionState_DISCON
 )
 
 const (
 	sessionContent_AUTHREQ = iota
 	sessionContent_AUTHRES
-	sessionContent_APP
+	sessionContent_APPDATA
 )
 
 type Session struct {
@@ -97,10 +102,37 @@ func (self *Session) writeRecord(rec *sessionRecord) error {
 		return err
 	}
 
-	_, err = transport.Write(rec.buf)
+	_, err = self.transport.Write(rec.buf)
 	return err
 }
 
-func (self *Session) WaitAuth(timeOut time.Duration) (succ bool, err error) {
+func (self *Session) Write(buf []byte) (n int, err error) {
+	rec := new(sessionRecord)
+	rec.contentType = sessionContent_APPDATA
+	rec.version = PROTOCOL_VERSION
+	rec.buf = buf
+	n = 0
+	err = self.writeRecord(rec)
+	if err != nil {
+		return
+	}
+	n = len(buf)
+	return
 }
+
+func (self *Session) recvLoop(dataChan chan<- []byte) {
+	for {
+		rec, err := self.readRecord()
+		if err != nil {
+			break
+		}
+		switch rec.contentType {
+		case sessionContent_APPDATA:
+			dataChan <- rec.buf
+		}
+	}
+}
+
+// func (self *Session) WaitAuth(timeOut time.Duration) (succ bool, err error) {
+//}
 
