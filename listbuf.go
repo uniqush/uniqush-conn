@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"errors"
 )
 
@@ -32,8 +33,13 @@ var ErrFull = errors.New("Full")
 type ListBuffer struct {
 	bufq *list.List
 	lock *sync.Mutex
-	size int
-	capacity int
+	size int32
+	capacity int32
+
+	hasSpace *sync.Cond
+	spaceCondLock *sync.Mutex
+	hasData *sync.Cond
+	dataCondLock *sync.Mutex
 }
 
 // Return a new empty list buffer
@@ -44,14 +50,37 @@ func NewListBuffer(capacity int) *ListBuffer {
 	ret.bufq= list.New()
 	ret.lock = new(sync.Mutex)
 	ret.size = 0
-	ret.capacity = capacity
+	ret.capacity = int32(capacity)
+
+	ret.spaceCondLock = new(sync.Mutex)
+	ret.hasSpace = sync.NewCond(ret.spaceCondLock)
+	ret.dataCondLock = new(sync.Mutex)
+	ret.hasData = sync.NewCond(ret.dataCondLock)
 	return ret
 }
 
+// Return if there is empty space in the buffer.
+// Otherwise, it will block the whole goroutine.
+//
+// Even if this method returned, it does not necessary mean
+// that the next Write() will be success.
 func (self *ListBuffer) WaitForSpace(size int) {
+	self.spaceCondLock.Lock()
+	self.hasSpace.Wait()
+	self.spaceCondLock.Unlock()
+	return
 }
 
+// Return if there is data in the buffer.
+// Otherwise, it will block the whole goroutine.
+//
+// Even if this method returned, it does not necessary mean
+// that the next Read() will never return io.EOF.
 func (self *ListBuffer) WaitForData() {
+	self.dataCondLock.Lock()
+	self.hasData.Wait()
+	self.dataCondLock.Unlock()
+	return
 }
 
 // Write() implementation.
@@ -67,10 +96,17 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
-	if len(buf) + self.size > self.capacity {
-		return ErrFull
+	if self.capacity > 0 && int32(len(buf)) + atomic.LoadInt32(&self.size) > self.capacity {
+		return 0, ErrFull
 	}
+
 	self.bufq.PushBack(buf)
+	self.size += int32(len(buf))
+	atomic.AddInt32(&self.size, int32(len(buf)))
+
+	self.dataCondLock.Lock()
+	self.hasData.Signal()
+	self.dataCondLock.Unlock()
 	return len(buf), nil
 }
 
@@ -88,12 +124,13 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 			if n == 0 {
 				err = io.EOF
 			}
-			return
+			break
 		}
 		var b []byte
 		var ok bool
 		if b, ok = elem.Value.([]byte); !ok {
-			return 0, fmt.Errorf("Unknown data type in buffer. should be panic")
+			err = fmt.Errorf("Unknown data type in buffer. should be panic")
+			break
 		}
 		self.bufq.Remove(elem)
 		c := copy(buf[n:], b)
@@ -103,7 +140,13 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 			self.bufq.PushFront(b)
 		}
 		n += c
-		self.size -= c
+		atomic.AddInt32(&self.size, -int32(c))
+	}
+
+	if n > 0 {
+		self.spaceCondLock.Lock()
+		self.hasSpace.Signal()
+		self.spaceCondLock.Unlock()
 	}
 	return
 }

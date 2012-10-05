@@ -48,7 +48,7 @@ const (
 // It provides a ReadWriteCloser implementation.
 // Read, Write could be safely called in parallel.
 type Session struct {
-	state int
+	state int32
 	transport io.ReadWriteCloser
 	buf *ListBuffer
 	writeLock *sync.Mutex
@@ -64,7 +64,9 @@ func NewSession(transport io.ReadWriteCloser) *Session {
 	ret := new(Session)
 	ret.transport = transport
 	ret.state = sessionState_UNAUTH
-	ret.buf = NewListBuffer()
+
+	// The buffer will hold at most 8K bytes of data
+	ret.buf = NewListBuffer(8192)
 	ret.writeLock = new(sync.Mutex)
 	return ret
 }
@@ -135,7 +137,6 @@ func (self *Session) Write(buf []byte) (n int, err error) {
 }
 
 func (self *Session) Read(buf []byte) (n int, err error) {
-	if self.state
 	n, err = self.buf.Read(buf)
 	for err == io.EOF {
 		self.buf.WaitForData()
@@ -155,7 +156,7 @@ func (self *Session) recvLoop() {
 			_, err := self.buf.Write(rec.buf)
 			for err == ErrFull {
 				self.buf.WaitForSpace(len(rec.buf))
-				_, err := self.buf.Write(rec.buf)
+				_, err = self.buf.Write(rec.buf)
 			}
 		}
 	}

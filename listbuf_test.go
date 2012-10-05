@@ -24,17 +24,23 @@ import (
 )
 
 func testReadWrite(size int, writeStep int, readStep int) error {
-	lb := NewListBuffer(-1, nil)
+	lb := NewListBuffer(-1)
 	buf := make([]byte, size)
 	var i int
 	for i = 0; i < len(buf); i++ {
 		buf[i] = byte(i)
 	}
 	for i = 0; i + writeStep < size; i += writeStep {
-		lb.Write(buf[i:i+writeStep])
+		_, err := lb.Write(buf[i:i+writeStep])
+		if err != nil {
+			return err
+		}
 	}
 	if i < size {
-		lb.Write(buf[i:])
+		_, err := lb.Write(buf[i:])
+		if err != nil {
+			return err
+		}
 	}
 
 	nbuf := make([]byte, size)
