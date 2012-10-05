@@ -24,7 +24,7 @@ import (
 )
 
 func testReadWrite(size int, writeStep int, readStep int) error {
-	lb := NewListBuffer()
+	lb := NewListBuffer(-1, nil)
 	buf := make([]byte, size)
 	var i int
 	for i = 0; i < len(buf); i++ {

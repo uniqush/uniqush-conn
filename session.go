@@ -21,6 +21,7 @@ import (
 	"io"
 	//"time"
 	"encoding/binary"
+	"sync"
 )
 
 const (
@@ -39,9 +40,18 @@ const (
 	sessionContent_APPDATA
 )
 
+// A session deals with:
+// - Authentication
+// - Encryption
+// - Compression
+//
+// It provides a ReadWriteCloser implementation.
+// Read, Write could be safely called in parallel.
 type Session struct {
 	state int
 	transport io.ReadWriteCloser
+	buf *ListBuffer
+	writeLock *sync.Mutex
 }
 
 type sessionRecord struct {
@@ -54,6 +64,8 @@ func NewSession(transport io.ReadWriteCloser) *Session {
 	ret := new(Session)
 	ret.transport = transport
 	ret.state = sessionState_UNAUTH
+	ret.buf = NewListBuffer()
+	ret.writeLock = new(sync.Mutex)
 	return ret
 }
 
@@ -87,6 +99,8 @@ func (self *Session) readRecord() (rec *sessionRecord, err error) {
 
 func (self *Session) writeRecord(rec *sessionRecord) error {
 	var err error
+	self.writeLock.Lock()
+	defer self.writeLock.Unlock()
 	err = binary.Write(self.transport, binary.LittleEndian, rec.contentType)
 	if err != nil {
 		return err
@@ -120,7 +134,17 @@ func (self *Session) Write(buf []byte) (n int, err error) {
 	return
 }
 
-func (self *Session) recvLoop(dataChan chan<- []byte) {
+func (self *Session) Read(buf []byte) (n int, err error) {
+	if self.state
+	n, err = self.buf.Read(buf)
+	for err == io.EOF {
+		self.buf.WaitForData()
+		n, err = self.buf.Read(buf)
+	}
+	return
+}
+
+func (self *Session) recvLoop() {
 	for {
 		rec, err := self.readRecord()
 		if err != nil {
@@ -128,7 +152,11 @@ func (self *Session) recvLoop(dataChan chan<- []byte) {
 		}
 		switch rec.contentType {
 		case sessionContent_APPDATA:
-			dataChan <- rec.buf
+			_, err := self.buf.Write(rec.buf)
+			for err == ErrFull {
+				self.buf.WaitForSpace(len(rec.buf))
+				_, err := self.buf.Write(rec.buf)
+			}
 		}
 	}
 }

@@ -22,34 +22,61 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"errors"
 )
+
+var ErrFull = errors.New("Full")
 
 // Used to store sequence of slices into a linked
 // list. It implements Reader and Writer interfaces.
 type ListBuffer struct {
 	bufq *list.List
 	lock *sync.Mutex
+	size int
+	capacity int
 }
 
 // Return a new empty list buffer
-func NewListBuffer() *ListBuffer {
+// capacity: the capacity of the buffer.
+// <= 0 means unlimited.
+func NewListBuffer(capacity int) *ListBuffer {
 	ret := new(ListBuffer)
 	ret.bufq= list.New()
 	ret.lock = new(sync.Mutex)
+	ret.size = 0
+	ret.capacity = capacity
 	return ret
+}
+
+func (self *ListBuffer) WaitForSpace(size int) {
+}
+
+func (self *ListBuffer) WaitForData() {
 }
 
 // Write() implementation.
 // NOTE: buf will be *directly* stored to the buffer, not a copy
 // of it, meaning changing buf else where will change the content
 // of the list buffer.
+//
+// Returns ErrFull if the capacity of the buffer is less than
+// the current size of the buffer plus len(buf)
+//
+// This means the buf will not be partially written.
 func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
+
+	if len(buf) + self.size > self.capacity {
+		return ErrFull
+	}
 	self.bufq.PushBack(buf)
 	return len(buf), nil
 }
 
+// Read() implementation.
+//
+// If the ListBuffer is empty, Read() returns io.EOF
 func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
@@ -76,6 +103,7 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 			self.bufq.PushFront(b)
 		}
 		n += c
+		self.size -= c
 	}
 	return
 }
