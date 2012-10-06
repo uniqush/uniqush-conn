@@ -19,11 +19,12 @@ package main
 
 import (
 	"io"
-	//"time"
+	"time"
 	"encoding/binary"
 	"sync"
 	"sync/atomic"
 	"errors"
+	"crypto/sha1"
 )
 
 const (
@@ -224,6 +225,9 @@ func (self *Session) recvLoop() {
 	}
 }
 
+// The Authorizer interface defines one method
+// used to authorize the user's name and token
+// combination.
 type Authorizer interface {
 	Authorize(name string, token string) bool
 }
@@ -295,6 +299,19 @@ func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool
 
 	if succ {
 		atomic.StoreInt32(&self.state, sessionState_AUTHED)
+	}
+
+	res := new(sessionRecord)
+	res.contentType = sessionContent_AUTHRES
+	res.version = PROTOCOL_VERSION
+
+	hash := sha1.New()
+	hash.Write(rec.buf)
+	res.buf = hash.Sum(res.buf)
+
+	err = self.writeRecord(res)
+	if err != nil {
+		return
 	}
 
 	go recvLoop()
