@@ -18,85 +18,13 @@
 package main
 
 import (
-	"testing"
 	"io"
 	"fmt"
 	"time"
 	"sync"
 )
 
-func testReadWrite(size int, writeStep int, readStep int) error {
-	lb := NewListBuffer(-1)
-	buf := make([]byte, size)
-	var i int
-	for i = 0; i < len(buf); i++ {
-		buf[i] = byte(i)
-	}
-	for i = 0; i + writeStep < size; i += writeStep {
-		_, err := lb.Write(buf[i:i+writeStep])
-		if err != nil {
-			return err
-		}
-	}
-	if i < size {
-		_, err := lb.Write(buf[i:])
-		if err != nil {
-			return err
-		}
-	}
-
-	nbuf := make([]byte, size)
-
-	for i = 0; i + readStep < size; i += readStep {
-		_, err := lb.Read(nbuf[i:i+readStep])
-		if size <= 100 {
-			fmt.Println(nbuf[i:i+readStep])
-		}
-		if err != nil {
-			return fmt.Errorf("Error: %v", err)
-		}
-	}
-	if i < size {
-		_, err := lb.Read(nbuf[i:])
-		if size <= 100 {
-			fmt.Println(nbuf[i:])
-		}
-		if err != nil {
-			return fmt.Errorf("Error: %v", err)
-		}
-	}
-
-	_, err := lb.Read(nbuf)
-	if err != io.EOF {
-		return fmt.Errorf("Should be EOF")
-	}
-	for i = 0; i < size; i++ {
-		if nbuf[i] != buf[i] {
-			return fmt.Errorf("@ %v: nbuf[i] = %v; buf[i] = %v",
-				i, nbuf[i], buf[i])
-		}
-	}
-	return nil
-}
-
-func TestReadWrite(t *testing.T) {
-	testCases := [][]int {
-		{100, 10, 20},
-		{99, 10, 20},
-		{100, 20, 10},
-		{1024, 100, 10},
-		{1024, 10, 10},
-	}
-	for _, c := range testCases {
-		fmt.Printf("Test on %v\n", c)
-		err := testReadWrite(c[0], c[1], c[2])
-		if err != nil {
-			t.Errorf("Error on %v: %v", c, err)
-		}
-	}
-}
-
-func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
+func dataProducer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	for stepSize <= len(data) {
 		s := stepSize
 		if s > len(data) {
@@ -120,7 +48,7 @@ func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	close(report)
 }
 
-func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
+func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	d := make([]byte, len(data))
 	backup := data
 	i := d
@@ -130,7 +58,7 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 			s = len(data)
 		}
 		n, err := buf.Read(i[:s])
-		if err != nil && err != io.EOF {
+		if err != nil && err != ErrFull {
 			report <- err
 		}
 		for err == io.EOF {
@@ -153,7 +81,9 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	close(report)
 }
 
-func TestWait(t *testing.T) {
+
+func main() {
+	fmt.Println("-------------------------")
 	fmt.Println("-------------------------")
 	lb := NewListBuffer(10)
 	dl := 100
@@ -166,23 +96,23 @@ func TestWait(t *testing.T) {
 	prodErrChan := make(chan error)
 	consErrChan := make(chan error)
 
-	go producer(lb, data, 5, prodErrChan)
+	go dataProducer(lb, data, 5, prodErrChan)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
 		for e := range prodErrChan {
-			t.Errorf("Producer Error: %v", e)
+			fmt.Errorf("Producer Error: %v", e)
 		}
 		wg.Done()
 	}()
 	time.Sleep(1 * time.Second)
-	go consumer(lb, data, 10, consErrChan)
+	go dataConsumer(lb, data, 10, consErrChan)
 
 	wg.Add(1)
 	go func() {
 		for e := range consErrChan {
-			t.Errorf("Consumer Error: %v", e)
+			fmt.Errorf("Producer Error: %v", e)
 		}
 		wg.Done()
 	}()

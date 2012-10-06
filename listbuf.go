@@ -101,8 +101,11 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 	}
 
 	self.bufq.PushBack(buf)
-	newsize := atomic.AddInt32(&self.size, int32(len(buf)))
+	/*
+	atomic.AddInt32(&self.size, int32(len(buf)))
+	*/
 
+	newsize := atomic.AddInt32(&self.size, int32(len(buf)))
 	fmt.Printf("Successfully wrote %v bytes. %v bytes of data in buffer.\n", len(buf), newsize)
 
 	self.dataCondLock.Lock()
@@ -141,6 +144,10 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 			self.bufq.PushFront(b)
 		}
 		n += c
+		/*
+		atomic.AddInt32(&self.size, -int32(c))
+		*/
+
 		newsize := atomic.AddInt32(&self.size, -int32(c))
 		fmt.Printf("Successfully read %v bytes. %v bytes of data in buffer.\n", c, newsize)
 	}
