@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"time"
 	"sync"
+	"sync/atomic"
 )
 
 func testReadWrite(size int, writeStep int, readStep int) error {
@@ -153,8 +154,68 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	close(report)
 }
 
+func testWait(bufSize, dataSize, readStep, writeStep int) int {
+	lb := NewListBuffer(bufSize)
+	dl := dataSize
+	data := make([]byte, dl)
+
+	for i := 0; i < dl; i++ {
+		data[i] = byte(i)
+	}
+
+	prodErrChan := make(chan error)
+	consErrChan := make(chan error)
+
+	go producer(lb, data, writeStep, prodErrChan)
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+
+	var failed int32
+
+	failed = 0
+	go func() {
+		for e := range prodErrChan {
+			fmt.Printf("Producer Error: %v\n", e)
+			atomic.AddInt32(&failed, 1)
+		}
+		wg.Done()
+	}()
+	time.Sleep(1 * time.Second)
+	go consumer(lb, data, readStep, consErrChan)
+
+	wg.Add(1)
+	go func() {
+		for e := range consErrChan {
+			fmt.Printf("Consumer Error: %v\n", e)
+			atomic.AddInt32(&failed, 1)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	if failed == 0 {
+		return 0
+	}
+	return -1
+}
+
 func TestWait(t *testing.T) {
-	fmt.Println("-------------------------")
+
+	testCases := [][]int {
+		{10, 100, 5, 10},
+	}
+
+	for _, c := range testCases {
+		fmt.Println("-------------------------")
+		fmt.Printf("Test on %v\n", c)
+		err := testWait(c[0], c[1], c[2], c[3])
+		if err < 0 {
+			t.Errorf("Error on %v", c)
+		}
+	}
+	/*
 	lb := NewListBuffer(10)
 	dl := 100
 	data := make([]byte, dl)
@@ -187,5 +248,6 @@ func TestWait(t *testing.T) {
 		wg.Done()
 	}()
 	wg.Wait()
+	*/
 }
 

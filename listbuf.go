@@ -65,7 +65,14 @@ func NewListBuffer(capacity int) *ListBuffer {
 // Even if this method returned, it does not necessary mean
 // that the next Write() will be success.
 func (self *ListBuffer) WaitForSpace(size int) {
+	self.lock.Lock()
+
+	if self.capacity < 0 || atomic.LoadInt32(&self.size) < self.capacity {
+		self.lock.Unlock()
+		return
+	}
 	self.spaceCondLock.Lock()
+	self.lock.Unlock()
 	self.hasSpace.Wait()
 	self.spaceCondLock.Unlock()
 	return
@@ -77,7 +84,14 @@ func (self *ListBuffer) WaitForSpace(size int) {
 // Even if this method returned, it does not necessary mean
 // that the next Read() will never return io.EOF.
 func (self *ListBuffer) WaitForData() {
+	self.lock.Lock()
+
+	if atomic.LoadInt32(&self.size) > 0 {
+		self.lock.Unlock()
+		return
+	}
 	self.dataCondLock.Lock()
+	self.lock.Unlock()
 	self.hasData.Wait()
 	self.dataCondLock.Unlock()
 	return
@@ -101,12 +115,8 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 	}
 
 	self.bufq.PushBack(buf)
-	/*
-	atomic.AddInt32(&self.size, int32(len(buf)))
-	*/
 
-	newsize := atomic.AddInt32(&self.size, int32(len(buf)))
-	fmt.Printf("Successfully wrote %v bytes. %v bytes of data in buffer.\n", len(buf), newsize)
+	atomic.AddInt32(&self.size, int32(len(buf)))
 
 	self.dataCondLock.Lock()
 	self.hasData.Signal()
@@ -144,12 +154,7 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 			self.bufq.PushFront(b)
 		}
 		n += c
-		/*
 		atomic.AddInt32(&self.size, -int32(c))
-		*/
-
-		newsize := atomic.AddInt32(&self.size, -int32(c))
-		fmt.Printf("Successfully read %v bytes. %v bytes of data in buffer.\n", c, newsize)
 	}
 
 	if n > 0 {
@@ -160,6 +165,7 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 	return
 }
 
+// Returns the size of the data inside the buffer
 func (self *ListBuffer) Size() int {
 	self.lock.Lock()
 	defer self.lock.Unlock()
