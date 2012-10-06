@@ -25,7 +25,7 @@ import (
 )
 
 func dataProducer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
-	for stepSize <= len(data) {
+	for len(data) > 0 {
 		s := stepSize
 		if s > len(data) {
 			s = len(data)
@@ -45,16 +45,17 @@ func dataProducer(buf *ListBuffer, data []byte, stepSize int, report chan<- erro
 				report <- err
 			}
 		}
-		data = data[stepSize:]
+		data = data[n:]
 	}
 	close(report)
 }
 
 func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	d := make([]byte, len(data))
-	backup := data
 	i := d
-	for stepSize <= len(data) {
+
+	sz := 0
+	for len(data) > 0 {
 		s := stepSize
 		if s > len(data) {
 			s = len(data)
@@ -74,13 +75,17 @@ func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- erro
 				report <- err
 			}
 		}
+
+		for j := 0; j < n; j++ {
+			if data[j] != i[j] {
+				fmt.Printf("[Consumer] Error: @ %v: data[i] = %v; received[i] = %v\n", sz + j, data[j], i[j])
+				report <- fmt.Errorf("@ %v: data[i] = %v; received[i] = %v", sz + j, data[j], i[j])
+			}
+		}
 		data = data[n:]
 		i = i[n:]
-	}
-	for j := 0; j < len(backup); j++ {
-		if backup[j] != d[j] {
-			report <- fmt.Errorf("@ %v: data[i] = %v; received[i] = %v", j, backup[j], d[j])
-		}
+		sz += n
+		fmt.Printf("[Consumer] %v bytes left\n", len(data))
 	}
 	close(report)
 }
@@ -134,7 +139,8 @@ func waitOnCase(bufSize, dataSize, readStep, writeStep int) int {
 
 func main() {
 	testCases := [][]int {
-		{10, 100, 5, 10},
+		//{555, 1024, 100, 10},
+		{10, 100, 15, 10},
 	}
 
 	for _, c := range testCases {
@@ -142,7 +148,7 @@ func main() {
 		fmt.Printf("Test on %v\n", c)
 		err := waitOnCase(c[0], c[1], c[2], c[3])
 		if err < 0 {
-			fmt.Printf("Error on %v", c)
+			fmt.Printf("Error on %v\n", c)
 		}
 	}
 }
