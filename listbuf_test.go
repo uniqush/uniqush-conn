@@ -97,58 +97,67 @@ func TestReadWrite(t *testing.T) {
 }
 
 func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
-	for stepSize <= len(data) {
+	for len(data) > 0 {
 		s := stepSize
 		if s > len(data) {
 			s = len(data)
 		}
-		_, err := buf.Write(data[:s])
+		n, err := buf.Write(data[:s])
+		fmt.Printf("[Producer] Wrote %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
 		if err != nil && err != ErrFull {
 			report <- err
 		}
 		for err == ErrFull {
-			//fmt.Println("Producer is blocked because of limitation of space. Current data size = ", buf.Size())
+			fmt.Println("[Producer] is blocked because of limitation of space. Current data size = ", buf.Size())
 			buf.WaitForSpace(s)
-			//fmt.Println("Producer got extra space")
-			_, err = buf.Write(data[:s])
+			fmt.Println("[Producer] got extra space")
+			n, err = buf.Write(data[:s])
+			fmt.Printf("[Producer] Wrote %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
 			if err != nil && err != ErrFull {
 				report <- err
 			}
 		}
-		data = data[stepSize:]
+		data = data[n:]
 	}
 	close(report)
 }
 
 func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 	d := make([]byte, len(data))
-	backup := data
 	i := d
-	for stepSize <= len(data) {
+
+	sz := 0
+	for len(data) > 0 {
 		s := stepSize
 		if s > len(data) {
 			s = len(data)
 		}
 		n, err := buf.Read(i[:s])
-		if err != nil && err != io.EOF {
+		fmt.Printf("[Consumer] Read %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
+		if err != nil && err != io.EOF{
 			report <- err
 		}
 		for err == io.EOF {
-			//fmt.Println("Consumer is blocked because there is no data, Current Data size = ", buf.Size())
+			fmt.Println("[Consumer] is blocked because there is no data, Current Data size = ", buf.Size())
 			buf.WaitForData()
-			//fmt.Println("Consumer got extra data")
+			fmt.Println("[Consumer] got extra data")
 			n, err = buf.Read(i[:s])
+			fmt.Printf("[Consumer] Read %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
 			if err != nil && err != io.EOF {
 				report <- err
 			}
 		}
+
+		for j := 0; j < n; j++ {
+			if data[j] != i[j] {
+				fmt.Printf("[Consumer] Error: @ %v: data[i] = %v; received[i] = %v\n", sz + j, data[j], i[j])
+				report <- fmt.Errorf("@ %v: data[i] = %v; received[i] = %v", sz + j, data[j], i[j])
+			}
+		}
 		data = data[n:]
 		i = i[n:]
-	}
-	for j := 0; j < len(backup); j++ {
-		if backup[j] != d[j] {
-			report <- fmt.Errorf("@ %v: data[i] = %v; received[i] = %v", j, backup[j], d[j])
-		}
+		sz += n
+		fmt.Printf("[Consumer] %v bytes left\n", len(data))
 	}
 	close(report)
 }
@@ -205,6 +214,8 @@ func TestWait(t *testing.T) {
 		{10, 100, 5, 10},
 		{10, 100, 10, 5},
 		{10, 100, 10, 10},
+		{10, 100, 15, 10},
+		{555, 1024, 100, 10},
 	}
 
 	for _, c := range testCases {
