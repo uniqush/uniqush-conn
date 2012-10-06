@@ -21,7 +21,6 @@ import (
 	"testing"
 	"io"
 	"fmt"
-	"time"
 	"sync"
 	"sync/atomic"
 )
@@ -108,9 +107,9 @@ func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 			report <- err
 		}
 		for err == ErrFull {
-			fmt.Println("Producer is blocked because of limitation of space. Current data size = ", buf.Size())
+			//fmt.Println("Producer is blocked because of limitation of space. Current data size = ", buf.Size())
 			buf.WaitForSpace(s)
-			fmt.Println("Producer got extra space")
+			//fmt.Println("Producer got extra space")
 			_, err = buf.Write(data[:s])
 			if err != nil && err != ErrFull {
 				report <- err
@@ -135,9 +134,9 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 			report <- err
 		}
 		for err == io.EOF {
-			fmt.Println("Consumer is blocked because there is no data, Current Data size = ", buf.Size())
+			//fmt.Println("Consumer is blocked because there is no data, Current Data size = ", buf.Size())
 			buf.WaitForData()
-			fmt.Println("Consumer got extra data")
+			//fmt.Println("Consumer got extra data")
 			n, err = buf.Read(i[:s])
 			if err != nil && err != io.EOF {
 				report <- err
@@ -181,7 +180,6 @@ func testWait(bufSize, dataSize, readStep, writeStep int) int {
 		}
 		wg.Done()
 	}()
-	time.Sleep(1 * time.Second)
 	go consumer(lb, data, readStep, consErrChan)
 
 	wg.Add(1)
@@ -205,6 +203,8 @@ func TestWait(t *testing.T) {
 
 	testCases := [][]int {
 		{10, 100, 5, 10},
+		{10, 100, 10, 5},
+		{10, 100, 10, 10},
 	}
 
 	for _, c := range testCases {
@@ -215,39 +215,5 @@ func TestWait(t *testing.T) {
 			t.Errorf("Error on %v", c)
 		}
 	}
-	/*
-	lb := NewListBuffer(10)
-	dl := 100
-	data := make([]byte, dl)
-
-	for i := 0; i < dl; i++ {
-		data[i] = byte(i)
-	}
-
-	prodErrChan := make(chan error)
-	consErrChan := make(chan error)
-
-	go producer(lb, data, 5, prodErrChan)
-
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		for e := range prodErrChan {
-			t.Errorf("Producer Error: %v", e)
-		}
-		wg.Done()
-	}()
-	time.Sleep(1 * time.Second)
-	go consumer(lb, data, 10, consErrChan)
-
-	wg.Add(1)
-	go func() {
-		for e := range consErrChan {
-			t.Errorf("Consumer Error: %v", e)
-		}
-		wg.Done()
-	}()
-	wg.Wait()
-	*/
 }
 
