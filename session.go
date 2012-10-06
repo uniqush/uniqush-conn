@@ -22,6 +22,8 @@ import (
 	//"time"
 	"encoding/binary"
 	"sync"
+	"sync/atomic"
+	"errors"
 )
 
 const (
@@ -38,7 +40,19 @@ const (
 	sessionContent_AUTHREQ = iota
 	sessionContent_AUTHRES
 	sessionContent_APPDATA
+	sessionContent_CONTROL
 )
+
+var ErrUnauth = errors.New("Unauthorized session")
+var ErrBadContentType = errors.New("Bad Content Type")
+
+type ErrorBadProtoImpl struct {
+	msg string
+}
+
+func (self *ErrorBadProtoImpl) Error() string {
+	return "Bad Protocol Implementation: " + self.msg
+}
 
 // A session deals with:
 // - Authentication
@@ -122,7 +136,14 @@ func (self *Session) writeRecord(rec *sessionRecord) error {
 	return err
 }
 
+// Write() writes the buf to the transport layer.
+// It will first compress the data, and then encrypt it.
+//
+// This method is goroutine-safe
 func (self *Session) Write(buf []byte) (n int, err error) {
+	if atomic.LoadInt32(&self.state) != sessionState_AUTHED {
+		return 0, ErrUnauth
+	}
 	rec := new(sessionRecord)
 	rec.contentType = sessionContent_APPDATA
 	rec.version = PROTOCOL_VERSION
@@ -136,24 +157,65 @@ func (self *Session) Write(buf []byte) (n int, err error) {
 	return
 }
 
+// Read() will first read data from the transport layer, 
+// then decrypt the data, then decompress it and copy
+// the finaly data to the buf.
+//
+// OK. I am cheating. Read() is actually reading data from
+// an internal buffer. All data there has already been
+// decrepted & decompressed by another goroutine.
+//
+// If you cannot understand what I said, simply think it as
+// a wrapper of another Reader and can do some magic stuff
+// on reading.
+//
+// This method is goroutine-safe
 func (self *Session) Read(buf []byte) (n int, err error) {
+	if atomic.LoadInt32(&self.state) != sessionState_AUTHED {
+		return 0, ErrUnauth
+	}
 	n, err = self.buf.Read(buf)
+	if err != nil && err != io.EOF {
+		return
+	}
 	for err == io.EOF {
+		// If the connection is disconnected, then...
+		if atomic.LoadInt32(&self.state) == sessionState_DISCON {
+			if n == 0 {
+				// return io.EOF if no data is read.
+				err = io.EOF
+			} else {
+				// Otherwise, return nil error with data first,
+				// then return an EOF on next call of Read().
+				err = nil
+			}
+			return
+		}
 		self.buf.WaitForData()
 		n, err = self.buf.Read(buf)
+		if err != nil && err != io.EOF {
+			return
+		}
 	}
 	return
 }
 
 func (self *Session) recvLoop() {
+	if atomic.LoadInt32(&self.state) != sessionState_AUTHED {
+		return
+	}
 	for {
 		rec, err := self.readRecord()
 		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				atomic.StoreInt32(&self.state, sessionState_DISCON)
+			}
 			break
 		}
 		switch rec.contentType {
 		case sessionContent_APPDATA:
 			_, err := self.buf.Write(rec.buf)
+
 			for err == ErrFull {
 				self.buf.WaitForSpace(len(rec.buf))
 				_, err = self.buf.Write(rec.buf)
@@ -162,6 +224,80 @@ func (self *Session) recvLoop() {
 	}
 }
 
-// func (self *Session) WaitAuth(timeOut time.Duration) (succ bool, err error) {
-//}
+type Authorizer interface {
+	Authorize(name string, token string) bool
+}
+
+func getString(buf []byte) (str string, newbuf []byte) {
+	stop := 0
+	str = ""
+	for i := 0; i < len(buf); i++ {
+		if buf[i] == 0 {
+			stop = i
+			break
+		}
+	}
+
+	if stop == 0 {
+		newbuf = buf
+		return
+	}
+
+	var ok bool
+
+	if str, ok = string(buf[:stop]); !ok {
+		newbuf = buf
+		return
+	}
+
+	newbuf = buf[stop:]
+	return
+}
+
+// This method should always be called before Read and Write.
+// If it returns true, nil, then it means the session now is authorized and ecrypted using
+// the new key. Otherwise, any call on Read or Write will return ErrUnauth error.
+func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool, err error) {
+	var rec *sessionRecord
+	err = nil
+	succ = false
+
+	rec, err = self.readRecord()
+	if err != nil {
+		return
+	}
+
+	if rec.contentType != sessionContent_AUTHREQ {
+		err = ErrBadContentType
+		return
+	}
+
+	buf := rec.buf
+
+	// Extract name part
+	name, buf := getString(buf)
+	if len(name) == 0 {
+		err = &ErrorBadProtoImpl{"Empty auth req"}
+		return
+	}
+	token, buf := getString(buf)
+	if len(token) == 0 {
+		err = &ErrorBadProtoImpl{"Bad token"}
+		return
+	}
+
+	if len(buf) == 0 {
+		err = &ErrorBadProtoImpl{"No key"}
+		return
+	}
+
+	succ = auth.Authorize(name, token)
+
+	if succ {
+		atomic.StoreInt32(&self.state, sessionState_AUTHED)
+	}
+
+	go recvLoop()
+	return
+}
 

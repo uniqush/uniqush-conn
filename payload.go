@@ -19,6 +19,5 @@ package main
 
 type Payload struct {
 	Header map[string]string
-	Body []byte
+	Body   []byte
 }
-

@@ -19,11 +19,11 @@ package main
 
 import (
 	"container/list"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
-	"errors"
 )
 
 var ErrFull = errors.New("Full")
@@ -31,15 +31,15 @@ var ErrFull = errors.New("Full")
 // Used to store sequence of slices into a linked
 // list. It implements Reader and Writer interfaces.
 type ListBuffer struct {
-	bufq *list.List
-	lock *sync.Mutex
-	size int32
+	bufq     *list.List
+	lock     *sync.Mutex
+	size     int32
 	capacity int32
 
-	hasSpace *sync.Cond
+	hasSpace      *sync.Cond
 	spaceCondLock *sync.Mutex
-	hasData *sync.Cond
-	dataCondLock *sync.Mutex
+	hasData       *sync.Cond
+	dataCondLock  *sync.Mutex
 }
 
 // Return a new empty list buffer
@@ -47,7 +47,7 @@ type ListBuffer struct {
 // <= 0 means unlimited.
 func NewListBuffer(capacity int) *ListBuffer {
 	ret := new(ListBuffer)
-	ret.bufq= list.New()
+	ret.bufq = list.New()
 	ret.lock = new(sync.Mutex)
 	ret.size = 0
 	ret.capacity = int32(capacity)
@@ -110,7 +110,7 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
-	if self.capacity > 0 && int32(len(buf)) + atomic.LoadInt32(&self.size) > self.capacity {
+	if self.capacity > 0 && int32(len(buf))+atomic.LoadInt32(&self.size) > self.capacity {
 		return 0, ErrFull
 	}
 
@@ -172,5 +172,3 @@ func (self *ListBuffer) Size() int {
 	s := atomic.LoadInt32(&self.size)
 	return int(s)
 }
-
-

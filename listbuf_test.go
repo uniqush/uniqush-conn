@@ -18,11 +18,11 @@
 package main
 
 import (
-	"testing"
-	"io"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
+	"testing"
 )
 
 func testReadWrite(size int, writeStep int, readStep int) error {
@@ -32,8 +32,8 @@ func testReadWrite(size int, writeStep int, readStep int) error {
 	for i = 0; i < len(buf); i++ {
 		buf[i] = byte(i)
 	}
-	for i = 0; i + writeStep < size; i += writeStep {
-		_, err := lb.Write(buf[i:i+writeStep])
+	for i = 0; i+writeStep < size; i += writeStep {
+		_, err := lb.Write(buf[i : i+writeStep])
 		if err != nil {
 			return err
 		}
@@ -47,10 +47,10 @@ func testReadWrite(size int, writeStep int, readStep int) error {
 
 	nbuf := make([]byte, size)
 
-	for i = 0; i + readStep < size; i += readStep {
-		_, err := lb.Read(nbuf[i:i+readStep])
+	for i = 0; i+readStep < size; i += readStep {
+		_, err := lb.Read(nbuf[i : i+readStep])
 		if size <= 100 {
-			fmt.Println(nbuf[i:i+readStep])
+			fmt.Println(nbuf[i : i+readStep])
 		}
 		if err != nil {
 			return fmt.Errorf("Error: %v", err)
@@ -80,7 +80,7 @@ func testReadWrite(size int, writeStep int, readStep int) error {
 }
 
 func TestReadWrite(t *testing.T) {
-	testCases := [][]int {
+	testCases := [][]int{
 		{100, 10, 20},
 		{99, 10, 20},
 		{100, 20, 10},
@@ -134,7 +134,7 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 		}
 		n, err := buf.Read(i[:s])
 		fmt.Printf("[Consumer] Read %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
-		if err != nil && err != io.EOF{
+		if err != nil && err != io.EOF {
 			report <- err
 		}
 		for err == io.EOF {
@@ -150,8 +150,8 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error) {
 
 		for j := 0; j < n; j++ {
 			if data[j] != i[j] {
-				fmt.Printf("[Consumer] Error: @ %v: data[i] = %v; received[i] = %v\n", sz + j, data[j], i[j])
-				report <- fmt.Errorf("@ %v: data[i] = %v; received[i] = %v", sz + j, data[j], i[j])
+				fmt.Printf("[Consumer] Error: @ %v: data[i] = %v; received[i] = %v\n", sz+j, data[j], i[j])
+				report <- fmt.Errorf("@ %v: data[i] = %v; received[i] = %v", sz+j, data[j], i[j])
 			}
 		}
 		data = data[n:]
@@ -210,12 +210,13 @@ func testWait(bufSize, dataSize, readStep, writeStep int) int {
 
 func TestWait(t *testing.T) {
 
-	testCases := [][]int {
+	testCases := [][]int{
 		{10, 100, 5, 10},
 		{10, 100, 10, 5},
 		{10, 100, 10, 10},
 		{10, 100, 15, 10},
 		{555, 1024, 100, 10},
+		{123, 1024, 100, 10},
 	}
 
 	for _, c := range testCases {
@@ -227,4 +228,3 @@ func TestWait(t *testing.T) {
 		}
 	}
 }
-
