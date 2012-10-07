@@ -65,16 +65,13 @@ func NewListBuffer(capacity int) *ListBuffer {
 // Even if this method returned, it does not necessary mean
 // that the next Write() will be success.
 func (self *ListBuffer) WaitForSpace(size int) {
-	self.lock.Lock()
+	self.spaceCondLock.Lock()
+	defer self.spaceCondLock.Unlock()
 
 	if self.capacity < 0 || atomic.LoadInt32(&self.size) < self.capacity {
-		self.lock.Unlock()
 		return
 	}
-	self.spaceCondLock.Lock()
-	self.lock.Unlock()
 	self.hasSpace.Wait()
-	self.spaceCondLock.Unlock()
 	return
 }
 
@@ -84,16 +81,13 @@ func (self *ListBuffer) WaitForSpace(size int) {
 // Even if this method returned, it does not necessary mean
 // that the next Read() will never return io.EOF.
 func (self *ListBuffer) WaitForData() {
-	self.lock.Lock()
+	self.dataCondLock.Lock()
+	defer self.dataCondLock.Unlock()
 
 	if atomic.LoadInt32(&self.size) > 0 {
-		self.lock.Unlock()
 		return
 	}
-	self.dataCondLock.Lock()
-	self.lock.Unlock()
 	self.hasData.Wait()
-	self.dataCondLock.Unlock()
 	return
 }
 
@@ -102,26 +96,30 @@ func (self *ListBuffer) WaitForData() {
 // of it, meaning changing buf else where will change the content
 // of the list buffer.
 //
-// Returns ErrFull if the capacity of the buffer is less than
-// the current size of the buffer plus len(buf)
-//
-// This means the buf will not be partially written.
+// Returns ErrFull if there is no space to store one single byte.
 func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
+	self.dataCondLock.Lock()
+	defer self.dataCondLock.Unlock()
 
-	if self.capacity > 0 && int32(len(buf))+atomic.LoadInt32(&self.size) > self.capacity {
+	if self.capacity > 0 && atomic.LoadInt32(&self.size) >= self.capacity {
 		return 0, ErrFull
 	}
 
-	self.bufq.PushBack(buf)
+	n = len(buf)
+	if self.capacity > 0 {
+		free := self.capacity - atomic.LoadInt32(&self.size)
+		if n > int(free) {
+			n = int(free)
+		}
+	}
+	self.bufq.PushBack(buf[:n])
 
-	atomic.AddInt32(&self.size, int32(len(buf)))
+	atomic.AddInt32(&self.size, int32(n))
 
-	self.dataCondLock.Lock()
-	self.hasData.Signal()
-	self.dataCondLock.Unlock()
-	return len(buf), nil
+	self.hasData.Broadcast()
+	return
 }
 
 // Read() implementation.
@@ -130,6 +128,8 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
+	self.spaceCondLock.Lock()
+	defer self.spaceCondLock.Unlock()
 	n = 0
 	err = nil
 	for n < len(buf) {
@@ -158,9 +158,7 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 	}
 
 	if n > 0 {
-		self.spaceCondLock.Lock()
-		self.hasSpace.Signal()
-		self.spaceCondLock.Unlock()
+		self.hasSpace.Broadcast()
 	}
 	return
 }

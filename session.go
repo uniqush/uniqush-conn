@@ -247,12 +247,7 @@ func getString(buf []byte) (str string, newbuf []byte) {
 		return
 	}
 
-	var ok bool
-
-	if str, ok = string(buf[:stop]); !ok {
-		newbuf = buf
-		return
-	}
+	str = string(buf[:stop])
 
 	newbuf = buf[stop:]
 	return
@@ -295,12 +290,15 @@ func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool
 		return
 	}
 
-	succ = auth.Authorize(name, token)
-
-	if succ {
-		atomic.StoreInt32(&self.state, sessionState_AUTHED)
+	if auth != nil {
+		succ = auth.Authorize(name, token)
 	}
 
+	if !succ {
+		return
+	}
+
+	atomic.StoreInt32(&self.state, sessionState_AUTHED)
 	res := new(sessionRecord)
 	res.contentType = sessionContent_AUTHRES
 	res.version = PROTOCOL_VERSION
@@ -314,7 +312,7 @@ func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool
 		return
 	}
 
-	go recvLoop()
+	go self.recvLoop()
 	return
 }
 
