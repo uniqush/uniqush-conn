@@ -144,7 +144,7 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 		if err != nil && err != io.EOF {
 			report <- err
 		}
-		for err == io.EOF {
+		if err == io.EOF {
 			if !silence {
 				fmt.Println("[Consumer] is blocked because there is no data, Current Data size = ", buf.Size())
 			}
@@ -153,13 +153,6 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 				fmt.Println("[Consumer] got extra data")
 			}
 
-			n, err = buf.Read(i[:s])
-			if !silence {
-				fmt.Printf("[Consumer] Read %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
-			}
-			if err != nil && err != io.EOF {
-				report <- err
-			}
 		}
 
 		for j := 0; j < n; j++ {
@@ -247,4 +240,3 @@ func TestWait(t *testing.T) {
 		}
 	}
 }
-

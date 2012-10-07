@@ -18,13 +18,13 @@
 package main
 
 import (
-	"io"
-	"time"
+	"crypto/sha1"
 	"encoding/binary"
+	"errors"
+	"io"
 	"sync"
 	"sync/atomic"
-	"errors"
-	"crypto/sha1"
+	"time"
 )
 
 const (
@@ -63,16 +63,16 @@ func (self *ErrorBadProtoImpl) Error() string {
 // It provides a ReadWriteCloser implementation.
 // Read, Write could be safely called in parallel.
 type Session struct {
-	state int32
+	state     int32
 	transport io.ReadWriteCloser
-	buf *ListBuffer
+	buf       *ListBuffer
 	writeLock *sync.Mutex
 }
 
 type sessionRecord struct {
 	contentType uint8
-	version uint8
-	buf []byte
+	version     uint8
+	buf         []byte
 }
 
 func NewSession(transport io.ReadWriteCloser) *Session {
@@ -216,14 +216,20 @@ func (self *Session) recvLoop() {
 		switch rec.contentType {
 		case sessionContent_APPDATA:
 			buf := rec.buf
-			n, err := self.buf.Write(buf)
 
-			for err == ErrFull || n != len(buf) {
-				if n > 0 && n < len(buf) {
-					buf = buf[:n]
+			for len(buf) > 0 {
+				n, err := self.buf.Write(buf)
+
+				// Should never happen.
+				if err != nil && err != ErrFull {
+					break
 				}
-				self.buf.WaitForSpace(len(rec.buf))
-				n, err = self.buf.Write(rec.buf)
+
+				buf = buf[:n]
+				if err == ErrFull {
+					self.buf.WaitForSpace(len(buf))
+				}
+
 			}
 		}
 	}
@@ -319,4 +325,3 @@ func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool
 	go self.recvLoop()
 	return
 }
-
