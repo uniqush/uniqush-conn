@@ -215,11 +215,15 @@ func (self *Session) recvLoop() {
 		}
 		switch rec.contentType {
 		case sessionContent_APPDATA:
-			_, err := self.buf.Write(rec.buf)
+			buf := rec.buf
+			n, err := self.buf.Write(buf)
 
-			for err == ErrFull {
+			for err == ErrFull || n != len(buf) {
+				if n > 0 && n < len(buf) {
+					buf = buf[:n]
+				}
 				self.buf.WaitForSpace(len(rec.buf))
-				_, err = self.buf.Write(rec.buf)
+				n, err = self.buf.Write(rec.buf)
 			}
 		}
 	}

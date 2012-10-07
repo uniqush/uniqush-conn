@@ -112,6 +112,7 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 		free := self.capacity - atomic.LoadInt32(&self.size)
 		if n > int(free) {
 			n = int(free)
+			err = ErrFull
 		}
 	}
 	self.bufq.PushBack(buf[:n])

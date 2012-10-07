@@ -113,20 +113,13 @@ func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 		if err != nil && err != ErrFull {
 			report <- err
 		}
-		for err == ErrFull {
+		if err == ErrFull {
 			if !silence {
 				fmt.Println("[Producer] is blocked because of limitation of space. Current data size = ", buf.Size())
 			}
 			buf.WaitForSpace(s)
 			if !silence {
 				fmt.Println("[Producer] got extra space")
-			}
-			n, err = buf.Write(data[:s])
-			if !silence {
-				fmt.Printf("[Producer] Wrote %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
-			}
-			if err != nil && err != ErrFull {
-				report <- err
 			}
 		}
 		data = data[n:]
