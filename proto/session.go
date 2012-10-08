@@ -15,7 +15,7 @@
  *
  */
 
-package main
+package proto
 
 import (
 	"crypto/sha1"
@@ -25,6 +25,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"github.com/uniqush/uniqush-conn/streambuf"
 )
 
 const (
@@ -65,7 +66,7 @@ func (self *ErrorBadProtoImpl) Error() string {
 type Session struct {
 	state     int32
 	transport io.ReadWriteCloser
-	buf       *ListBuffer
+	buf       *streambuf.StreamBuffer
 	writeLock *sync.Mutex
 }
 
@@ -81,7 +82,7 @@ func NewSession(transport io.ReadWriteCloser) *Session {
 	ret.state = sessionState_UNAUTH
 
 	// The buffer will hold at most 8K bytes of data
-	ret.buf = NewListBuffer(8192)
+	ret.buf = streambuf.New(8192)
 	ret.writeLock = new(sync.Mutex)
 	return ret
 }
@@ -221,12 +222,12 @@ func (self *Session) recvLoop() {
 				n, err := self.buf.Write(buf)
 
 				// Should never happen.
-				if err != nil && err != ErrFull {
+				if err != nil && err != streambuf.ErrFull {
 					break
 				}
 
 				buf = buf[:n]
-				if err == ErrFull {
+				if err == streambuf.ErrFull {
 					self.buf.WaitForSpace(len(buf))
 				}
 

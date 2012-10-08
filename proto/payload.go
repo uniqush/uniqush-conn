@@ -15,7 +15,7 @@
  *
  */
 
-package main
+package proto
 
 type Payload struct {
 	Header map[string]string
