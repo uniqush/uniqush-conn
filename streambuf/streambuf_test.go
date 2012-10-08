@@ -15,16 +15,92 @@
  *
  */
 
-package main
+package streambuf
 
 import (
-	"io"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
+	"testing"
 )
 
-func dataProducer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
+func testReadWrite(size int, writeStep int, readStep int) error {
+	lb := New(-1)
+	buf := make([]byte, size)
+	var i int
+	for i = 0; i < len(buf); i++ {
+		buf[i] = byte(i)
+	}
+	for i = 0; i+writeStep < size; i += writeStep {
+		_, err := lb.Write(buf[i : i+writeStep])
+		if err != nil {
+			return err
+		}
+	}
+	if i < size {
+		_, err := lb.Write(buf[i:])
+		if err != nil {
+			return err
+		}
+	}
+
+	nbuf := make([]byte, size)
+
+	for i = 0; i+readStep < size; i += readStep {
+		_, err := lb.Read(nbuf[i : i+readStep])
+		/*
+			if size <= 100 {
+				fmt.Println(nbuf[i : i+readStep])
+			}
+		*/
+		if err != nil {
+			return fmt.Errorf("Error: %v", err)
+		}
+	}
+	if i < size {
+		_, err := lb.Read(nbuf[i:])
+		/*
+			if size <= 100 {
+				fmt.Println(nbuf[i:])
+			}
+		*/
+		if err != nil {
+			return fmt.Errorf("Error: %v", err)
+		}
+	}
+
+	_, err := lb.Read(nbuf)
+	if err != io.EOF {
+		return fmt.Errorf("Should be EOF")
+	}
+	for i = 0; i < size; i++ {
+		if nbuf[i] != buf[i] {
+			return fmt.Errorf("@ %v: nbuf[i] = %v; buf[i] = %v",
+				i, nbuf[i], buf[i])
+		}
+	}
+	return nil
+}
+
+func TestReadWrite(t *testing.T) {
+	testCases := [][]int{
+		{100, 10, 20},
+		{99, 10, 20},
+		{100, 20, 10},
+		{1024, 100, 10},
+		{1024, 10, 10},
+	}
+	for _, c := range testCases {
+		//fmt.Printf("Test on %v\n", c)
+		err := testReadWrite(c[0], c[1], c[2])
+		if err != nil {
+			t.Errorf("Error on %v: %v", c, err)
+		}
+	}
+}
+
+func producer(buf *StreamBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
 	for len(data) > 0 {
 		s := stepSize
 		if s > len(data) {
@@ -51,7 +127,7 @@ func dataProducer(buf *ListBuffer, data []byte, stepSize int, report chan<- erro
 	close(report)
 }
 
-func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
+func consumer(buf *StreamBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
 	d := make([]byte, len(data))
 	i := d
 
@@ -68,7 +144,7 @@ func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- erro
 		if err != nil && err != io.EOF {
 			report <- err
 		}
-		for err == io.EOF {
+		if err == io.EOF {
 			if !silence {
 				fmt.Println("[Consumer] is blocked because there is no data, Current Data size = ", buf.Size())
 			}
@@ -77,13 +153,6 @@ func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- erro
 				fmt.Println("[Consumer] got extra data")
 			}
 
-			n, err = buf.Read(i[:s])
-			if !silence {
-				fmt.Printf("[Consumer] Read %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
-			}
-			if err != nil && err != io.EOF {
-				report <- err
-			}
 		}
 
 		for j := 0; j < n; j++ {
@@ -104,8 +173,8 @@ func dataConsumer(buf *ListBuffer, data []byte, stepSize int, report chan<- erro
 	close(report)
 }
 
-func waitOnCase(bufSize, dataSize, readStep, writeStep int, silence bool) int {
-	lb := NewListBuffer(bufSize)
+func testWait(bufSize, dataSize, readStep, writeStep int, silence bool) int {
+	lb := New(bufSize)
 	dl := dataSize
 	data := make([]byte, dl)
 
@@ -116,7 +185,7 @@ func waitOnCase(bufSize, dataSize, readStep, writeStep int, silence bool) int {
 	prodErrChan := make(chan error)
 	consErrChan := make(chan error)
 
-	go dataProducer(lb, data, writeStep, prodErrChan, silence)
+	go producer(lb, data, writeStep, prodErrChan, silence)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
@@ -131,7 +200,7 @@ func waitOnCase(bufSize, dataSize, readStep, writeStep int, silence bool) int {
 		}
 		wg.Done()
 	}()
-	go dataConsumer(lb, data, readStep, consErrChan, silence)
+	go consumer(lb, data, readStep, consErrChan, silence)
 
 	wg.Add(1)
 	go func() {
@@ -150,22 +219,24 @@ func waitOnCase(bufSize, dataSize, readStep, writeStep int, silence bool) int {
 	return -1
 }
 
+func TestWait(t *testing.T) {
 
-func main() {
-	testCases := [][]int {
+	testCases := [][]int{
+		{10, 100, 5, 10},
+		{10, 100, 10, 5},
+		{10, 100, 10, 10},
+		{10, 100, 15, 10},
 		{555, 1024, 100, 10},
-		{5, 10, 10, 10},
+		{123, 1024, 100, 10},
 		{1, 2, 2, 2},
 	}
 
 	for _, c := range testCases {
 		fmt.Println("-------------------------")
 		fmt.Printf("Test on %v\n", c)
-		err := waitOnCase(c[0], c[1], c[2], c[3], true)
+		err := testWait(c[0], c[1], c[2], c[3], true)
 		if err < 0 {
-			fmt.Printf("Error on %v\n", c)
+			t.Errorf("Error on %v", c)
 		}
 	}
 }
-
-

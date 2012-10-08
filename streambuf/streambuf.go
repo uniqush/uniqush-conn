@@ -15,7 +15,7 @@
  *
  */
 
-package main
+package streambuf
 
 import (
 	"container/list"
@@ -30,7 +30,7 @@ var ErrFull = errors.New("Full")
 
 // Used to store sequence of slices into a linked
 // list. It implements Reader and Writer interfaces.
-type ListBuffer struct {
+type StreamBuffer struct {
 	bufq     *list.List
 	lock     *sync.Mutex
 	size     int32
@@ -42,11 +42,11 @@ type ListBuffer struct {
 	dataCondLock  *sync.Mutex
 }
 
-// Return a new empty list buffer
+// Return a new empty stream buffer
 // capacity: the capacity of the buffer.
 // <= 0 means unlimited.
-func NewListBuffer(capacity int) *ListBuffer {
-	ret := new(ListBuffer)
+func New(capacity int) *StreamBuffer {
+	ret := new(StreamBuffer)
 	ret.bufq = list.New()
 	ret.lock = new(sync.Mutex)
 	ret.size = 0
@@ -64,7 +64,7 @@ func NewListBuffer(capacity int) *ListBuffer {
 //
 // Even if this method returned, it does not necessary mean
 // that the next Write() will be success.
-func (self *ListBuffer) WaitForSpace(size int) {
+func (self *StreamBuffer) WaitForSpace(size int) {
 	self.spaceCondLock.Lock()
 	defer self.spaceCondLock.Unlock()
 
@@ -80,7 +80,7 @@ func (self *ListBuffer) WaitForSpace(size int) {
 //
 // Even if this method returned, it does not necessary mean
 // that the next Read() will never return io.EOF.
-func (self *ListBuffer) WaitForData() {
+func (self *StreamBuffer) WaitForData() {
 	self.dataCondLock.Lock()
 	defer self.dataCondLock.Unlock()
 
@@ -97,7 +97,7 @@ func (self *ListBuffer) WaitForData() {
 // of the list buffer.
 //
 // Returns ErrFull if there is no space to store one single byte.
-func (self *ListBuffer) Write(buf []byte) (n int, err error) {
+func (self *StreamBuffer) Write(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	self.dataCondLock.Lock()
@@ -125,8 +125,8 @@ func (self *ListBuffer) Write(buf []byte) (n int, err error) {
 
 // Read() implementation.
 //
-// If the ListBuffer is empty, Read() returns io.EOF
-func (self *ListBuffer) Read(buf []byte) (n int, err error) {
+// If the StreamBuffer is empty, Read() returns io.EOF
+func (self *StreamBuffer) Read(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	self.spaceCondLock.Lock()
@@ -165,7 +165,7 @@ func (self *ListBuffer) Read(buf []byte) (n int, err error) {
 }
 
 // Returns the size of the data inside the buffer
-func (self *ListBuffer) Size() int {
+func (self *StreamBuffer) Size() int {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	s := atomic.LoadInt32(&self.size)

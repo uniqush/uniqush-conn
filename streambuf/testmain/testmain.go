@@ -18,89 +18,14 @@
 package main
 
 import (
-	"fmt"
 	"io"
+	"fmt"
 	"sync"
 	"sync/atomic"
-	"testing"
+	"github.com/uniqush/uniqush-conn/streambuf"
 )
 
-func testReadWrite(size int, writeStep int, readStep int) error {
-	lb := NewListBuffer(-1)
-	buf := make([]byte, size)
-	var i int
-	for i = 0; i < len(buf); i++ {
-		buf[i] = byte(i)
-	}
-	for i = 0; i+writeStep < size; i += writeStep {
-		_, err := lb.Write(buf[i : i+writeStep])
-		if err != nil {
-			return err
-		}
-	}
-	if i < size {
-		_, err := lb.Write(buf[i:])
-		if err != nil {
-			return err
-		}
-	}
-
-	nbuf := make([]byte, size)
-
-	for i = 0; i+readStep < size; i += readStep {
-		_, err := lb.Read(nbuf[i : i+readStep])
-		/*
-			if size <= 100 {
-				fmt.Println(nbuf[i : i+readStep])
-			}
-		*/
-		if err != nil {
-			return fmt.Errorf("Error: %v", err)
-		}
-	}
-	if i < size {
-		_, err := lb.Read(nbuf[i:])
-		/*
-			if size <= 100 {
-				fmt.Println(nbuf[i:])
-			}
-		*/
-		if err != nil {
-			return fmt.Errorf("Error: %v", err)
-		}
-	}
-
-	_, err := lb.Read(nbuf)
-	if err != io.EOF {
-		return fmt.Errorf("Should be EOF")
-	}
-	for i = 0; i < size; i++ {
-		if nbuf[i] != buf[i] {
-			return fmt.Errorf("@ %v: nbuf[i] = %v; buf[i] = %v",
-				i, nbuf[i], buf[i])
-		}
-	}
-	return nil
-}
-
-func TestReadWrite(t *testing.T) {
-	testCases := [][]int{
-		{100, 10, 20},
-		{99, 10, 20},
-		{100, 20, 10},
-		{1024, 100, 10},
-		{1024, 10, 10},
-	}
-	for _, c := range testCases {
-		//fmt.Printf("Test on %v\n", c)
-		err := testReadWrite(c[0], c[1], c[2])
-		if err != nil {
-			t.Errorf("Error on %v: %v", c, err)
-		}
-	}
-}
-
-func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
+func dataProducer(buf *streambuf.StreamBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
 	for len(data) > 0 {
 		s := stepSize
 		if s > len(data) {
@@ -110,10 +35,10 @@ func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 		if !silence {
 			fmt.Printf("[Producer] Wrote %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
 		}
-		if err != nil && err != ErrFull {
+		if err != nil && err != streambuf.ErrFull {
 			report <- err
 		}
-		if err == ErrFull {
+		if err == streambuf.ErrFull {
 			if !silence {
 				fmt.Println("[Producer] is blocked because of limitation of space. Current data size = ", buf.Size())
 			}
@@ -127,7 +52,7 @@ func producer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 	close(report)
 }
 
-func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
+func dataConsumer(buf *streambuf.StreamBuffer, data []byte, stepSize int, report chan<- error, silence bool) {
 	d := make([]byte, len(data))
 	i := d
 
@@ -144,7 +69,7 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 		if err != nil && err != io.EOF {
 			report <- err
 		}
-		if err == io.EOF {
+		for err == io.EOF {
 			if !silence {
 				fmt.Println("[Consumer] is blocked because there is no data, Current Data size = ", buf.Size())
 			}
@@ -153,6 +78,13 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 				fmt.Println("[Consumer] got extra data")
 			}
 
+			n, err = buf.Read(i[:s])
+			if !silence {
+				fmt.Printf("[Consumer] Read %v bytes of data; %v bytes of data in buffer now\n", n, buf.Size())
+			}
+			if err != nil && err != io.EOF {
+				report <- err
+			}
 		}
 
 		for j := 0; j < n; j++ {
@@ -173,8 +105,8 @@ func consumer(buf *ListBuffer, data []byte, stepSize int, report chan<- error, s
 	close(report)
 }
 
-func testWait(bufSize, dataSize, readStep, writeStep int, silence bool) int {
-	lb := NewListBuffer(bufSize)
+func waitOnCase(bufSize, dataSize, readStep, writeStep int, silence bool) int {
+	lb := streambuf.New(bufSize)
 	dl := dataSize
 	data := make([]byte, dl)
 
@@ -185,7 +117,7 @@ func testWait(bufSize, dataSize, readStep, writeStep int, silence bool) int {
 	prodErrChan := make(chan error)
 	consErrChan := make(chan error)
 
-	go producer(lb, data, writeStep, prodErrChan, silence)
+	go dataProducer(lb, data, writeStep, prodErrChan, silence)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
@@ -200,7 +132,7 @@ func testWait(bufSize, dataSize, readStep, writeStep int, silence bool) int {
 		}
 		wg.Done()
 	}()
-	go consumer(lb, data, readStep, consErrChan, silence)
+	go dataConsumer(lb, data, readStep, consErrChan, silence)
 
 	wg.Add(1)
 	go func() {
@@ -219,24 +151,22 @@ func testWait(bufSize, dataSize, readStep, writeStep int, silence bool) int {
 	return -1
 }
 
-func TestWait(t *testing.T) {
 
-	testCases := [][]int{
-		{10, 100, 5, 10},
-		{10, 100, 10, 5},
-		{10, 100, 10, 10},
-		{10, 100, 15, 10},
+func main() {
+	testCases := [][]int {
 		{555, 1024, 100, 10},
-		{123, 1024, 100, 10},
+		{5, 10, 10, 10},
 		{1, 2, 2, 2},
 	}
 
 	for _, c := range testCases {
 		fmt.Println("-------------------------")
 		fmt.Printf("Test on %v\n", c)
-		err := testWait(c[0], c[1], c[2], c[3], true)
+		err := waitOnCase(c[0], c[1], c[2], c[3], true)
 		if err < 0 {
-			t.Errorf("Error on %v", c)
+			fmt.Printf("Error on %v\n", c)
 		}
 	}
 }
+
+
