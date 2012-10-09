@@ -19,13 +19,16 @@ package proto
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"errors"
 	"io"
 	"testing"
 	"time"
 	"encoding/binary"
+	"io/ioutil"
 )
 
-func getAuthReqData(name, token string, key []byte) io.Reader {
+func getAuthReqData(name, token string, key []byte) (io.Reader, []byte) {
 	buf := make([]byte, 0, len([]byte(name))+len([]byte(token))+len(key)+16)
 	ret := bytes.NewBuffer(buf)
 	var ui8 uint8
@@ -42,7 +45,10 @@ func getAuthReqData(name, token string, key []byte) io.Reader {
 	ret.WriteString(token)
 	ret.WriteByte(byte(0))
 	ret.Write(key)
-	return ret
+
+	retdata, _ := ioutil.ReadAll(ret)
+	ret = bytes.NewBuffer(retdata)
+	return ret, retdata
 }
 
 type fakeAuthorizer struct {
@@ -85,7 +91,7 @@ func (self *rwcCombo) Close() error {
 }
 
 func testAuth(pass bool) error {
-	reader := getAuthReqData("hello", "world", []byte{1, 2, 3})
+	reader, data := getAuthReqData("hello", "world", []byte{1, 2, 3})
 	writer := bytes.NewBuffer(make([]byte, 0, 128))
 	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}}
 	session := NewSession(rwc)
@@ -95,6 +101,30 @@ func testAuth(pass bool) error {
 	if succ != pass {
 		return err
 	}
+	res, _ := ioutil.ReadAll(writer)
+	if !succ {
+		if len(res) != 0 {
+			return errors.New("Should return 0 length response")
+		}
+		return nil
+	}
+	hash := sha1.New()
+
+	hd := data[4:]
+	hash.Write(hd)
+
+	hashRes := make([]byte, 0, 64)
+	hashRes = hash.Sum(hashRes)
+
+	if len(res) < 4 {
+		return errors.New("Wrong response")
+	}
+	res = res[4:]
+
+	if !bytes.Equal(res, hashRes) {
+		return errors.New("Hash unequal")
+	}
+
 	return nil
 }
 
@@ -108,3 +138,4 @@ func TestAuth(t *testing.T) {
 		t.Errorf("should not pass but passed: %v", err)
 	}
 }
+
