@@ -76,9 +76,13 @@ type rwcCombo struct {
 	reader io.Reader
 	writer io.Writer
 	closer io.Closer
+	closed bool
 }
 
 func (self *rwcCombo) Read(buf []byte) (int, error) {
+	if self.closed {
+		return 0, io.EOF
+	}
 	return self.reader.Read(buf)
 }
 
@@ -87,13 +91,14 @@ func (self *rwcCombo) Write(buf []byte) (int, error) {
 }
 
 func (self *rwcCombo) Close() error {
+	self.closed = true
 	return self.closer.Close()
 }
 
 func testAuth(pass bool) error {
 	reader, data := getAuthReqData("hello", "world", []byte{1, 2, 3})
 	writer := bytes.NewBuffer(make([]byte, 0, 128))
-	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}}
+	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}, closed: false}
 	session := NewSession(rwc)
 	auth := newFakeAuthorizer(pass)
 	to := 0 * time.Second
@@ -105,6 +110,10 @@ func testAuth(pass bool) error {
 	if !succ {
 		if len(res) != 0 {
 			return errors.New("Should return 0 length response")
+		}
+
+		if !rwc.closed {
+			return errors.New("Should close")
 		}
 		return nil
 	}

@@ -288,16 +288,22 @@ func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool
 	name, buf := getString(buf)
 	if len(name) == 0 {
 		err = &ErrorBadProtoImpl{"Empty auth req"}
+		self.transport.Close()
+		atomic.StoreInt32(&self.state, sessionState_DISCON)
 		return
 	}
 	token, buf := getString(buf)
 	if len(token) == 0 {
 		err = &ErrorBadProtoImpl{"Bad token"}
+		self.transport.Close()
+		atomic.StoreInt32(&self.state, sessionState_DISCON)
 		return
 	}
 
 	if len(buf) == 0 {
 		err = &ErrorBadProtoImpl{"No key"}
+		self.transport.Close()
+		atomic.StoreInt32(&self.state, sessionState_DISCON)
 		return
 	}
 
@@ -306,6 +312,8 @@ func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool
 	}
 
 	if !succ {
+		self.transport.Close()
+		atomic.StoreInt32(&self.state, sessionState_DISCON)
 		return
 	}
 
