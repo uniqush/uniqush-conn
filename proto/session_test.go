@@ -45,11 +45,18 @@ func getAuthReqData(name, token string, key []byte) io.Reader {
 	return ret
 }
 
-type alwaysPassAuthorizer struct {
+type fakeAuthorizer struct {
+	pass bool
 }
 
-func (self *alwaysPassAuthorizer) Authorize(name, token string) bool {
-	return true
+func newFakeAuthorizer(pass bool) Authorizer {
+	ret := new(fakeAuthorizer)
+	ret.pass = pass
+	return ret
+}
+
+func (self *fakeAuthorizer) Authorize(name, token string) bool {
+	return self.pass
 }
 
 type nopCloser struct {
@@ -77,15 +84,27 @@ func (self *rwcCombo) Close() error {
 	return self.closer.Close()
 }
 
-func TestAuth(t *testing.T) {
+func testAuth(pass bool) error {
 	reader := getAuthReqData("hello", "world", []byte{1, 2, 3})
 	writer := bytes.NewBuffer(make([]byte, 0, 128))
 	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}}
 	session := NewSession(rwc)
-	auth := &alwaysPassAuthorizer{}
+	auth := newFakeAuthorizer(pass)
 	to := 0 * time.Second
 	succ, err := session.WaitAuth(auth, to)
-	if !succ {
-		t.Errorf("Should pass but not, %v", err)
+	if succ != pass {
+		return err
+	}
+	return nil
+}
+
+func TestAuth(t *testing.T) {
+	err := testAuth(true)
+	if err != nil {
+		t.Errorf("should pass but not: %v", err)
+	}
+	err = testAuth(false)
+	if err != nil {
+		t.Errorf("should not pass but passed: %v", err)
 	}
 }
