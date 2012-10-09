@@ -21,11 +21,22 @@ import (
 	"bytes"
 	"io"
 	"testing"
+	"time"
+	"encoding/binary"
 )
 
 func getAuthReqData(name, token string, key []byte) io.Reader {
-	buf := make([]byte, len([]byte(name))+len([]byte(token))+len(key)+16)
+	buf := make([]byte, 0, len([]byte(name))+len([]byte(token))+len(key)+16)
 	ret := bytes.NewBuffer(buf)
+	var ui8 uint8
+	ui8 = sessionContent_AUTHREQ
+	binary.Write(ret, binary.LittleEndian, ui8)
+	ui8 = PROTOCOL_VERSION
+	binary.Write(ret, binary.LittleEndian, ui8)
+
+	var ui16 uint16
+	ui16 = uint16(len([]byte(name)) + 1 + len([]byte(token)) + 1 + len(key))
+	binary.Write(ret, binary.LittleEndian, ui16)
 	ret.WriteString(name)
 	ret.WriteByte(byte(0))
 	ret.WriteString(token)
@@ -41,6 +52,40 @@ func (self *alwaysPassAuthorizer) Authorize(name, token string) bool {
 	return true
 }
 
+type nopCloser struct {
+}
+
+func (self *nopCloser) Close() error {
+	return nil
+}
+
+type rwcCombo struct {
+	reader io.Reader
+	writer io.Writer
+	closer io.Closer
+}
+
+func (self *rwcCombo) Read(buf []byte) (int, error) {
+	return self.reader.Read(buf)
+}
+
+func (self *rwcCombo) Write(buf []byte) (int, error) {
+	return self.writer.Write(buf)
+}
+
+func (self *rwcCombo) Close() error {
+	return self.closer.Close()
+}
+
 func TestAuth(t *testing.T) {
-	getAuthReqData("hello", "world", []byte{1, 2, 3})
+	reader := getAuthReqData("hello", "world", []byte{1, 2, 3})
+	writer := bytes.NewBuffer(make([]byte, 0, 128))
+	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}}
+	session := NewSession(rwc)
+	auth := &alwaysPassAuthorizer{}
+	to := 0 * time.Second
+	succ, err := session.WaitAuth(auth, to)
+	if !succ {
+		t.Errorf("Should pass but not, %v", err)
+	}
 }

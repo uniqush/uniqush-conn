@@ -260,7 +260,7 @@ func getString(buf []byte) (str string, newbuf []byte) {
 
 	str = string(buf[:stop])
 
-	newbuf = buf[stop:]
+	newbuf = buf[stop + 1:]
 	return
 }
 
