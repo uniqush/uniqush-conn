@@ -21,3 +21,6 @@ type Payload struct {
 	Header map[string]string
 	Body   []byte
 }
+
+type Presentation struct {
+}

@@ -33,6 +33,10 @@ const (
 )
 
 const (
+	maxPayloadSize = 65536
+)
+
+const (
 	sessionState_UNAUTH = iota
 	sessionState_AUTHED
 	sessionState_DISCON
@@ -116,26 +120,60 @@ func (self *Session) readRecord() (rec *sessionRecord, err error) {
 }
 
 func (self *Session) writeRecord(rec *sessionRecord) error {
-	var err error
 	self.writeLock.Lock()
 	defer self.writeLock.Unlock()
-	err = binary.Write(self.transport, binary.LittleEndian, rec.contentType)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(self.transport, binary.LittleEndian, rec.version)
-	if err != nil {
-		return err
-	}
-	var length uint16
-	length = uint16(len(rec.buf))
-	err = binary.Write(self.transport, binary.LittleEndian, length)
-	if err != nil {
-		return err
+
+	var err error
+
+	// This is a simply control message, no data
+	if len(rec.buf) == 0 {
+		err = binary.Write(self.transport, binary.LittleEndian, rec.contentType)
+		if err != nil {
+			return err
+		}
+		err = binary.Write(self.transport, binary.LittleEndian, rec.version)
+		if err != nil {
+			return err
+		}
+		var length uint16
+		length = 0
+		err = binary.Write(self.transport, binary.LittleEndian, length)
+		if err != nil {
+			return err
+		}
 	}
 
-	_, err = self.transport.Write(rec.buf)
-	return err
+	// Handle the case if the record length is too long.
+	// If so, it will write multiply records.
+	buf := rec.buf
+	for len(buf) > 0 {
+		err = binary.Write(self.transport, binary.LittleEndian, rec.contentType)
+		if err != nil {
+			return err
+		}
+		err = binary.Write(self.transport, binary.LittleEndian, rec.version)
+		if err != nil {
+			return err
+		}
+		var length uint16
+
+		data := buf
+		if len(buf) > maxPayloadSize {
+			data = buf[:maxPayloadSize]
+		}
+		length = uint16(len(data))
+		err = binary.Write(self.transport, binary.LittleEndian, length)
+		if err != nil {
+			return err
+		}
+		_, err = self.transport.Write(data)
+		if err != nil {
+			return err
+		}
+		buf = buf[int(length):]
+	}
+
+	return nil
 }
 
 // Write() writes the buf to the transport layer.
@@ -217,7 +255,6 @@ func (self *Session) recvLoop() {
 		switch rec.contentType {
 		case sessionContent_APPDATA:
 			buf := rec.buf
-
 			for len(buf) > 0 {
 				n, err := self.buf.Write(buf)
 
@@ -230,7 +267,6 @@ func (self *Session) recvLoop() {
 				if err == streambuf.ErrFull {
 					self.buf.WaitForSpace(len(buf))
 				}
-
 			}
 		}
 	}
