@@ -23,7 +23,6 @@ import (
 	"errors"
 	"io"
 	"testing"
-	"time"
 	"encoding/binary"
 	"io/ioutil"
 )
@@ -101,8 +100,7 @@ func testAuth(pass bool) error {
 	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}, closed: false}
 	session := NewSession(rwc)
 	auth := newFakeAuthorizer(pass)
-	to := 0 * time.Second
-	succ, err := session.WaitAuth(auth, to)
+	succ, err := session.WaitAuth(auth)
 	if succ != pass {
 		return err
 	}

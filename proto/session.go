@@ -24,7 +24,6 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
-	"time"
 	"github.com/uniqush/uniqush-conn/streambuf"
 )
 
@@ -33,6 +32,7 @@ const (
 )
 
 const (
+	// 2 ^ 16. In case of overflow.
 	maxPayloadSize = 65536
 )
 
@@ -303,7 +303,7 @@ func getString(buf []byte) (str string, newbuf []byte) {
 // This method should always be called before Read and Write.
 // If it returns true, nil, then it means the session now is authorized and ecrypted using
 // the new key. Otherwise, any call on Read or Write will return ErrUnauth error.
-func (self *Session) WaitAuth(auth Authorizer, timeOut time.Duration) (succ bool, err error) {
+func (self *Session) WaitAuth(auth Authorizer) (succ bool, err error) {
 	var rec *sessionRecord
 	err = nil
 	succ = false
