@@ -18,13 +18,16 @@
 package proto
 
 import (
-	"crypto/sha1"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"github.com/uniqush/uniqush-conn/streambuf"
 	"io"
 	"sync"
+	"fmt"
 	"sync/atomic"
-	"github.com/uniqush/uniqush-conn/streambuf"
 )
 
 const (
@@ -37,13 +40,15 @@ const (
 )
 
 const (
-	sessionState_UNAUTH = iota
+	sessionState_INIT = iota
+	sessionState_UNAUTH
 	sessionState_AUTHED
 	sessionState_DISCON
 )
 
 const (
-	sessionContent_AUTHREQ = iota
+	sessionContent_EXCHKEY = iota
+	sessionContent_AUTHREQ
 	sessionContent_AUTHRES
 	sessionContent_APPDATA
 	sessionContent_CONTROL
@@ -72,6 +77,10 @@ type Session struct {
 	transport io.ReadWriteCloser
 	buf       *streambuf.StreamBuffer
 	writeLock *sync.Mutex
+	privKey   *rsa.PrivateKey
+
+	key []byte
+	macKey []byte
 }
 
 type sessionRecord struct {
@@ -80,15 +89,33 @@ type sessionRecord struct {
 	buf         []byte
 }
 
-func NewSession(transport io.ReadWriteCloser) *Session {
+func NewSession(transport io.ReadWriteCloser, privKey *rsa.PrivateKey) *Session {
 	ret := new(Session)
 	ret.transport = transport
-	ret.state = sessionState_UNAUTH
+	ret.state = sessionState_INIT
 
 	// The buffer will hold at most 8K bytes of data
 	ret.buf = streambuf.New(8192)
 	ret.writeLock = new(sync.Mutex)
+	ret.privKey = privKey
 	return ret
+}
+
+func (self *Session) readBytes() (data []byte, err error) {
+	data = nil
+	var length uint16
+	err = binary.Read(self.transport, binary.LittleEndian, &length)
+	if err != nil {
+		return
+	}
+	data = make([]byte, length)
+	_, err = io.ReadFull(self.transport, data)
+	if err != nil {
+		return
+	}
+	err = nil
+	return
+
 }
 
 func (self *Session) readRecord() (rec *sessionRecord, err error) {
@@ -296,14 +323,37 @@ func getString(buf []byte) (str string, newbuf []byte) {
 
 	str = string(buf[:stop])
 
-	newbuf = buf[stop + 1:]
+	newbuf = buf[stop+1:]
 	return
+}
+
+func (self *Session) keyExchange() error {
+	data, err := self.readBytes()
+	if err != nil {
+		return err
+	}
+	sha := sha256.New()
+	plainText, err := rsa.DecryptOAEP(sha, rand.Reader, self.privKey, data, nil)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%v", string(plainText))
+	return nil
 }
 
 // This method should always be called before Read and Write.
 // If it returns true, nil, then it means the session now is authorized and ecrypted using
 // the new key. Otherwise, any call on Read or Write will return ErrUnauth error.
 func (self *Session) WaitAuth(auth Authorizer) (succ bool, err error) {
+	succ = false
+	err = self.keyExchange()
+	if err != nil {
+		return
+	}
+	succ = true
+	return
+	/*
 	var rec *sessionRecord
 	err = nil
 	succ = false
@@ -358,7 +408,7 @@ func (self *Session) WaitAuth(auth Authorizer) (succ bool, err error) {
 	res.contentType = sessionContent_AUTHRES
 	res.version = PROTOCOL_VERSION
 
-	hash := sha1.New()
+	hash := sha256.New()
 	hash.Write(rec.buf)
 	res.buf = hash.Sum(res.buf)
 
@@ -369,4 +419,5 @@ func (self *Session) WaitAuth(auth Authorizer) (succ bool, err error) {
 
 	go self.recvLoop()
 	return
+	*/
 }

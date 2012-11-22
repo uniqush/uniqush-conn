@@ -25,6 +25,7 @@ import (
 	"testing"
 	"encoding/binary"
 	"io/ioutil"
+	"fmt"
 )
 
 func getAuthReqData(name, token string, key []byte) (io.Reader, []byte) {
@@ -96,6 +97,7 @@ func (self *rwcCombo) Close() error {
 
 func testAuth(pass bool) error {
 	reader, data := getAuthReqData("hello", "world", []byte{1, 2, 3})
+	fmt.Printf("%v\n", data)
 	writer := bytes.NewBuffer(make([]byte, 0, 128))
 	rwc := &rwcCombo{reader: reader, writer: writer, closer: &nopCloser{}, closed: false}
 	session := NewSession(rwc)
