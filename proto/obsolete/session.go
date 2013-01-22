@@ -333,12 +333,13 @@ func (self *Session) keyExchange() error {
 		return err
 	}
 	sha := sha256.New()
-	plainText, err := rsa.DecryptOAEP(sha, rand.Reader, self.privKey, data, nil)
+	keys, err := rsa.DecryptOAEP(sha, rand.Reader, self.privKey, data, nil)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("%v", string(plainText))
+	fmt.Printf("%v\n", keys)
+	self.state = sessionState_UNAUTH
 	return nil
 }
 

@@ -42,7 +42,8 @@ type StreamBuffer struct {
 	dataCondLock  *sync.Mutex
 }
 
-// Return a new empty stream buffer
+// Return a new empty stream buffer.
+//
 // capacity: the capacity of the buffer.
 // <= 0 means unlimited.
 func New(capacity int) *StreamBuffer {
@@ -92,6 +93,7 @@ func (self *StreamBuffer) WaitForData() {
 }
 
 // Write() implementation.
+//
 // NOTE: buf will be *directly* stored to the buffer, not a copy
 // of it, meaning changing buf else where will change the content
 // of the list buffer.
@@ -125,7 +127,7 @@ func (self *StreamBuffer) Write(buf []byte) (n int, err error) {
 
 // Read() implementation.
 //
-// If the StreamBuffer is empty, Read() returns io.EOF
+// If the StreamBuffer is empty, Read() returns io.EOF.
 func (self *StreamBuffer) Read(buf []byte) (n int, err error) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
@@ -164,7 +166,7 @@ func (self *StreamBuffer) Read(buf []byte) (n int, err error) {
 	return
 }
 
-// Returns the size of the data inside the buffer
+// Returns the size of the data inside the buffer.
 func (self *StreamBuffer) Size() int {
 	self.lock.Lock()
 	defer self.lock.Unlock()
