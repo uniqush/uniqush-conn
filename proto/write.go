@@ -18,17 +18,22 @@
 package proto
 
 import (
-	"net"
+	"io"
 )
 
-
-func Dial(conn net.Conn) (ret net.Conn, err error) {
-	buf := make([]byte, 256)
-	err = writen(conn, buf)
-	if err != nil {
-		return
+func writen(w io.Writer, buf []byte) error {
+	n := len(buf)
+	for n >= 0 {
+		l, err := w.Write(buf)
+		if err != nil {
+			return err
+		}
+		if l >= n {
+			return nil
+		}
+		n -= l
+		buf = buf[l:]
 	}
-	ret = conn
-	return
+	return nil
 }
 
