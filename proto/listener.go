@@ -18,6 +18,7 @@
 package proto
 
 import (
+	"fmt"
 	"net"
 	"io"
 	"errors"
@@ -30,9 +31,9 @@ var ErrBadKeyExchangePacket = errors.New("Bad Key-exchange Packet")
 
 type authResult struct {
 	sessionKey []byte
-	mackey []byte
+	macKey []byte
 	err error
-	c net.Conn
+	conn net.Conn
 }
 
 type Authenticator interface {
@@ -63,15 +64,16 @@ func (self *serverListener) Close() error {
 	return err
 }
 
-func (self *serverListener) auth(conn net.Conn) *authResult {
-	// Since we are using RSA-OAEP encryption,
-	// there are 256 bytes for each block
-	keyExPktLen := 256
+func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
+	// Message length of the first packet.
+	// Since the first packet is encrypted by RSA,
+	// its length is same as the public key's length.
+	keyExPktLen := self.privKey.PublicKey.N.BitLen() / 8
 	keyExPkt := make([]byte, keyExPktLen)
 	ret := new(authResult)
 
 	// Let's first read the keys.
-	n, err := io.ReadFull(c, keyExPkt)
+	n, err := io.ReadFull(conn, keyExPkt)
 
 	if err != nil {
 		ret.err = err
@@ -88,6 +90,7 @@ func (self *serverListener) auth(conn net.Conn) *authResult {
 	// and should be hardly compressed.
 	sha := sha256.New()
 	keyData, err := rsa.DecryptOAEP(sha, rand.Reader, self.privKey, keyExPkt, nil)
+	fmt.Printf("Message received: %v\n", keyData)
 
 	if err != nil {
 		ret.err = err
@@ -103,9 +106,9 @@ func (self *serverListener) auth(conn net.Conn) *authResult {
 	// - session key.
 	// - mac key.
 	// - random data used to authenticate the server's identity.
-	//
-
 	randomData := keyData[sessionKeyLen + macKeyLen:]
+
+	fmt.Printf("salt: len= %v; %v\n", len(randomData), randomData)
 
 	// We send back the random data to prove the identity
 	err = writen(conn, randomData)
@@ -118,7 +121,7 @@ func (self *serverListener) auth(conn net.Conn) *authResult {
 	ret.sessionKey = make([]byte, sessionKeyLen)
 	ret.macKey = make([]byte, macKeyLen)
 	copy(ret.sessionKey, keyData)
-	copy(ret.macKey, keyData[sessionKeyLen:]
+	copy(ret.macKey, keyData[sessionKeyLen:])
 
 	// TODO username/password auth
 	ret.conn = conn
@@ -131,7 +134,7 @@ func (self *serverListener) Accept() (conn net.Conn, err error) {
 		return
 	}
 
-	res := self.auth(c)
+	res := self.serverAuthenticate(c)
 
 	if res.err != nil {
 		err = res.err
