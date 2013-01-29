@@ -23,15 +23,20 @@ import (
 	"crypto/sha256"
 	"crypto/rsa"
 	"crypto/rand"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
 	"io"
 	"errors"
 )
 
 var ErrZeroEntropy = errors.New("Need more random number")
 var ErrBadServer = errors.New("Unkown Server")
+var ErrCorruptedData = errors.New("Corrupted Data")
 
 func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, username, token string) error {
-	dataLen := 96
+	// This makes 1024 bit pub key impossible.
+	dataLen := 128
 	data := make([]byte, dataLen)
 	n, err := io.ReadFull(rand.Reader, data)
 	if err != nil {
@@ -55,16 +60,42 @@ func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, username, token st
 	// Wait the server.
 	// It should be able to decrypt the message and send back the
 	// random salt.
-	salt := make([]byte, len(data) - sessionKeyLen - macKeyLen)
-	n, err = io.ReadFull(conn, salt)
+	saltLen := len(data) - sessionKeyLen - macKeyLen - ivLen
+	cipherText := make([]byte, saltLen + hmacLen)
+	n, err = io.ReadFull(conn, cipherText)
 	if err != nil {
 		return err
 	}
-	if n != len(salt) {
+	if n != len(cipherText) {
 		return ErrBadServer
 	}
+	sessionKey := data[:sessionKeyLen]
+	macKey := data[sessionKeyLen:sessionKeyLen + macKeyLen]
+	iv := data[sessionKeyLen + macKeyLen:sessionKeyLen + macKeyLen + ivLen]
+	block, err := aes.NewCipher(sessionKey)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("block size: %v\n", block.BlockSize())
+	stream := cipher.NewCTR(block, iv)
+	mac := hmac.New(sha256.New, macKey)
+	err = writen(mac, cipherText[hmacLen:])
+	if err != nil {
+		return err
+	}
+	hmacSum := mac.Sum(nil)
+	mac.Reset()
+	for i, b := range hmacSum {
+		if b != cipherText[i] {
+			return ErrCorruptedData
+		}
+	}
+
+	salt := cipherText[hmacLen:]
+	stream.XORKeyStream(salt, salt)
 	fmt.Printf("salt: len = %v; %v\n", len(salt), salt)
-	for i, b := range data[sessionKeyLen + macKeyLen:] {
+
+	for i, b := range data[sessionKeyLen + macKeyLen + ivLen:] {
 		if b != salt[i] {
 			return ErrBadServer
 		}

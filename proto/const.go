@@ -20,5 +20,7 @@ package proto
 const (
 	sessionKeyLen int = 32
 	macKeyLen int = 32
+	ivLen int = 16
+	hmacLen int = 32
 )
 

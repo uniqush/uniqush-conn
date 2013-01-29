@@ -25,6 +25,9 @@ import (
 	"crypto/sha256"
 	"crypto/rsa"
 	"crypto/rand"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
 )
 
 var ErrBadKeyExchangePacket = errors.New("Bad Key-exchange Packet")
@@ -100,18 +103,45 @@ func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
 		ret.err = ErrBadKeyExchangePacket
 	}
 
+	sessionKey := make([]byte, sessionKeyLen)
+	macKey := make([]byte, macKeyLen)
+	iv := make([]byte, ivLen)
+
 	// The client send the first packet
 	// with the following fields (in sequence):
 	//
 	// - session key.
 	// - mac key.
+	// - IV.
 	// - random data used to authenticate the server's identity.
-	randomData := keyData[sessionKeyLen + macKeyLen:]
+	randomData := keyData[sessionKeyLen + macKeyLen + ivLen:]
+	copy(sessionKey, keyData)
+	copy(macKey, keyData[sessionKeyLen:])
+	copy(iv, keyData[sessionKeyLen + macKeyLen:])
+
 
 	fmt.Printf("salt: len= %v; %v\n", len(randomData), randomData)
 
+	block, err := aes.NewCipher(sessionKey)
+	if err != nil {
+		ret.err = err
+		return ret
+	}
+	stream := cipher.NewCTR(block, iv)
+	cipherText := make([]byte, len(randomData) + hmacLen)
+	stream.XORKeyStream(cipherText[hmacLen:], randomData)
+	mac := hmac.New(sha256.New, macKey)
+	err = writen(mac, cipherText[hmacLen:])
+	if err != nil {
+		ret.err = err
+		return ret
+	}
+	hmacSum := mac.Sum(nil)
+	copy(cipherText[:hmacLen], hmacSum)
+	mac.Reset()
+
 	// We send back the random data to prove the identity
-	err = writen(conn, randomData)
+	err = writen(conn, cipherText)
 	if err != nil {
 		ret.err = err
 		return ret
