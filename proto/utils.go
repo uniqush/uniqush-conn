@@ -23,6 +23,7 @@ import (
 	"hash"
 	"crypto/sha256"
 	"errors"
+	"io"
 )
 
 var ErrZeroEntropy = errors.New("Need more random number")
@@ -199,5 +200,21 @@ func bytesEq(a, b []byte) bool {
 		}
 	}
 	return true
+}
+
+func writen(w io.Writer, buf []byte) error {
+	n := len(buf)
+	for n >= 0 {
+		l, err := w.Write(buf)
+		if err != nil {
+			return err
+		}
+		if l >= n {
+			return nil
+		}
+		n -= l
+		buf = buf[l:]
+	}
+	return nil
 }
 
