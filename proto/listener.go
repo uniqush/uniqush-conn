@@ -103,7 +103,7 @@ func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
 	siglen := (self.privKey.N.BitLen() + 7) / 8
 	keyExPkt := make([]byte, dhPubkeyLen + siglen + nonceLen)
 	copy(keyExPkt, mypub)
-	copy(keyExPkt, sig)
+	copy(keyExPkt[dhPubkeyLen:], sig)
 	nonce := keyExPkt[dhPubkeyLen + siglen:]
 	n, err = io.ReadFull(rand.Reader, nonce)
 	if err != nil || n != len(nonce) {
