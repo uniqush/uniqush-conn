@@ -18,26 +18,15 @@
 package proto
 
 import (
-	"fmt"
 	"net"
 	"io"
-	"errors"
 	"crypto/sha256"
 	"crypto/rsa"
 	"crypto/rand"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/hmac"
+	"crypto"
+	pss "github.com/monnand/rsa"
+	"github.com/monnand/dhkx"
 )
-
-var ErrBadKeyExchangePacket = errors.New("Bad Key-exchange Packet")
-
-type authResult struct {
-	sessionKey []byte
-	macKey []byte
-	err error
-	conn net.Conn
-}
 
 type Authenticator interface {
 	Authenticate(usr, token string) (bool, error)
@@ -67,17 +56,77 @@ func (self *serverListener) Close() error {
 	return err
 }
 
+// The authentication here is quite similar with, if not same as, tarsnap's auth algorithm.
+//
+// First, server generate a Diffie-Hellman public key, dhpub1, sign it with 
+// server's private key using RSASSA-PSS signing algorithm.
+// Send dhpub1, its signature and a nonce to client.
+// An nonce is just a sequence of random bytes.
+//
+// Server -- dhpub1 + sign(dhpub1) + nonce --> Client
+//
+// Then client generate its own Diffie-Hellman key. It now can calculate
+// a key, K, using its own Diffie-Hellman key and server's DH public key.
+// (According to DH key exchange algorithm)
+//
+// Now, we can use K to derive any key we need on server and client side.
+// master key, mkey = MGF1(nonce || K, 48)
+//
+//
 func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
-	// Message length of the first packet.
-	// Since the first packet is encrypted by RSA,
-	// its length is same as the public key's length.
-	keyExPktLen := self.privKey.PublicKey.N.BitLen() / 8
-	keyExPkt := make([]byte, keyExPktLen)
 	ret := new(authResult)
 
-	// Let's first read the keys.
-	n, err := io.ReadFull(conn, keyExPkt)
+	group, _ := dhkx.GetGroup(dhGroupID)
+	priv, _ := group.GeneratePrivateKey(nil)
 
+	mypub := priv.Bytes()
+	mypub = leftPaddingZero(mypub, dhPubkeyLen)
+
+	salt := make([]byte, pssSaltLen)
+	n, err := io.ReadFull(rand.Reader, salt)
+	if err != nil || n != len(salt) {
+		ret.err = ErrZeroEntropy
+		return ret
+	}
+
+	sha := sha256.New()
+	hashed := make([]byte, sha.Size())
+	sha.Write(mypub)
+	hashed = sha.Sum(hashed[:0])
+
+	sig, err := pss.SignPSS(rand.Reader, self.privKey, crypto.SHA256, hashed, salt)
+	if err != nil {
+		ret.err = err
+		return ret
+	}
+
+	siglen := (self.privKey.N.BitLen() + 7) / 8
+	keyExPkt := make([]byte, dhPubkeyLen + siglen + nonceLen)
+	copy(keyExPkt, mypub)
+	copy(keyExPkt, sig)
+	nonce := keyExPkt[dhPubkeyLen + siglen:]
+	n, err = io.ReadFull(rand.Reader, nonce)
+	if err != nil || n != len(nonce) {
+		ret.err = ErrZeroEntropy
+		return ret
+	}
+
+	// Send to client:
+	// - DH public key: g ^ x
+	// - Signature of DH public key RSASSA-PSS(g ^ x)
+	// - nonce
+	ret.err = writen(conn, keyExPkt)
+	if ret.err != nil {
+		return ret
+	}
+
+	// Receive from client:
+	// - Client's DH public key: g ^ y
+	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
+	keyExPkt = keyExPkt[:dhPubkeyLen + authKeyLen]
+
+	// Receive the data from client
+	n, err = io.ReadFull(conn, keyExPkt)
 	if err != nil {
 		ret.err = err
 		return ret
@@ -87,71 +136,28 @@ func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
 		return ret
 	}
 
-	// Now, let's decrypt it.
-	// This data is not compressed
-	// because they are basically random data
-	// and should be hardly compressed.
-	sha := sha256.New()
-	keyData, err := rsa.DecryptOAEP(sha, rand.Reader, self.privKey, keyExPkt, nil)
-	fmt.Printf("Message received: %v\n", keyData)
+	// First, recover client's DH public key
+	clientpub := dhkx.NewPublicKey(keyExPkt[:dhPubkeyLen])
 
-	if err != nil {
-		ret.err = err
-		return ret
-	}
-	if len(keyData) < sessionKeyLen + macKeyLen {
-		ret.err = ErrBadKeyExchangePacket
-	}
-
-	sessionKey := make([]byte, sessionKeyLen)
-	macKey := make([]byte, macKeyLen)
-	iv := make([]byte, ivLen)
-
-	// The client send the first packet
-	// with the following fields (in sequence):
-	//
-	// - session key.
-	// - mac key.
-	// - IV.
-	// - random data used to authenticate the server's identity.
-	randomData := keyData[sessionKeyLen + macKeyLen + ivLen:]
-	copy(sessionKey, keyData)
-	copy(macKey, keyData[sessionKeyLen:])
-	copy(iv, keyData[sessionKeyLen + macKeyLen:])
-
-
-	fmt.Printf("salt: len= %v; %v\n", len(randomData), randomData)
-
-	block, err := aes.NewCipher(sessionKey)
-	if err != nil {
-		ret.err = err
-		return ret
-	}
-	stream := cipher.NewCTR(block, iv)
-	cipherText := make([]byte, len(randomData) + hmacLen)
-	stream.XORKeyStream(cipherText[hmacLen:], randomData)
-	mac := hmac.New(sha256.New, macKey)
-	err = writen(mac, cipherText[hmacLen:])
-	if err != nil {
-		ret.err = err
-		return ret
-	}
-	hmacSum := mac.Sum(nil)
-	copy(cipherText[:hmacLen], hmacSum)
-	mac.Reset()
-
-	// We send back the random data to prove the identity
-	err = writen(conn, cipherText)
+	// Compute a shared key K.
+	K, err := group.ComputeKey(clientpub, priv)
 	if err != nil {
 		ret.err = err
 		return ret
 	}
 
-	// Now, it's time to copy the keys
-	ret.sessionKey = make([]byte, sessionKeyLen)
-	ret.macKey = make([]byte, macKeyLen)
-	copy(ret.sessionKey, keyData)
-	copy(ret.macKey, keyData[sessionKeyLen:])
+	// Generate keys from the shared key
+	ret.ks, err = generateKeys(K.Bytes(), nonce)
+	if err != nil {
+		ret.err = err
+		return ret
+	}
+
+	// Check client's hmac
+	ret.err = ret.ks.checkClientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	if ret.err != nil {
+		return ret
+	}
 
 	// TODO username/password auth
 	ret.conn = conn

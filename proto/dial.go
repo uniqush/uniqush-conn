@@ -18,94 +18,89 @@
 package proto
 
 import (
-	"fmt"
 	"net"
 	"crypto/sha256"
 	"crypto/rsa"
-	"crypto/rand"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/hmac"
+	"crypto"
 	"io"
-	"errors"
+	pss "github.com/monnand/rsa"
+	"github.com/monnand/dhkx"
 )
 
-var ErrZeroEntropy = errors.New("Need more random number")
-var ErrBadServer = errors.New("Unkown Server")
-var ErrCorruptedData = errors.New("Corrupted Data")
+func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, username, token string) *authResult {
+	ret := new(authResult)
 
-func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, username, token string) error {
-	// This makes 1024 bit pub key impossible.
-	dataLen := 128
-	data := make([]byte, dataLen)
-	n, err := io.ReadFull(rand.Reader, data)
+	// Generate a DH key
+	group, _ := dhkx.GetGroup(dhGroupID)
+	priv, _ := group.GeneratePrivateKey(nil)
+	mypub := leftPaddingZero(priv.Bytes(), dhPubkeyLen)
+
+	// Receive the data from server, which contains:
+	// - Server's DH public key: g ^ x
+	// - Signature of server's DH public key RSASSA-PSS(g ^ x)
+	// - nonce
+	siglen := (pubKey.N.BitLen() + 7) / 8
+	keyExPkt := make([]byte, dhPubkeyLen + siglen + nonceLen)
+	n, err := io.ReadFull(conn, keyExPkt)
 	if err != nil {
-		return err
+		ret.err = err
+		return ret
 	}
-	if n != len(data) && n > sessionKeyLen + macKeyLen {
-		data = data[:n]
+	if n != len(keyExPkt) {
+		ret.err = ErrBadKeyExchangePacket
+		return ret
 	}
-	if n != len(data) {
-		return ErrZeroEntropy
-	}
+
+	serverPubData := keyExPkt[:dhPubkeyLen]
+	signature := keyExPkt[dhPubkeyLen:dhPubkeyLen + siglen]
+	nonce := keyExPkt[dhPubkeyLen + siglen:]
+
 	sha := sha256.New()
+	hashed := make([]byte, sha.Size())
+	sha.Write(serverPubData)
+	hashed = sha.Sum(hashed[:0])
 
-	fmt.Printf("Message sent: %v\n", data)
-	out, err := rsa.EncryptOAEP(sha, rand.Reader, pubKey, data, nil)
-	if err != nil {
-		return err
-	}
-	writen(conn, out)
+	// Verify the signature
+	err = pss.VerifyPSS(pubKey, crypto.SHA256, hashed, signature, pssSaltLen)
 
-	// Wait the server.
-	// It should be able to decrypt the message and send back the
-	// random salt.
-	saltLen := len(data) - sessionKeyLen - macKeyLen - ivLen
-	cipherText := make([]byte, saltLen + hmacLen)
-	n, err = io.ReadFull(conn, cipherText)
 	if err != nil {
-		return err
-	}
-	if n != len(cipherText) {
-		return ErrBadServer
-	}
-	sessionKey := data[:sessionKeyLen]
-	macKey := data[sessionKeyLen:sessionKeyLen + macKeyLen]
-	iv := data[sessionKeyLen + macKeyLen:sessionKeyLen + macKeyLen + ivLen]
-	block, err := aes.NewCipher(sessionKey)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("block size: %v\n", block.BlockSize())
-	stream := cipher.NewCTR(block, iv)
-	mac := hmac.New(sha256.New, macKey)
-	err = writen(mac, cipherText[hmacLen:])
-	if err != nil {
-		return err
-	}
-	hmacSum := mac.Sum(nil)
-	mac.Reset()
-	for i, b := range hmacSum {
-		if b != cipherText[i] {
-			return ErrCorruptedData
-		}
+		ret.err = err
+		return ret
 	}
 
-	salt := cipherText[hmacLen:]
-	stream.XORKeyStream(salt, salt)
-	fmt.Printf("salt: len = %v; %v\n", len(salt), salt)
-
-	for i, b := range data[sessionKeyLen + macKeyLen + ivLen:] {
-		if b != salt[i] {
-			return ErrBadServer
-		}
+	// Generate the shared key from server's DH public key and client DH private key
+	serverpub := dhkx.NewPublicKey(serverPubData)
+	K, err := group.ComputeKey(serverpub, priv)
+	if err != nil {
+		ret.err = err
+		return ret
 	}
-	return nil
+
+	ret.ks, ret.err = generateKeys(K.Bytes(), nonce)
+	if ret.err != nil {
+		return ret
+	}
+
+	keyExPkt = keyExPkt[:dhPubkeyLen + authKeyLen]
+	copy(keyExPkt, mypub)
+	ret.err = ret.ks.clientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	if ret.err != nil {
+		return ret
+	}
+
+	// Send the client message to server, which contains:
+	// - Client's DH public key: g ^ y
+	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
+	ret.err = writen(conn, keyExPkt)
+
+	ret.conn = conn
+	return ret
 }
 
 func Dial(conn net.Conn, pubKey *rsa.PublicKey, username, token string) (ret net.Conn, err error) {
-	err = clientAuthenticate(conn, pubKey, username, token)
-	if err != nil {
+	auth := clientAuthenticate(conn, pubKey, username, token)
+	if auth.err != nil {
+		err = auth.err
 		return
 	}
 	ret = conn
