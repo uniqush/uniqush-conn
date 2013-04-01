@@ -27,7 +27,7 @@ import (
 	"github.com/monnand/dhkx"
 )
 
-func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, username, token string) *authResult {
+func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) *authResult {
 	ret := new(authResult)
 
 	// Generate a DH key
@@ -97,8 +97,8 @@ func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, username, token st
 	return ret
 }
 
-func Dial(conn net.Conn, pubKey *rsa.PublicKey, username, token string) (ret net.Conn, err error) {
-	auth := clientAuthenticate(conn, pubKey, username, token)
+func Dial(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) (ret net.Conn, err error) {
+	auth := clientAuthenticate(conn, pubKey, service, username, token)
 	if auth.err != nil {
 		err = auth.err
 		return

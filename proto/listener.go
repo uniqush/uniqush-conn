@@ -29,31 +29,7 @@ import (
 )
 
 type Authenticator interface {
-	Authenticate(usr, token string) (bool, error)
-}
-
-type serverListener struct {
-	listener net.Listener
-	auth Authenticator
-	privKey *rsa.PrivateKey
-}
-
-func Listen(listener net.Listener, auth Authenticator, privKey *rsa.PrivateKey) (l net.Listener, err error) {
-	ret := new(serverListener)
-	ret.listener = listener
-	ret.auth = auth
-	ret.privKey = privKey
-	l = ret
-	return
-}
-
-func (self *serverListener) Addr() net.Addr {
-	return self.listener.Addr()
-}
-
-func (self *serverListener) Close() error {
-	err := self.listener.Close()
-	return err
+	Authenticate(srv, usr, token string) (bool, error)
 }
 
 // The authentication here is quite similar with, if not same as, tarsnap's auth algorithm.
@@ -73,7 +49,7 @@ func (self *serverListener) Close() error {
 // master key, mkey = MGF1(nonce || K, 48)
 //
 //
-func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
+func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	ret := new(authResult)
 
 	group, _ := dhkx.GetGroup(dhGroupID)
@@ -94,13 +70,13 @@ func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
 	sha.Write(mypub)
 	hashed = sha.Sum(hashed[:0])
 
-	sig, err := pss.SignPSS(rand.Reader, self.privKey, crypto.SHA256, hashed, salt)
+	sig, err := pss.SignPSS(rand.Reader, privKey, crypto.SHA256, hashed, salt)
 	if err != nil {
 		ret.err = err
 		return ret
 	}
 
-	siglen := (self.privKey.N.BitLen() + 7) / 8
+	siglen := (privKey.N.BitLen() + 7) / 8
 	keyExPkt := make([]byte, dhPubkeyLen + siglen + nonceLen)
 	copy(keyExPkt, mypub)
 	copy(keyExPkt[dhPubkeyLen:], sig)
@@ -162,21 +138,5 @@ func (self *serverListener) serverAuthenticate(conn net.Conn) *authResult {
 	// TODO username/password auth
 	ret.conn = conn
 	return ret
-}
-
-func (self *serverListener) Accept() (conn net.Conn, err error) {
-	c, err := self.listener.Accept()
-	if err != nil {
-		return
-	}
-
-	res := self.serverAuthenticate(c)
-
-	if res.err != nil {
-		err = res.err
-		return
-	}
-	conn = res.conn
-	return
 }
 
