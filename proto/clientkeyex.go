@@ -25,7 +25,6 @@ import (
 	"io"
 	pss "github.com/monnand/rsa"
 	"github.com/monnand/dhkx"
-	. "github.com/uniqush/proto"
 )
 
 func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) *authResult {
