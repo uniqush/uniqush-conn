@@ -18,13 +18,12 @@
 package proto
 
 const (
-	encrKeyLen int = 32
-	authKeyLen int = 32
-	ivLen int = 16
-	hmacLen int = 32
-	pssSaltLen int = 32
-	dhGroupID int = 0
+	encrKeyLen  int = 32
+	authKeyLen  int = 32
+	ivLen       int = 16
+	hmacLen     int = 32
+	pssSaltLen  int = 32
+	dhGroupID   int = 0
 	dhPubkeyLen int = 256
-	nonceLen int = 32
+	nonceLen    int = 32
 )
-

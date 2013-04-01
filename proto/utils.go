@@ -18,12 +18,12 @@
 package proto
 
 import (
-	"net"
 	"crypto/hmac"
-	"hash"
 	"crypto/sha256"
 	"errors"
+	"hash"
 	"io"
+	"net"
 )
 
 var ErrZeroEntropy = errors.New("Need more random number")
@@ -100,8 +100,8 @@ func (self *keySet) checkClientHMAC(data, mac []byte) error {
 }
 
 type authResult struct {
-	ks *keySet
-	err error
+	ks   *keySet
+	err  error
 	conn net.Conn
 }
 
@@ -175,7 +175,7 @@ func leftPaddingZero(data []byte, l int) []byte {
 	if len(data) >= l {
 		return data
 	}
-	ret := make([]byte, l - len(data), l)
+	ret := make([]byte, l-len(data), l)
 	ret = append(ret, data...)
 	return ret
 }
@@ -217,4 +217,3 @@ func writen(w io.Writer, buf []byte) error {
 	}
 	return nil
 }
-

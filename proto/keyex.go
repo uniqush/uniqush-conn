@@ -18,14 +18,14 @@
 package proto
 
 import (
-	"net"
-	"io"
-	"crypto/sha256"
-	"crypto/rsa"
-	"crypto/rand"
 	"crypto"
-	pss "github.com/monnand/rsa"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
 	"github.com/monnand/dhkx"
+	pss "github.com/monnand/rsa"
+	"io"
+	"net"
 )
 
 type Authenticator interface {
@@ -34,7 +34,7 @@ type Authenticator interface {
 
 // The authentication here is quite similar with, if not same as, tarsnap's auth algorithm.
 //
-// First, server generate a Diffie-Hellman public key, dhpub1, sign it with 
+// First, server generate a Diffie-Hellman public key, dhpub1, sign it with
 // server's private key using RSASSA-PSS signing algorithm.
 // Send dhpub1, its signature and a nonce to client.
 // An nonce is just a sequence of random bytes.
@@ -77,10 +77,10 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	}
 
 	siglen := (privKey.N.BitLen() + 7) / 8
-	keyExPkt := make([]byte, dhPubkeyLen + siglen + nonceLen)
+	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen)
 	copy(keyExPkt, mypub)
 	copy(keyExPkt[dhPubkeyLen:], sig)
-	nonce := keyExPkt[dhPubkeyLen + siglen:]
+	nonce := keyExPkt[dhPubkeyLen+siglen:]
 	n, err = io.ReadFull(rand.Reader, nonce)
 	if err != nil || n != len(nonce) {
 		ret.err = ErrZeroEntropy
@@ -99,7 +99,7 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	// Receive from client:
 	// - Client's DH public key: g ^ y
 	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
-	keyExPkt = keyExPkt[:dhPubkeyLen + authKeyLen]
+	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen]
 
 	// Receive the data from client
 	n, err = io.ReadFull(conn, keyExPkt)
@@ -139,4 +139,3 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	ret.conn = conn
 	return ret
 }
-

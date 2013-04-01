@@ -18,13 +18,13 @@
 package proto
 
 import (
-	"net"
-	"crypto/sha256"
-	"crypto/rsa"
 	"crypto"
-	"io"
-	pss "github.com/monnand/rsa"
+	"crypto/rsa"
+	"crypto/sha256"
 	"github.com/monnand/dhkx"
+	pss "github.com/monnand/rsa"
+	"io"
+	"net"
 )
 
 func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) *authResult {
@@ -40,7 +40,7 @@ func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, 
 	// - Signature of server's DH public key RSASSA-PSS(g ^ x)
 	// - nonce
 	siglen := (pubKey.N.BitLen() + 7) / 8
-	keyExPkt := make([]byte, dhPubkeyLen + siglen + nonceLen)
+	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen)
 	n, err := io.ReadFull(conn, keyExPkt)
 	if err != nil {
 		ret.err = err
@@ -52,8 +52,8 @@ func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, 
 	}
 
 	serverPubData := keyExPkt[:dhPubkeyLen]
-	signature := keyExPkt[dhPubkeyLen:dhPubkeyLen + siglen]
-	nonce := keyExPkt[dhPubkeyLen + siglen:]
+	signature := keyExPkt[dhPubkeyLen : dhPubkeyLen+siglen]
+	nonce := keyExPkt[dhPubkeyLen+siglen:]
 
 	sha := sha256.New()
 	hashed := make([]byte, sha.Size())
@@ -81,7 +81,7 @@ func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, 
 		return ret
 	}
 
-	keyExPkt = keyExPkt[:dhPubkeyLen + authKeyLen]
+	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen]
 	copy(keyExPkt, mypub)
 	ret.err = ret.ks.clientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
 	if ret.err != nil {
@@ -96,4 +96,3 @@ func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, 
 	ret.conn = conn
 	return ret
 }
-
