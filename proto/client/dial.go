@@ -25,9 +25,10 @@ import (
 	"io"
 	pss "github.com/monnand/rsa"
 	"github.com/monnand/dhkx"
+	. "github.com/uniqush/proto"
 )
 
-func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) *authResult {
+func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) *authResult {
 	ret := new(authResult)
 
 	// Generate a DH key
@@ -95,15 +96,5 @@ func clientAuthenticate(conn net.Conn, pubKey *rsa.PublicKey, service, username,
 
 	ret.conn = conn
 	return ret
-}
-
-func Dial(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) (ret net.Conn, err error) {
-	auth := clientAuthenticate(conn, pubKey, service, username, token)
-	if auth.err != nil {
-		err = auth.err
-		return
-	}
-	ret = conn
-	return
 }
 
