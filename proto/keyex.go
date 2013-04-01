@@ -47,8 +47,6 @@ type Authenticator interface {
 //
 // Now, we can use K to derive any key we need on server and client side.
 // master key, mkey = MGF1(nonce || K, 48)
-//
-//
 func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	ret := new(authResult)
 
