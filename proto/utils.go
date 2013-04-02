@@ -171,6 +171,12 @@ func generateKeys(k, nonce []byte) (ks *keySet, err error) {
 	return
 }
 
+func clearBytes(data []byte) {
+	for i, _ := range data {
+		data[i] = byte(0)
+	}
+}
+
 func leftPaddingZero(data []byte, l int) []byte {
 	if len(data) >= l {
 		return data

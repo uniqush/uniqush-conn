@@ -17,7 +17,7 @@
 
 package proto
 
-type Payload struct {
+type Message struct {
 	Type int ",omitempty"
 	Header map[string]string ",omitempty"
 	Body []byte ",omitempty"
@@ -26,6 +26,6 @@ type Payload struct {
 type command struct {
 	Cmd uint8
 	Params [][]byte ",omitempty"
-	Payload ",omitempty"
+	Message ",omitempty"
 }
 
