@@ -47,9 +47,7 @@ type Authenticator interface {
 //
 // Now, we can use K to derive any key we need on server and client side.
 // master key, mkey = MGF1(nonce || K, 48)
-func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
-	ret := new(authResult)
-
+func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err error) {
 	group, _ := dhkx.GetGroup(dhGroupID)
 	priv, _ := group.GeneratePrivateKey(nil)
 
@@ -59,8 +57,8 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	salt := make([]byte, pssSaltLen)
 	n, err := io.ReadFull(rand.Reader, salt)
 	if err != nil || n != len(salt) {
-		ret.err = ErrZeroEntropy
-		return ret
+		err = ErrZeroEntropy
+		return
 	}
 
 	sha := sha256.New()
@@ -70,8 +68,7 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 
 	sig, err := pss.SignPSS(rand.Reader, privKey, crypto.SHA256, hashed, salt)
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 
 	siglen := (privKey.N.BitLen() + 7) / 8
@@ -81,17 +78,17 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	nonce := keyExPkt[dhPubkeyLen+siglen:]
 	n, err = io.ReadFull(rand.Reader, nonce)
 	if err != nil || n != len(nonce) {
-		ret.err = ErrZeroEntropy
-		return ret
+		err = ErrZeroEntropy
+		return
 	}
 
 	// Send to client:
 	// - DH public key: g ^ x
 	// - Signature of DH public key RSASSA-PSS(g ^ x)
 	// - nonce
-	ret.err = writen(conn, keyExPkt)
-	if ret.err != nil {
-		return ret
+	err = writen(conn, keyExPkt)
+	if err != nil {
+		return
 	}
 
 	// Receive from client:
@@ -102,12 +99,11 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	// Receive the data from client
 	n, err = io.ReadFull(conn, keyExPkt)
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 	if n != len(keyExPkt) {
-		ret.err = ErrBadKeyExchangePacket
-		return ret
+		err = ErrBadKeyExchangePacket
+		return
 	}
 
 	// First, recover client's DH public key
@@ -116,24 +112,20 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) *authResult {
 	// Compute a shared key K.
 	K, err := group.ComputeKey(clientpub, priv)
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 
 	// Generate keys from the shared key
-	ret.ks, err = generateKeys(K.Bytes(), nonce)
+	ks, err = generateKeys(K.Bytes(), nonce)
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 
 	// Check client's hmac
-	ret.err = ret.ks.checkClientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
-	if ret.err != nil {
-		return ret
+	err = ks.checkClientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	if err != nil {
+		return
 	}
 
-	// TODO username/password auth
-	ret.conn = conn
-	return ret
+	return
 }
