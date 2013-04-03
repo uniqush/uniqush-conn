@@ -18,30 +18,30 @@
 package proto
 
 import (
-	"io"
-	"hash"
+	"code.google.com/p/snappy-go/snappy"
 	"crypto/aes"
+	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/sha256"
-	"crypto/cipher"
-	"code.google.com/p/snappy-go/snappy"
-	"labix.org/v2/mgo/bson"
 	"encoding/binary"
+	"hash"
+	"io"
+	"labix.org/v2/mgo/bson"
 )
 
 type commandIO struct {
-	writeAuth hash.Hash
+	writeAuth   hash.Hash
 	cryptWriter io.Writer
 
 	// we want to make
 	// compress-then-encrypt
 	// be the default configuration
-	noWriteEncrypt bool
+	noWriteEncrypt  bool
 	noWriteCompress bool
 
-	readAuth hash.Hash
-	cryptReader io.Reader
-	noReadEncrypt bool
+	readAuth       hash.Hash
+	cryptReader    io.Reader
+	noReadEncrypt  bool
 	noReadCompress bool
 
 	conn io.ReadWriter
@@ -52,7 +52,7 @@ func (self *commandIO) ReadCompressOn() {
 }
 
 func (self *commandIO) ReadEncryptOn() {
-	self.noReadEncrypt= false
+	self.noReadEncrypt = false
 }
 
 func (self *commandIO) ReadCompressOff() {
@@ -60,14 +60,14 @@ func (self *commandIO) ReadCompressOff() {
 }
 
 func (self *commandIO) ReadEncryptOff() {
-	self.noReadEncrypt= true
+	self.noReadEncrypt = true
 }
 
 func (self *commandIO) WriteCompressOn() {
 	self.noWriteCompress = false
 }
 func (self *commandIO) WriteEncryptOn() {
-	self.noWriteEncrypt= false
+	self.noWriteEncrypt = false
 }
 
 func (self *commandIO) WriteCompressOff() {
@@ -75,7 +75,7 @@ func (self *commandIO) WriteCompressOff() {
 }
 
 func (self *commandIO) WriteEncryptOff() {
-	self.noWriteEncrypt= true
+	self.noWriteEncrypt = true
 }
 
 func (self *commandIO) writeThenHmac(data []byte) (mac []byte, err error) {
@@ -169,7 +169,7 @@ func (self *commandIO) readEncodedMessage(data []byte) (cmd *command, err error)
 	return
 }
 
-func (self *commandIO) encodeCommand(cmd *command)(data []byte, err error) {
+func (self *commandIO) encodeCommand(cmd *command) (data []byte, err error) {
 	bsonEncoded, err := bson.Marshal(cmd)
 	if err != nil {
 		return
@@ -257,4 +257,3 @@ func newCommandIO(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn io.R
 	ret.cryptReader = sreader
 	return ret
 }
-
