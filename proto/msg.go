@@ -18,13 +18,12 @@
 package proto
 
 type Message struct {
-	Type   int               ",omitempty"
 	Header map[string]string ",omitempty"
 	Body   []byte            ",omitempty"
 }
 
 type command struct {
-	Cmd     uint8
+	Type    uint16   ",omitempty"
 	Params  [][]byte ",omitempty"
 	Message ",omitempty"
 }

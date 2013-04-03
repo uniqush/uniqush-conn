@@ -119,5 +119,3 @@ func generateKeys(k, nonce []byte) (ks *keySet, err error) {
 	ks = newKeySet(serverEncrKey, serverAuthKey, clientEncrKey, clientAuthKey)
 	return
 }
-
-
