@@ -22,8 +22,40 @@ type Message struct {
 	Body   []byte            ",omitempty"
 }
 
+func (a *Message) Eq(b *Message) bool {
+	if len(a.Header) != len(b.Header) {
+		return false
+	}
+	for k, v := range a.Header {
+		if bv, ok := b.Header[k]; ok {
+			if bv != v {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+	return bytesEq(a.Body, b. Body)
+}
+
 type command struct {
 	Type    uint16   ",omitempty"
 	Params  [][]byte ",omitempty"
 	Message ",omitempty"
 }
+
+func (self *command) eq(cmd *command) bool {
+	if self.Type != cmd.Type {
+		return false
+	}
+	if len(self.Params) != len(cmd.Params) {
+		return false
+	}
+	for i, p := range self.Params {
+		if !bytesEq(cmd.Params[i], p) {
+			return false
+		}
+	}
+	return self.Message.Eq(cmd.Message)
+}
+
