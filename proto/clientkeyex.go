@@ -27,9 +27,7 @@ import (
 	"net"
 )
 
-func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, token string) *authResult {
-	ret := new(authResult)
-
+func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey) (ks *keySet, err error) {
 	// Generate a DH key
 	group, _ := dhkx.GetGroup(dhGroupID)
 	priv, _ := group.GeneratePrivateKey(nil)
@@ -43,12 +41,11 @@ func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, 
 	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen)
 	n, err := io.ReadFull(conn, keyExPkt)
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 	if n != len(keyExPkt) {
-		ret.err = ErrBadKeyExchangePacket
-		return ret
+		err = ErrBadKeyExchangePacket
+		return
 	}
 
 	serverPubData := keyExPkt[:dhPubkeyLen]
@@ -64,35 +61,32 @@ func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey, service, username, 
 	err = pss.VerifyPSS(pubKey, crypto.SHA256, hashed, signature, pssSaltLen)
 
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 
 	// Generate the shared key from server's DH public key and client DH private key
 	serverpub := dhkx.NewPublicKey(serverPubData)
 	K, err := group.ComputeKey(serverpub, priv)
 	if err != nil {
-		ret.err = err
-		return ret
+		return
 	}
 
-	ret.ks, ret.err = generateKeys(K.Bytes(), nonce)
-	if ret.err != nil {
-		return ret
+	ks, err = generateKeys(K.Bytes(), nonce)
+	if err != nil {
+		return
 	}
 
 	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen]
 	copy(keyExPkt, mypub)
-	ret.err = ret.ks.clientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
-	if ret.err != nil {
-		return ret
+	err = ks.clientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	if err != nil {
+		return
 	}
 
 	// Send the client message to server, which contains:
 	// - Client's DH public key: g ^ y
 	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
-	ret.err = writen(conn, keyExPkt)
+	err = writen(conn, keyExPkt)
 
-	ret.conn = conn
-	return ret
+	return
 }
