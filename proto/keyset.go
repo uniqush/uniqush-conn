@@ -65,6 +65,16 @@ func (self *keySet) checkServerHMAC(data, mac []byte) error {
 	return nil
 }
 
+func (self *keySet) getClientCommandIO(conn io.ReadWriter) *commandIO {
+	ret := newCommandIO(self.clientEncrKey, self.clientAuthKey, self.serverEncrKey, self.serverAuthKey, conn)
+	return ret
+}
+
+func (self *keySet) getServerCommandIO(conn io.ReadWriter) *commandIO {
+	ret := newCommandIO(self.serverEncrKey, self.serverAuthKey, self.clientEncrKey, self.clientAuthKey, conn)
+	return ret
+}
+
 func (self *keySet) clientHMAC(data, mac []byte) error {
 	hash := hmac.New(sha256.New, self.clientAuthKey)
 	err := writen(hash, data)
