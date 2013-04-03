@@ -21,6 +21,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"io"
+	"fmt"
 )
 
 type keySet struct {
@@ -28,6 +29,26 @@ type keySet struct {
 	serverAuthKey []byte
 	clientEncrKey []byte
 	clientAuthKey []byte
+}
+
+func (self *keySet) String() string {
+	return fmt.Sprintf("serverEncr: %v; serverAuth: %v\nclientEncr: %v; clientAuth: %v", self.serverEncrKey, self.serverAuthKey, self.clientEncrKey, self.clientAuthKey)
+}
+
+func (self *keySet) eq(ks *keySet) bool {
+	if !bytesEq(self.serverEncrKey, ks.serverEncrKey) {
+		return false
+	}
+	if !bytesEq(self.serverAuthKey, ks.serverAuthKey) {
+		return false
+	}
+	if !bytesEq(self.clientEncrKey, ks.clientEncrKey) {
+		return false
+	}
+	if !bytesEq(self.clientAuthKey, ks.clientAuthKey) {
+		return false
+	}
+	return true
 }
 
 func newKeySet(serverEncrKey, serverAuthKey, clientEncrKey, clientAuthKey []byte) *keySet {

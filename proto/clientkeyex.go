@@ -27,7 +27,7 @@ import (
 	"net"
 )
 
-func clientKeyExchange(conn net.Conn, pubKey *rsa.PublicKey) (ks *keySet, err error) {
+func clientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err error) {
 	// Generate a DH key
 	group, _ := dhkx.GetGroup(dhGroupID)
 	priv, _ := group.GeneratePrivateKey(nil)
