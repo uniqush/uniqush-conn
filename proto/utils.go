@@ -18,92 +18,15 @@
 package proto
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"errors"
 	"hash"
 	"io"
-	"net"
 )
 
 var ErrZeroEntropy = errors.New("Need more random number")
 var ErrBadServer = errors.New("Unkown Server")
 var ErrCorruptedData = errors.New("corrupted data")
 var ErrBadKeyExchangePacket = errors.New("Bad Key-exchange Packet")
-
-type keySet struct {
-	serverEncrKey []byte
-	serverAuthKey []byte
-	clientEncrKey []byte
-	clientAuthKey []byte
-}
-
-func newKeySet(serverEncrKey, serverAuthKey, clientEncrKey, clientAuthKey []byte) *keySet {
-	result := new(keySet)
-
-	result.serverEncrKey = serverEncrKey
-	result.serverAuthKey = serverAuthKey
-	result.clientEncrKey = clientEncrKey
-	result.clientAuthKey = clientAuthKey
-
-	return result
-}
-
-func (self *keySet) serverHMAC(data, mac []byte) error {
-	hash := hmac.New(sha256.New, self.serverAuthKey)
-	err := writen(hash, data)
-	if err != nil {
-		return err
-	}
-	mac = hash.Sum(mac[:0])
-	return nil
-}
-
-func (self *keySet) checkServerHMAC(data, mac []byte) error {
-	if len(mac) != authKeyLen {
-		return ErrCorruptedData
-	}
-	hmac := make([]byte, len(mac))
-	err := self.serverHMAC(data, hmac)
-	if err != nil {
-		return err
-	}
-	if !bytesEq(hmac, mac) {
-		return ErrCorruptedData
-	}
-	return nil
-}
-
-func (self *keySet) clientHMAC(data, mac []byte) error {
-	hash := hmac.New(sha256.New, self.clientAuthKey)
-	err := writen(hash, data)
-	if err != nil {
-		return err
-	}
-	mac = hash.Sum(mac[:0])
-	return nil
-}
-
-func (self *keySet) checkClientHMAC(data, mac []byte) error {
-	if len(mac) != authKeyLen {
-		return ErrCorruptedData
-	}
-	hmac := make([]byte, len(mac))
-	err := self.clientHMAC(data, hmac)
-	if err != nil {
-		return err
-	}
-	if !bytesEq(hmac, mac) {
-		return ErrCorruptedData
-	}
-	return nil
-}
-
-type authResult struct {
-	ks   *keySet
-	err  error
-	conn net.Conn
-}
 
 // incCounter increments a four byte, big-endian counter.
 func incCounter(c *[4]byte) {
@@ -139,36 +62,6 @@ func mgf1XOR(out []byte, hash hash.Hash, seed []byte) {
 		}
 		incCounter(&counter)
 	}
-}
-
-func generateKeys(k, nonce []byte) (ks *keySet, err error) {
-	mkey := make([]byte, 48)
-	mgf1XOR(mkey, sha256.New(), append(k, nonce...))
-
-	h := hmac.New(sha256.New, mkey)
-
-	serverEncrKey := make([]byte, encrKeyLen)
-	h.Write([]byte("ServerEncr"))
-	serverEncrKey = h.Sum(serverEncrKey[:0])
-	h.Reset()
-
-	serverAuthKey := make([]byte, authKeyLen)
-	h.Write([]byte("ServerAuth"))
-	serverAuthKey = h.Sum(serverAuthKey[:0])
-	h.Reset()
-
-	clientEncrKey := make([]byte, encrKeyLen)
-	h.Write([]byte("ClientEncr"))
-	clientEncrKey = h.Sum(clientEncrKey[:0])
-	h.Reset()
-
-	clientAuthKey := make([]byte, authKeyLen)
-	h.Write([]byte("ClientAuth"))
-	clientAuthKey = h.Sum(clientAuthKey[:0])
-	h.Reset()
-
-	ks = newKeySet(serverEncrKey, serverAuthKey, clientEncrKey, clientAuthKey)
-	return
 }
 
 func clearBytes(data []byte) {
