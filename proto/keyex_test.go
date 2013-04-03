@@ -67,7 +67,7 @@ func buildServerClient(addr string) (server net.Conn, client net.Conn, err error
 	return
 }
 
-func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet) {
+func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet, server2client, client2server net.Conn) {
 	addr := "127.0.0.1:8080"
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -83,6 +83,8 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet) {
 		t.Errorf("Nil pointer: server=%v; client=%v", server, client)
 		return
 	}
+	server2client = client
+	client2server = server
 	var es error
 	var ec error
 	ch := make(chan bool)
@@ -103,12 +105,18 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet) {
 	<-ch
 	<-ch
 	if es != nil {
+		serverKeySet = nil
+		clientKeySet = nil
 		t.Errorf("Error from server: %v", es)
 	}
 	if ec != nil {
+		serverKeySet = nil
+		clientKeySet = nil
 		t.Errorf("Error from client: %v", ec)
 	}
 	if !serverKeySet.eq(clientKeySet) {
+		serverKeySet = nil
+		clientKeySet = nil
 		t.Errorf("Not equal")
 	}
 	return
