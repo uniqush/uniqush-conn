@@ -20,6 +20,7 @@ package proto
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"io"
 )
 
 type keySet struct {

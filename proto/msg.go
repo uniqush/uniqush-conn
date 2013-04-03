@@ -56,6 +56,6 @@ func (self *command) eq(cmd *command) bool {
 			return false
 		}
 	}
-	return self.Message.Eq(cmd.Message)
+	return self.Message.Eq(&cmd.Message)
 }
 
