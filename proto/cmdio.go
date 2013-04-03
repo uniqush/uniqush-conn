@@ -116,18 +116,6 @@ func (self *commandIO) readThenHmac(data []byte) (mac []byte, err error) {
 	return
 }
 
-func cmpHmac(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, c := range a {
-		if c != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func (self *commandIO) writeHmac(mac []byte) error {
 	if self.noWriteEncrypt {
 		return nil
@@ -147,7 +135,7 @@ func (self *commandIO) readAndCmpHmac(mac []byte) error {
 	if n != len(macRecved) {
 		return ErrCorruptedData
 	}
-	if !cmpHmac(mac, macRecved) {
+	if !bytesEq(mac, macRecved) {
 		return ErrCorruptedData
 	}
 	return nil
