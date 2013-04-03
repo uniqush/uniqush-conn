@@ -23,6 +23,7 @@ import (
 	"crypto/rsa"
 	"crypto/rand"
 	"time"
+	"fmt"
 )
 
 func serverGetOneClient(addr string) (conn net.Conn, err error) {
@@ -86,11 +87,17 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet) {
 	var ec error
 	ch := make(chan bool)
 	go func() {
+		start := time.Now()
 		serverKeySet, es = serverKeyExchange(priv, client)
+		delta := time.Since(start)
+		fmt.Printf("Server used %v\n", delta)
 		ch <- true
 	}()
 	go func() {
+		start := time.Now()
 		clientKeySet, ec = clientKeyExchange(pub, server)
+		delta := time.Since(start)
+		fmt.Printf("Client used %v\n", delta)
 		ch <- true
 	}()
 	<-ch
