@@ -29,58 +29,22 @@ import (
 	"labix.org/v2/mgo/bson"
 )
 
+const (
+	cmdflag_COMPRESS = 1 << iota
+	cmdflag_ENCRYPT
+)
+
 type commandIO struct {
 	writeAuth   hash.Hash
 	cryptWriter io.Writer
-
-	// we want to make
-	// compress-then-encrypt
-	// be the default configuration
-	noWriteEncrypt  bool
-	noWriteCompress bool
-
 	readAuth       hash.Hash
 	cryptReader    io.Reader
-	noReadEncrypt  bool
-	noReadCompress bool
-
 	conn io.ReadWriter
 }
 
-func (self *commandIO) ReadCompressOn() {
-	self.noReadCompress = false
-}
-
-func (self *commandIO) ReadEncryptOn() {
-	self.noReadEncrypt = false
-}
-
-func (self *commandIO) ReadCompressOff() {
-	self.noReadCompress = true
-}
-
-func (self *commandIO) ReadEncryptOff() {
-	self.noReadEncrypt = true
-}
-
-func (self *commandIO) WriteCompressOn() {
-	self.noWriteCompress = false
-}
-func (self *commandIO) WriteEncryptOn() {
-	self.noWriteEncrypt = false
-}
-
-func (self *commandIO) WriteCompressOff() {
-	self.noWriteCompress = true
-}
-
-func (self *commandIO) WriteEncryptOff() {
-	self.noWriteEncrypt = true
-}
-
-func (self *commandIO) writeThenHmac(data []byte) (mac []byte, err error) {
+func (self *commandIO) writeThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
 	writer := self.cryptWriter
-	if self.noWriteEncrypt {
+	if !encrypt {
 		writer = self.conn
 	} else {
 		self.writeAuth.Reset()
@@ -89,16 +53,16 @@ func (self *commandIO) writeThenHmac(data []byte) (mac []byte, err error) {
 	if err != nil {
 		return
 	}
-	if self.noWriteEncrypt {
+	if !encrypt {
 		return
 	}
 	mac = self.writeAuth.Sum(nil)
 	return
 }
 
-func (self *commandIO) readThenHmac(data []byte) (mac []byte, err error) {
+func (self *commandIO) readThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
 	reader := self.cryptReader
-	if self.noReadEncrypt {
+	if !encrypt {
 		reader = self.conn
 	} else {
 		self.readAuth.Reset()
@@ -112,7 +76,7 @@ func (self *commandIO) readThenHmac(data []byte) (mac []byte, err error) {
 		err = io.EOF
 		return
 	}
-	if self.noReadEncrypt {
+	if !encrypt {
 		return
 	}
 	mac = self.readAuth.Sum(nil)
@@ -120,14 +84,14 @@ func (self *commandIO) readThenHmac(data []byte) (mac []byte, err error) {
 }
 
 func (self *commandIO) writeHmac(mac []byte) error {
-	if self.noWriteEncrypt {
+	if len(mac) == 0 {
 		return nil
 	}
 	return writen(self.conn, mac)
 }
 
 func (self *commandIO) readAndCmpHmac(mac []byte) error {
-	if self.noReadEncrypt {
+	if len(mac) == 0 {
 		return nil
 	}
 	macRecved := make([]byte, self.readAuth.Size())
@@ -144,9 +108,9 @@ func (self *commandIO) readAndCmpHmac(mac []byte) error {
 	return nil
 }
 
-func (self *commandIO) decodeCommand(data []byte) (cmd *command, err error) {
+func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *command, err error) {
 	decoded := data
-	if !self.noReadCompress {
+	if !compress {
 		decoded, err = snappy.Decode(nil, data)
 		if err != nil {
 			return
@@ -160,14 +124,14 @@ func (self *commandIO) decodeCommand(data []byte) (cmd *command, err error) {
 	return
 }
 
-func (self *commandIO) encodeCommand(cmd *command) (data []byte, err error) {
+func (self *commandIO) encodeCommand(cmd *command, compress bool) (data []byte, err error) {
 	bsonEncoded, err := bson.Marshal(cmd)
 	if err != nil {
 		return
 	}
 
 	data = bsonEncoded
-	if !self.noWriteCompress {
+	if !compress {
 		data, err = snappy.Encode(nil, bsonEncoded)
 		if err != nil {
 			return
@@ -176,15 +140,30 @@ func (self *commandIO) encodeCommand(cmd *command) (data []byte, err error) {
 	return
 }
 
-func (self *commandIO) WriteCommand(cmd *command) error {
-	data, err := self.encodeCommand(cmd)
+func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error {
+	var flag uint16
+	flag = 0
+	if compress {
+		flag |= cmdflag_COMPRESS
+	}
+	if encrypt {
+		flag |= cmdflag_ENCRYPT
+	}
+	data, err := self.encodeCommand(cmd, compress)
 	if err != nil {
 		return err
 	}
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
 	err = binary.Write(self.conn, binary.LittleEndian, cmdLen)
-	mac, err := self.writeThenHmac(data)
+	if err != nil {
+		return err
+	}
+	err = binary.Write(self.conn, binary.LittleEndian, flag)
+	if err != nil {
+		return err
+	}
+	mac, err := self.writeThenHmac(data, encrypt)
 	if err != nil {
 		return err
 	}
@@ -197,12 +176,21 @@ func (self *commandIO) WriteCommand(cmd *command) error {
 
 func (self *commandIO) ReadCommand() (cmd *command, err error) {
 	var cmdLen uint16
+	var flag uint16
 	err = binary.Read(self.conn, binary.LittleEndian, &cmdLen)
 	if err != nil {
 		return
 	}
+	err = binary.Read(self.conn, binary.LittleEndian, &flag)
+	if err != nil {
+		return
+	}
+
+	compress := ((flag & cmdflag_COMPRESS) != 0)
+	encrypt := ((flag & cmdflag_ENCRYPT) != 0)
+
 	data := make([]byte, int(cmdLen))
-	mac, err := self.readThenHmac(data)
+	mac, err := self.readThenHmac(data, encrypt)
 	if err != nil {
 		return
 	}
@@ -210,7 +198,7 @@ func (self *commandIO) ReadCommand() (cmd *command, err error) {
 	if err != nil {
 		return
 	}
-	cmd, err = self.decodeCommand(data)
+	cmd, err = self.decodeCommand(data, compress)
 	return
 }
 

@@ -31,7 +31,7 @@ type opBetweenWriteAndRead interface {
 	Op()
 }
 
-func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, from, to *commandIO, cmds ...*command) {
+func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encrypt bool, from, to *commandIO, cmds ...*command) {
 	errCh := make(chan error)
 	startRead := make(chan bool)
 	go func() {
@@ -52,7 +52,7 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, from, to *comma
 	}()
 
 	for _, cmd := range cmds {
-		err := from.WriteCommand(cmd)
+		err := from.WriteCommand(cmd, compress, encrypt)
 		if err != nil {
 			t.Errorf("Error on write: %v", err)
 		}
@@ -69,7 +69,7 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, from, to *comma
 	}
 }
 
-func getBufferCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *commandIO, buffer *bytes.Buffer, ks *keySet) {
+func getBufferCommandIOs(t *testing.T) (io1, io2 *commandIO, buffer *bytes.Buffer, ks *keySet) {
 	keybuf := make([]byte, 2 * (authKeyLen + encrKeyLen))
 	io.ReadFull(rand.Reader, keybuf)
 	sen := keybuf[:encrKeyLen]
@@ -84,36 +84,20 @@ func getBufferCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *comman
 	buffer = new(bytes.Buffer)
 	ks = newKeySet(sen, sau, cen, cau)
 	scmdio := ks.getServerCommandIO(buffer)
-	scmdio = confCommandIO(scmdio, compress, encrypt)
 	ccmdio := ks.getClientCommandIO(buffer)
-	ccmdio = confCommandIO(ccmdio, compress, encrypt)
 	io1 = scmdio
 	io2 = ccmdio
 	return
 }
 
-func confCommandIO(cmdio *commandIO, compress, encrypt bool) *commandIO {
-	if !compress {
-		cmdio.ReadCompressOff()
-		cmdio.WriteCompressOff()
-	}
-	if !encrypt {
-		cmdio.ReadEncryptOff()
-		cmdio.WriteEncryptOff()
-	}
-	return cmdio
-}
-
-func getNetworkCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *commandIO) {
+func getNetworkCommandIOs(t *testing.T) (io1, io2 *commandIO) {
 	sks, cks, s2c, c2s := exchangeKeysOrReport(t)
 	if sks == nil || cks == nil || s2c == nil || c2s == nil {
 		return
 	}
 
 	scmdio := sks.getServerCommandIO(s2c)
-	scmdio = confCommandIO(scmdio, compress, encrypt)
 	ccmdio := cks.getClientCommandIO(c2s)
-	ccmdio = confCommandIO(ccmdio, compress, encrypt)
 	io1 = scmdio
 	io2 = ccmdio
 	return
@@ -129,9 +113,11 @@ func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	io1, io2 := getNetworkCommandIOs(t, false, false)
-	testSendingCommands(t, nil, io1, io2, cmd)
-	testSendingCommands(t, nil, io2, io1, cmd)
+	compress := false
+	encrypt := false
+	io1, io2 := getNetworkCommandIOs(t)
+	testSendingCommands(t, nil, compress, encrypt, io1, io2, cmd)
+	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
 }
 
 func TestExchangingFullCommandNoEncrypt(t *testing.T) {
@@ -144,9 +130,11 @@ func TestExchangingFullCommandNoEncrypt(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	io1, io2 := getNetworkCommandIOs(t, true, false)
-	testSendingCommands(t, nil, io1, io2, cmd)
-	testSendingCommands(t, nil, io2, io1, cmd)
+	compress := true
+	encrypt := false
+	io1, io2 := getNetworkCommandIOs(t)
+	testSendingCommands(t, nil, compress, encrypt, io1, io2, cmd)
+	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
 }
 
 type bufPrinter struct {
@@ -178,9 +166,11 @@ func TestExchangingFullCommandOverNetwork(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	io1, io2 := getNetworkCommandIOs(t, true, true)
-	testSendingCommands(t, nil, io1, io2, cmd)
-	testSendingCommands(t, nil, io2, io1, cmd)
+	compress := true
+	encrypt := true
+	io1, io2 := getNetworkCommandIOs(t)
+	testSendingCommands(t, nil, compress, encrypt, io1, io2, cmd)
+	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
 }
 
 
@@ -194,12 +184,16 @@ func TestExchangingFullCommandInBuffer(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	io1, io2, buffer, ks := getBufferCommandIOs(t, true, true)
+
+	compress := true
+	encrypt := true
+	io1, io2 := getNetworkCommandIOs(t)
+	io1, io2, buffer, ks := getBufferCommandIOs(t)
 	op := &bufPrinter{buffer, ks.serverAuthKey}
-	testSendingCommands(t, op, io1, io2, cmd)
+	testSendingCommands(t, op, compress, encrypt, io1, io2, cmd)
 
 	op = &bufPrinter{buffer, ks.clientAuthKey}
-	testSendingCommands(t, op, io2, io1, cmd)
+	testSendingCommands(t, op, compress, encrypt, io2, io1, cmd)
 }
 
 func randomCommand() *command {
@@ -221,9 +215,12 @@ func TestExchangingMultiFullCommandOverNetwork(t *testing.T) {
 		cmd := randomCommand()
 		cmds[i] = cmd
 	}
-	io1, io2 := getNetworkCommandIOs(t, true, true)
-	testSendingCommands(t, nil, io1, io2, cmds...)
-	testSendingCommands(t, nil, io2, io1, cmds...)
+
+	compress := true
+	encrypt := true
+	io1, io2 := getNetworkCommandIOs(t)
+	testSendingCommands(t, nil, compress, encrypt, io1, io2, cmds...)
+	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmds...)
 }
 
 func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
@@ -233,7 +230,7 @@ func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 		cmd := randomCommand()
 		cmds[i] = cmd
 	}
-	io1, io2 := getNetworkCommandIOs(nil, true, true)
+	io1, io2 := getNetworkCommandIOs(nil)
 	done := make(chan bool)
 	go func() {
 		defer close(done)
@@ -244,7 +241,7 @@ func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 
 	b.StartTimer()
 	for _, cmd := range cmds {
-		io1.WriteCommand(cmd)
+		io1.WriteCommand(cmd, true, true)
 	}
 	<-done
 }
@@ -256,7 +253,7 @@ func BenchmarkExchangingMultiFullCommandNoEncrypt(b *testing.B) {
 		cmd := randomCommand()
 		cmds[i] = cmd
 	}
-	io1, io2 := getNetworkCommandIOs(nil, true, false)
+	io1, io2 := getNetworkCommandIOs(nil)
 	done := make(chan bool)
 	go func() {
 		defer close(done)
@@ -267,7 +264,7 @@ func BenchmarkExchangingMultiFullCommandNoEncrypt(b *testing.B) {
 
 	b.StartTimer()
 	for _, cmd := range cmds {
-		io1.WriteCommand(cmd)
+		io1.WriteCommand(cmd, true, false)
 	}
 	<-done
 }
@@ -279,7 +276,7 @@ func BenchmarkExchangingMultiFullCommandNoEncryptNoCompress(b *testing.B) {
 		cmd := randomCommand()
 		cmds[i] = cmd
 	}
-	io1, io2 := getNetworkCommandIOs(nil, false, false)
+	io1, io2 := getNetworkCommandIOs(nil)
 	done := make(chan bool)
 	go func() {
 		defer close(done)
@@ -290,7 +287,7 @@ func BenchmarkExchangingMultiFullCommandNoEncryptNoCompress(b *testing.B) {
 
 	b.StartTimer()
 	for _, cmd := range cmds {
-		io1.WriteCommand(cmd)
+		io1.WriteCommand(cmd, false, false)
 	}
 	<-done
 }
