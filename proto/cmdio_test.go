@@ -94,3 +94,29 @@ func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 	testExchangingCommands(t, false, false, cmd)
 }
 
+func TestExchangingFullCommandNoCompress(t *testing.T) {
+	cmd := new(command)
+	cmd.Body = []byte{1,2,3}
+	cmd.Type = 1
+	cmd.Params = make([][]byte, 2)
+	cmd.Params[0] = []byte{1,2,3}
+	cmd.Params[1] = []byte{2,2,3}
+	cmd.Header = make(map[string]string, 2)
+	cmd.Header["a"] = "hello"
+	cmd.Header["b"] = "hell"
+	testExchangingCommands(t, true, false, cmd)
+}
+
+func TestExchangingFullCommand(t *testing.T) {
+	cmd := new(command)
+	cmd.Body = []byte{1,2,3}
+	cmd.Type = 1
+	cmd.Params = make([][]byte, 2)
+	cmd.Params[0] = []byte{1,2,3}
+	cmd.Params[1] = []byte{2,2,3}
+	cmd.Header = make(map[string]string, 2)
+	cmd.Header["a"] = "hello"
+	cmd.Header["b"] = "hell"
+	testExchangingCommands(t, true, true, cmd)
+}
+
