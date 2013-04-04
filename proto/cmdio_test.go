@@ -20,12 +20,16 @@ package proto
 import (
 	"testing"
 	"fmt"
+	"bytes"
+	"io"
+	"crypto/rand"
 )
 
 func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 	errCh := make(chan error)
 	go func() {
 		for i, cmd := range cmds {
+			fmt.Printf("Reading command...\n")
 			recved, err := to.ReadCommand()
 			if err != nil {
 				errCh <- err
@@ -35,15 +39,18 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 				errCh <- fmt.Errorf("%vth command does not equal", i)
 			}
 		}
+		fmt.Printf("Read Done\n")
 		close(errCh)
 	}()
 
 	for _, cmd := range cmds {
+		fmt.Printf("Writing command...\n")
 		err := from.WriteCommand(cmd)
 		if err != nil {
 			t.Errorf("Error on write: %v", err)
 		}
 	}
+	fmt.Printf("Write Done\n")
 
 	for err := range errCh {
 		if err != nil {
@@ -52,33 +59,54 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 	}
 }
 
-func testExchangingCommands(t *testing.T, compress, encrypt bool, cmds ...*command) {
+func getBufferCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *commandIO) {
+	keybuf := make([]byte, 2 * (authKeyLen + encrKeyLen))
+	io.ReadFull(rand.Reader, keybuf)
+	sen := keybuf[:encrKeyLen]
+	keybuf = keybuf[encrKeyLen:]
+	sau := keybuf[:authKeyLen]
+	keybuf = keybuf[authKeyLen:]
+	cen := keybuf[:encrKeyLen]
+	keybuf = keybuf[encrKeyLen:]
+	cau := keybuf[:authKeyLen]
+	keybuf = keybuf[authKeyLen:]
+
+	buffer := new(bytes.Buffer)
+	ks := newKeySet(sen, sau, cen, cau)
+	scmdio := ks.getServerCommandIO(buffer)
+	scmdio = confCommandIO(scmdio, compress, encrypt)
+	ccmdio := ks.getServerCommandIO(buffer)
+	ccmdio = confCommandIO(ccmdio, compress, encrypt)
+	io1 = scmdio
+	io2 = ccmdio
+	return
+}
+
+func confCommandIO(cmdio *commandIO, compress, encrypt bool) *commandIO {
+	if !compress {
+		cmdio.ReadCompressOff()
+		cmdio.WriteCompressOff()
+	}
+	if !encrypt {
+		cmdio.ReadEncryptOff()
+		cmdio.WriteEncryptOff()
+	}
+	return cmdio
+}
+
+func getNetworkCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *commandIO) {
 	sks, cks, s2c, c2s := exchangeKeysOrReport(t)
 	if sks == nil || cks == nil || s2c == nil || c2s == nil {
 		return
 	}
 
 	scmdio := sks.getServerCommandIO(s2c)
-	if !compress {
-		scmdio.ReadCompressOff()
-		scmdio.WriteCompressOff()
-	}
-	if !encrypt {
-		scmdio.ReadEncryptOff()
-		scmdio.WriteEncryptOff()
-	}
-
+	scmdio = confCommandIO(scmdio, compress, encrypt)
 	ccmdio := cks.getServerCommandIO(c2s)
-	if !compress {
-		ccmdio.ReadCompressOff()
-		ccmdio.WriteCompressOff()
-	}
-	if !encrypt {
-		ccmdio.ReadEncryptOff()
-		ccmdio.WriteEncryptOff()
-	}
-	testSendingCommands(t, scmdio, ccmdio, cmds...)
-	testSendingCommands(t, ccmdio, scmdio, cmds...)
+	ccmdio = confCommandIO(ccmdio, compress, encrypt)
+	io1 = scmdio
+	io2 = ccmdio
+	return
 }
 
 func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
@@ -91,10 +119,12 @@ func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	testExchangingCommands(t, false, false, cmd)
+	io1, io2 := getNetworkCommandIOs(t, false, false)
+	testSendingCommands(t, io1, io2, cmd)
+	testSendingCommands(t, io2, io1, cmd)
 }
 
-func TestExchangingFullCommandNoCompress(t *testing.T) {
+func TestExchangingFullCommandNoEncrypt(t *testing.T) {
 	cmd := new(command)
 	cmd.Body = []byte{1,2,3}
 	cmd.Type = 1
@@ -104,10 +134,13 @@ func TestExchangingFullCommandNoCompress(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	testExchangingCommands(t, true, false, cmd)
+	io1, io2 := getNetworkCommandIOs(t, false, false)
+	testSendingCommands(t, io1, io2, cmd)
+	testSendingCommands(t, io2, io1, cmd)
 }
 
 func TestExchangingFullCommand(t *testing.T) {
+	fmt.Printf("TestExchangeFullCommand\n")
 	cmd := new(command)
 	cmd.Body = []byte{1,2,3}
 	cmd.Type = 1
@@ -117,6 +150,8 @@ func TestExchangingFullCommand(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	testExchangingCommands(t, true, true, cmd)
+	io1, io2 := getNetworkCommandIOs(t, false, false)
+	testSendingCommands(t, io1, io2, cmd)
+	testSendingCommands(t, io2, io1, cmd)
 }
 
