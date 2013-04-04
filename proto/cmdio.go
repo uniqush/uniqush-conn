@@ -27,7 +27,6 @@ import (
 	"hash"
 	"io"
 	"labix.org/v2/mgo/bson"
-	"fmt"
 )
 
 type commandIO struct {
@@ -133,7 +132,6 @@ func (self *commandIO) readAndCmpHmac(mac []byte) error {
 	}
 	macRecved := make([]byte, self.readAuth.Size())
 	n, err := io.ReadFull(self.conn, macRecved)
-	fmt.Printf("Have read the HAMC: %v; %v bytes\n", macRecved, self.readAuth.Size())
 	if err != nil {
 		return err
 	}
@@ -180,16 +178,13 @@ func (self *commandIO) encodeCommand(cmd *command) (data []byte, err error) {
 
 func (self *commandIO) WriteCommand(cmd *command) error {
 	data, err := self.encodeCommand(cmd)
-	fmt.Printf("Encoded data: %v\n", data)
 	if err != nil {
 		return err
 	}
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
-	fmt.Printf("Need to write %v bytes of data\n", cmdLen)
 	err = binary.Write(self.conn, binary.LittleEndian, cmdLen)
 	mac, err := self.writeThenHmac(data)
-	fmt.Printf("Writing HMAC: %v; %v bytes; blocksize=%v\n", mac, len(mac), self.writeAuth.Size())
 	if err != nil {
 		return err
 	}
@@ -206,11 +201,8 @@ func (self *commandIO) ReadCommand() (cmd *command, err error) {
 	if err != nil {
 		return
 	}
-	fmt.Printf("Need to read %v bytes of data\n", cmdLen)
 	data := make([]byte, int(cmdLen))
 	mac, err := self.readThenHmac(data)
-	fmt.Printf("Have read data: %v\n", data)
-	fmt.Printf("Calculated the HMAC of read data: %v\n", mac)
 	if err != nil {
 		return
 	}

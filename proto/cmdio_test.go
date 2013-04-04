@@ -40,7 +40,6 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, from, to *comma
 			<-startRead
 		}
 		for i, cmd := range cmds {
-			fmt.Printf("Reading command...\n")
 			recved, err := to.ReadCommand()
 			if err != nil {
 				errCh <- err
@@ -50,17 +49,14 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, from, to *comma
 				errCh <- fmt.Errorf("%vth command does not equal", i)
 			}
 		}
-		fmt.Printf("Read Done\n")
 	}()
 
 	for _, cmd := range cmds {
-		fmt.Printf("Writing command...\n")
 		err := from.WriteCommand(cmd)
 		if err != nil {
 			t.Errorf("Error on write: %v", err)
 		}
 	}
-	fmt.Printf("Write Done\n")
 	if op != nil {
 		op.Op()
 		startRead<-true
@@ -172,8 +168,23 @@ func (self *bufPrinter) Op() {
 	fmt.Printf("--------------\n")
 }
 
-func TestExchangingFullCommand(t *testing.T) {
-	fmt.Printf("TestExchangeFullCommand\n")
+func TestExchangingFullCommandOnNetwork(t *testing.T) {
+	cmd := new(command)
+	cmd.Body = []byte{1,2,3}
+	cmd.Type = 1
+	cmd.Params = make([][]byte, 2)
+	cmd.Params[0] = []byte{1,2,3}
+	cmd.Params[1] = []byte{2,2,3}
+	cmd.Header = make(map[string]string, 2)
+	cmd.Header["a"] = "hello"
+	cmd.Header["b"] = "hell"
+	io1, io2 := getNetworkCommandIOs(t, true, true)
+	testSendingCommands(t, nil, io1, io2, cmd)
+	testSendingCommands(t, nil, io2, io1, cmd)
+}
+
+
+func TestExchangingFullCommandInBuffer(t *testing.T) {
 	cmd := new(command)
 	cmd.Body = []byte{1,2,3}
 	cmd.Type = 1
