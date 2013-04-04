@@ -17,6 +17,9 @@
 
 package proto
 
+import (
+)
+
 type Message struct {
 	Header map[string]string ",omitempty"
 	Body   []byte            ",omitempty"

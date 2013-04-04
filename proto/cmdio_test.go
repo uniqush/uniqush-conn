@@ -26,13 +26,12 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 	errCh := make(chan error)
 	go func() {
 		for i, cmd := range cmds {
-			fmt.Printf("Receiving cmd..\n")
 			recved, err := to.ReadCommand()
 			if err != nil {
 				errCh <- err
 				return
 			}
-			if cmd.eq(recved) {
+			if !cmd.eq(recved) {
 				errCh <- fmt.Errorf("%vth command does not equal", i)
 			}
 		}
@@ -40,7 +39,6 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 	}()
 
 	for _, cmd := range cmds {
-		fmt.Printf("Sending cmd..\n")
 		err := from.WriteCommand(cmd)
 		if err != nil {
 			t.Errorf("Error on write: %v", err)
@@ -54,22 +52,36 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 	}
 }
 
-func testExchangingCommands(t *testing.T, cmds ...*command) {
+func testExchangingCommands(t *testing.T, compress, encrypt bool, cmds ...*command) {
 	sks, cks, s2c, c2s := exchangeKeysOrReport(t)
 	if sks == nil || cks == nil || s2c == nil || c2s == nil {
 		return
 	}
 
 	scmdio := sks.getServerCommandIO(s2c)
-	ccmdio := cks.getServerCommandIO(c2s)
+	if !compress {
+		scmdio.ReadCompressOff()
+		scmdio.WriteCompressOff()
+	}
+	if !encrypt {
+		scmdio.ReadEncryptOff()
+		scmdio.WriteEncryptOff()
+	}
 
-	fmt.Printf("Server -> Client\n")
+	ccmdio := cks.getServerCommandIO(c2s)
+	if !compress {
+		ccmdio.ReadCompressOff()
+		ccmdio.WriteCompressOff()
+	}
+	if !encrypt {
+		ccmdio.ReadEncryptOff()
+		ccmdio.WriteEncryptOff()
+	}
 	testSendingCommands(t, scmdio, ccmdio, cmds...)
-	fmt.Printf("Client -> Server\n")
 	testSendingCommands(t, ccmdio, scmdio, cmds...)
 }
 
-func TestExchangingFullCommand(t *testing.T) {
+func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 	cmd := new(command)
 	cmd.Body = []byte{1,2,3}
 	cmd.Type = 1
@@ -79,6 +91,6 @@ func TestExchangingFullCommand(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	testExchangingCommands(t, cmd)
+	testExchangingCommands(t, false, false, cmd)
 }
 
