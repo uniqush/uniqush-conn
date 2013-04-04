@@ -18,12 +18,12 @@
 package proto
 
 import (
-	"testing"
-	"net"
-	"crypto/rsa"
 	"crypto/rand"
-	"time"
+	"crypto/rsa"
 	"fmt"
+	"net"
+	"testing"
+	"time"
 )
 
 func serverGetOneClient(addr string) (conn net.Conn, err error) {
@@ -71,16 +71,23 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet, ser
 	addr := "127.0.0.1:8080"
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		t.Errorf("Error: %v", err)
+		if t != nil {
+			t.Errorf("Error: %v", err)
+		}
+		return
 	}
 	pub := &priv.PublicKey
 	server, client, err := buildServerClient(addr)
 	if err != nil {
-		t.Errorf("Error: %v", err)
+		if t != nil {
+			t.Errorf("Error: %v", err)
+		}
 		return
 	}
 	if server == nil || client == nil {
-		t.Errorf("Nil pointer: server=%v; client=%v", server, client)
+		if t != nil {
+			t.Errorf("Nil pointer: server=%v; client=%v", server, client)
+		}
 		return
 	}
 	server2client = client
@@ -92,14 +99,14 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet, ser
 		start := time.Now()
 		serverKeySet, es = serverKeyExchange(priv, client)
 		delta := time.Since(start)
-		fmt.Printf("Server used %v\n", delta)
+		fmt.Printf("Key exchange: Server used %v\n", delta)
 		ch <- true
 	}()
 	go func() {
 		start := time.Now()
 		clientKeySet, ec = clientKeyExchange(pub, server)
 		delta := time.Since(start)
-		fmt.Printf("Client used %v\n", delta)
+		fmt.Printf("Key exchange: Client used %v\n", delta)
 		ch <- true
 	}()
 	<-ch
@@ -107,17 +114,24 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet, ser
 	if es != nil {
 		serverKeySet = nil
 		clientKeySet = nil
-		t.Errorf("Error from server: %v", es)
+		if t != nil {
+			t.Errorf("Error from server: %v", es)
+		}
 	}
 	if ec != nil {
 		serverKeySet = nil
 		clientKeySet = nil
-		t.Errorf("Error from client: %v", ec)
+		if t != nil {
+			t.Errorf("Error from client: %v", ec)
+		}
 	}
 	if !serverKeySet.eq(clientKeySet) {
 		serverKeySet = nil
 		clientKeySet = nil
-		t.Errorf("Not equal")
+
+		if t != nil {
+			t.Errorf("Key set Not equal")
+		}
 	}
 	return
 }
@@ -125,4 +139,3 @@ func exchangeKeysOrReport(t *testing.T) (serverKeySet, clientKeySet *keySet, ser
 func TestKeyExchange(t *testing.T) {
 	exchangeKeysOrReport(t)
 }
-

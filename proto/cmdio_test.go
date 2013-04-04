@@ -226,3 +226,25 @@ func TestExchangingMultiFullCommandOverNetwork(t *testing.T) {
 	testSendingCommands(t, nil, io2, io1, cmds...)
 }
 
+func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
+	b.StopTimer()
+	cmds := make([]*command, b.N)
+	for i, _ := range cmds {
+		cmd := randomCommand()
+		cmds[i] = cmd
+	}
+	io1, io2 := getNetworkCommandIOs(nil, true, true)
+	done := make(chan bool)
+	go func() {
+		defer close(done)
+		for i := 0; i < b.N; i++ {
+			io2.ReadCommand()
+		}
+	}()
+
+	b.StartTimer()
+	for _, cmd := range cmds {
+		io1.WriteCommand(cmd)
+	}
+	<-done
+}
