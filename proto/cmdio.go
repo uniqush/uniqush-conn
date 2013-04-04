@@ -131,9 +131,9 @@ func (self *commandIO) readAndCmpHmac(mac []byte) error {
 	if self.noReadEncrypt {
 		return nil
 	}
-	macRecved := make([]byte, self.readAuth.BlockSize())
+	macRecved := make([]byte, self.readAuth.Size())
 	n, err := io.ReadFull(self.conn, macRecved)
-	fmt.Printf("Have read the HAMC: %v\n", macRecved)
+	fmt.Printf("Have read the HAMC: %v; %v bytes\n", macRecved, self.readAuth.Size())
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (self *commandIO) WriteCommand(cmd *command) error {
 	fmt.Printf("Need to write %v bytes of data\n", cmdLen)
 	err = binary.Write(self.conn, binary.LittleEndian, cmdLen)
 	mac, err := self.writeThenHmac(data)
-	fmt.Printf("Writing HMAC: %v...\n", mac)
+	fmt.Printf("Writing HMAC: %v; %v bytes; blocksize=%v\n", mac, len(mac), self.writeAuth.Size())
 	if err != nil {
 		return err
 	}

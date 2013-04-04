@@ -23,11 +23,22 @@ import (
 	"bytes"
 	"io"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/hmac"
 )
 
-func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
+type opBetweenWriteAndRead interface {
+	Op()
+}
+
+func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, from, to *commandIO, cmds ...*command) {
 	errCh := make(chan error)
+	startRead := make(chan bool)
 	go func() {
+		defer close(errCh)
+		if op != nil {
+			<-startRead
+		}
 		for i, cmd := range cmds {
 			fmt.Printf("Reading command...\n")
 			recved, err := to.ReadCommand()
@@ -40,7 +51,6 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 			}
 		}
 		fmt.Printf("Read Done\n")
-		close(errCh)
 	}()
 
 	for _, cmd := range cmds {
@@ -51,15 +61,19 @@ func testSendingCommands(t *testing.T, from, to *commandIO, cmds ...*command) {
 		}
 	}
 	fmt.Printf("Write Done\n")
+	if op != nil {
+		op.Op()
+		startRead<-true
+	}
 
 	for err := range errCh {
 		if err != nil {
-			t.Errorf("Error on write: %v", err)
+			t.Errorf("Error on read: %v", err)
 		}
 	}
 }
 
-func getBufferCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *commandIO) {
+func getBufferCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *commandIO, buffer *bytes.Buffer, ks *keySet) {
 	keybuf := make([]byte, 2 * (authKeyLen + encrKeyLen))
 	io.ReadFull(rand.Reader, keybuf)
 	sen := keybuf[:encrKeyLen]
@@ -71,11 +85,11 @@ func getBufferCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *comman
 	cau := keybuf[:authKeyLen]
 	keybuf = keybuf[authKeyLen:]
 
-	buffer := new(bytes.Buffer)
-	ks := newKeySet(sen, sau, cen, cau)
+	buffer = new(bytes.Buffer)
+	ks = newKeySet(sen, sau, cen, cau)
 	scmdio := ks.getServerCommandIO(buffer)
 	scmdio = confCommandIO(scmdio, compress, encrypt)
-	ccmdio := ks.getServerCommandIO(buffer)
+	ccmdio := ks.getClientCommandIO(buffer)
 	ccmdio = confCommandIO(ccmdio, compress, encrypt)
 	io1 = scmdio
 	io2 = ccmdio
@@ -102,7 +116,7 @@ func getNetworkCommandIOs(t *testing.T, compress, encrypt bool) (io1, io2 *comma
 
 	scmdio := sks.getServerCommandIO(s2c)
 	scmdio = confCommandIO(scmdio, compress, encrypt)
-	ccmdio := cks.getServerCommandIO(c2s)
+	ccmdio := cks.getClientCommandIO(c2s)
 	ccmdio = confCommandIO(ccmdio, compress, encrypt)
 	io1 = scmdio
 	io2 = ccmdio
@@ -120,8 +134,8 @@ func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
 	io1, io2 := getNetworkCommandIOs(t, false, false)
-	testSendingCommands(t, io1, io2, cmd)
-	testSendingCommands(t, io2, io1, cmd)
+	testSendingCommands(t, nil, io1, io2, cmd)
+	testSendingCommands(t, nil, io2, io1, cmd)
 }
 
 func TestExchangingFullCommandNoEncrypt(t *testing.T) {
@@ -134,9 +148,28 @@ func TestExchangingFullCommandNoEncrypt(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	io1, io2 := getNetworkCommandIOs(t, false, false)
-	testSendingCommands(t, io1, io2, cmd)
-	testSendingCommands(t, io2, io1, cmd)
+	io1, io2 := getNetworkCommandIOs(t, true, false)
+	testSendingCommands(t, nil, io1, io2, cmd)
+	testSendingCommands(t, nil, io2, io1, cmd)
+}
+
+type bufPrinter struct {
+	buf *bytes.Buffer
+	authKey []byte
+}
+
+func (self *bufPrinter) Op() {
+	fmt.Printf("--------------\n")
+	fmt.Printf("Data in buffer: %v\n", self.buf.Bytes())
+
+	data := self.buf.Bytes()
+	data = data[16:]
+
+	hash := hmac.New(sha256.New, self.authKey)
+	hash.Write(data)
+
+	fmt.Printf("HMAC: %v\n", hash.Sum(nil))
+	fmt.Printf("--------------\n")
 }
 
 func TestExchangingFullCommand(t *testing.T) {
@@ -150,8 +183,11 @@ func TestExchangingFullCommand(t *testing.T) {
 	cmd.Header = make(map[string]string, 2)
 	cmd.Header["a"] = "hello"
 	cmd.Header["b"] = "hell"
-	io1, io2 := getNetworkCommandIOs(t, false, false)
-	testSendingCommands(t, io1, io2, cmd)
-	testSendingCommands(t, io2, io1, cmd)
+	io1, io2, buffer, ks := getBufferCommandIOs(t, true, true)
+	op := &bufPrinter{buffer, ks.serverAuthKey}
+	testSendingCommands(t, op, io1, io2, cmd)
+
+	op = &bufPrinter{buffer, ks.clientAuthKey}
+	testSendingCommands(t, op, io2, io1, cmd)
 }
 
