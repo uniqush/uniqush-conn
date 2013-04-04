@@ -168,7 +168,7 @@ func (self *bufPrinter) Op() {
 	fmt.Printf("--------------\n")
 }
 
-func TestExchangingFullCommandOnNetwork(t *testing.T) {
+func TestExchangingFullCommandOverNetwork(t *testing.T) {
 	cmd := new(command)
 	cmd.Body = []byte{1,2,3}
 	cmd.Type = 1
@@ -200,5 +200,29 @@ func TestExchangingFullCommandInBuffer(t *testing.T) {
 
 	op = &bufPrinter{buffer, ks.clientAuthKey}
 	testSendingCommands(t, op, io2, io1, cmd)
+}
+
+func randomCommand() *command {
+	cmd := new(command)
+	cmd.Body = make([]byte, 10)
+	io.ReadFull(rand.Reader, cmd.Body)
+	cmd.Params = make([][]byte, 2)
+	cmd.Params[0] = []byte{1,2,3}
+	cmd.Params[1] = []byte{2,2,3}
+	cmd.Header = make(map[string]string, 2)
+	cmd.Header["d"] = "hello"
+	cmd.Header["c"] = "hell"
+	return cmd
+}
+
+func TestExchangingMultiFullCommandOverNetwork(t *testing.T) {
+	cmds := make([]*command, 10)
+	for i, _ := range cmds {
+		cmd := randomCommand()
+		cmds[i] = cmd
+	}
+	io1, io2 := getNetworkCommandIOs(t, true, true)
+	testSendingCommands(t, nil, io1, io2, cmds...)
+	testSendingCommands(t, nil, io2, io1, cmds...)
 }
 
