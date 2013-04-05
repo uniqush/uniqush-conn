@@ -44,7 +44,7 @@ func (a *Message) Eq(b *Message) bool {
 type command struct {
 	Type    uint16   ",omitempty"
 	Params  [][]byte ",omitempty"
-	Message ",omitempty"
+	Message *Message ",omitempty"
 }
 
 func (self *command) eq(cmd *command) bool {
@@ -59,6 +59,6 @@ func (self *command) eq(cmd *command) bool {
 			return false
 		}
 	}
-	return self.Message.Eq(&cmd.Message)
+	return self.Message.Eq(cmd.Message)
 }
 

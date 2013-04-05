@@ -104,15 +104,7 @@ func getNetworkCommandIOs(t *testing.T) (io1, io2 *commandIO) {
 }
 
 func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
-	cmd := new(command)
-	cmd.Body = []byte{1,2,3}
-	cmd.Type = 1
-	cmd.Params = make([][]byte, 2)
-	cmd.Params[0] = []byte{1,2,3}
-	cmd.Params[1] = []byte{2,2,3}
-	cmd.Header = make(map[string]string, 2)
-	cmd.Header["a"] = "hello"
-	cmd.Header["b"] = "hell"
+	cmd := randomCommand()
 	compress := false
 	encrypt := false
 	io1, io2 := getNetworkCommandIOs(t)
@@ -121,15 +113,7 @@ func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 }
 
 func TestExchangingFullCommandNoEncrypt(t *testing.T) {
-	cmd := new(command)
-	cmd.Body = []byte{1,2,3}
-	cmd.Type = 1
-	cmd.Params = make([][]byte, 2)
-	cmd.Params[0] = []byte{1,2,3}
-	cmd.Params[1] = []byte{2,2,3}
-	cmd.Header = make(map[string]string, 2)
-	cmd.Header["a"] = "hello"
-	cmd.Header["b"] = "hell"
+	cmd := randomCommand()
 	compress := true
 	encrypt := false
 	io1, io2 := getNetworkCommandIOs(t)
@@ -157,15 +141,7 @@ func (self *bufPrinter) Op() {
 }
 
 func TestExchangingFullCommandOverNetwork(t *testing.T) {
-	cmd := new(command)
-	cmd.Body = []byte{1,2,3}
-	cmd.Type = 1
-	cmd.Params = make([][]byte, 2)
-	cmd.Params[0] = []byte{1,2,3}
-	cmd.Params[1] = []byte{2,2,3}
-	cmd.Header = make(map[string]string, 2)
-	cmd.Header["a"] = "hello"
-	cmd.Header["b"] = "hell"
+	cmd := randomCommand()
 	compress := true
 	encrypt := true
 	io1, io2 := getNetworkCommandIOs(t)
@@ -175,16 +151,7 @@ func TestExchangingFullCommandOverNetwork(t *testing.T) {
 
 
 func TestExchangingFullCommandInBuffer(t *testing.T) {
-	cmd := new(command)
-	cmd.Body = []byte{1,2,3}
-	cmd.Type = 1
-	cmd.Params = make([][]byte, 2)
-	cmd.Params[0] = []byte{1,2,3}
-	cmd.Params[1] = []byte{2,2,3}
-	cmd.Header = make(map[string]string, 2)
-	cmd.Header["a"] = "hello"
-	cmd.Header["b"] = "hell"
-
+	cmd := randomCommand()
 	compress := true
 	encrypt := true
 	io1, io2 := getNetworkCommandIOs(t)
@@ -198,14 +165,16 @@ func TestExchangingFullCommandInBuffer(t *testing.T) {
 
 func randomCommand() *command {
 	cmd := new(command)
-	cmd.Body = make([]byte, 10)
-	io.ReadFull(rand.Reader, cmd.Body)
+	cmd.Type = 1
 	cmd.Params = make([][]byte, 2)
 	cmd.Params[0] = []byte{1,2,3}
 	cmd.Params[1] = []byte{2,2,3}
-	cmd.Header = make(map[string]string, 2)
-	cmd.Header["d"] = "hello"
-	cmd.Header["c"] = "hell"
+	cmd.Message = new(Message)
+	cmd.Message.Header = make(map[string]string, 2)
+	cmd.Message.Header["a"] = "hello"
+	cmd.Message.Header["b"] = "hell"
+	cmd.Message.Body = make([]byte, 10)
+	io.ReadFull(rand.Reader, cmd.Message.Body)
 	return cmd
 }
 
