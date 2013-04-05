@@ -37,11 +37,15 @@ type MessageReadWriter interface {
 
 type Conn interface {
 	MessageReadWriter
+	Service() string
+	Username() string
 }
 
 type messageIO struct {
 	conn net.Conn
 	cmdio *commandIO
+	service string
+	username string
 	msgChan chan interface{}
 }
 
@@ -78,6 +82,14 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 	return self.cmdio.WriteCommand(cmd, compress, encrypt)
 }
 
+func (self *messageIO) Service() string {
+	return self.service
+}
+
+func (self *messageIO) Username() string {
+	return self.username
+}
+
 func (self *messageIO) ReadMessage() (msg *Message, err error) {
 	d := <-self.msgChan
 	switch t := d.(type) {
@@ -89,11 +101,13 @@ func (self *messageIO) ReadMessage() (msg *Message, err error) {
 	return
 }
 
-func newMessageChannel(cmdio *commandIO, conn net.Conn) Conn {
+func newMessageChannel(cmdio *commandIO, srv, usr string, conn net.Conn) Conn {
 	bufSz := 1024
 	ret := new(messageIO)
 	ret.conn = conn
 	ret.cmdio = cmdio
+	ret.service = srv
+	ret.username = usr
 	ret.msgChan = make(chan interface{}, bufSz)
 	go ret.collectMessage()
 	return ret

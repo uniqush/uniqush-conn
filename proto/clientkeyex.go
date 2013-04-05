@@ -90,3 +90,33 @@ func clientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 
 	return
 }
+
+func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string) (c Conn, err error) {
+	ks, err := clientKeyExchange(pubkey, conn)
+	if err != nil {
+		return
+	}
+	cmdio := ks.getClientCommandIO(conn)
+
+	cmd := new(command)
+	cmd.Type = cmdtype_AUTH
+	cmd.Params = make([][]byte, 3)
+	cmd.Params[0] = []byte(service)
+	cmd.Params[1] = []byte(username)
+	cmd.Params[2] = []byte(token)
+
+	// don't compress, but encrypt it
+	cmdio.WriteCommand(cmd, false, true)
+
+	cmd, err = cmdio.ReadCommand()
+	if err != nil {
+		return
+	}
+	if cmd.Type != cmdtype_AUTHOK {
+		return
+	}
+	c = newMessageChannel(cmdio, service, username, conn)
+	err = nil
+	return
+}
+

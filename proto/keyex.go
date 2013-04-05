@@ -26,10 +26,54 @@ import (
 	pss "github.com/monnand/rsa"
 	"io"
 	"net"
+	"time"
+	"errors"
 )
 
 type Authenticator interface {
 	Authenticate(srv, usr, token string) (bool, error)
+}
+
+var ErrAuthFail = errors.New("authentication failed")
+
+func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeout time.Duration) (c Conn, err error) {
+	conn.SetDeadline(time.Now().Add(timeout))
+	defer conn.SetDeadline(time.Time{})
+
+	ks, err := serverKeyExchange(privkey, conn)
+	if err != nil {
+		return
+	}
+	cmdio := ks.getServerCommandIO(conn)
+	cmd, err := cmdio.ReadCommand()
+	if err != nil {
+		return
+	}
+	err = ErrAuthFail
+	if cmd.Type != cmdtype_AUTH {
+		return
+	}
+	if len(cmd.Params) != 3 {
+		return
+	}
+	service := string(cmd.Params[0])
+	username := string(cmd.Params[1])
+	token := string(cmd.Params[2])
+	ok, err := auth.Authenticate(service, username, token)
+	if err != nil || !ok {
+		return
+	}
+
+	cmd.Type = cmdtype_AUTHOK
+	cmd.Params = nil
+	cmd.Message = nil
+	err = cmdio.WriteCommand(cmd, false, true)
+	if err != nil {
+		return
+	}
+	c = newMessageChannel(cmdio, service, username, conn)
+	err = nil
+	return
 }
 
 // The authentication here is quite similar with, if not same as, tarsnap's auth algorithm.
@@ -126,6 +170,5 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	if err != nil {
 		return
 	}
-
 	return
 }
