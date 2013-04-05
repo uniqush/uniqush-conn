@@ -35,7 +35,7 @@ type MessageReadWriter interface {
 	MessageWriter
 }
 
-type MessageChannel interface {
+type Conn interface {
 	MessageReadWriter
 }
 
@@ -89,11 +89,11 @@ func (self *messageIO) ReadMessage() (msg *Message, err error) {
 	return
 }
 
-func NewMessageChannel(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn net.Conn) MessageChannel {
+func newMessageChannel(cmdio *commandIO, conn net.Conn) Conn {
 	bufSz := 1024
 	ret := new(messageIO)
 	ret.conn = conn
-	ret.cmdio = newCommandIO(writeKey, writeAuthKey, readKey, readAuthKey, conn)
+	ret.cmdio = cmdio
 	ret.msgChan = make(chan interface{}, bufSz)
 	go ret.collectMessage()
 	return ret
