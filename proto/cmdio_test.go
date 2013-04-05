@@ -112,6 +112,16 @@ func TestExchangingFullCommandNoCompressNoEncrypt(t *testing.T) {
 	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
 }
 
+func TestExchangingFullCommandNoCompress(t *testing.T) {
+	cmd := randomCommand()
+	compress := false
+	encrypt := true
+	io1, io2 := getNetworkCommandIOs(t)
+	testSendingCommands(t, nil, compress, encrypt, io1, io2, cmd)
+	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
+}
+
+
 func TestExchangingFullCommandNoEncrypt(t *testing.T) {
 	cmd := randomCommand()
 	compress := true
