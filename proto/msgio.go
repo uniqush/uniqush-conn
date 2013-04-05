@@ -49,10 +49,16 @@ type messageIO struct {
 	msgChan chan interface{}
 }
 
-func (self *messageIO) processCommand(cmd *command) {
+func (self *messageIO) processCommand(cmd *command) error {
+	switch cmd.Type {
+	case cmdtype_BYE:
+		return io.EOF
+	}
+	return nil
 }
 
 func (self *messageIO) collectMessage() {
+	defer self.conn.Close()
 	for {
 		cmd, err := self.cmdio.ReadCommand()
 		if err != nil {
@@ -71,7 +77,11 @@ func (self *messageIO) collectMessage() {
 			self.msgChan <- cmd.Message
 			continue
 		}
-		self.processCommand(cmd)
+		err = self.processCommand(cmd)
+		if err != nil {
+			self.msgChan <- err
+			return
+		}
 	}
 }
 

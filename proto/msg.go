@@ -50,6 +50,7 @@ const (
 	cmdtype_DATA = iota
 	cmdtype_AUTH
 	cmdtype_AUTHOK
+	cmdtype_BYE
 )
 
 type command struct {
