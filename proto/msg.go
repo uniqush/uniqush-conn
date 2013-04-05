@@ -41,6 +41,15 @@ func (a *Message) Eq(b *Message) bool {
 	return bytesEq(a.Body, b. Body)
 }
 
+const (
+	cmdflag_COMPRESS = 1 << iota
+	cmdflag_ENCRYPT
+)
+
+const (
+	cmdtype_DATA = iota
+)
+
 type command struct {
 	Type    uint16   ",omitempty"
 	Params  [][]byte ",omitempty"

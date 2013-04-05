@@ -30,11 +30,6 @@ import (
 	"sync"
 )
 
-const (
-	cmdflag_COMPRESS = 1 << iota
-	cmdflag_ENCRYPT
-)
-
 type commandIO struct {
 	writeAuth   hash.Hash
 	cryptWriter io.Writer
@@ -159,6 +154,9 @@ func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error 
 	}
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
+	if cmdLen == 0 {
+		return nil
+	}
 	self.writeLock.Lock()
 	defer self.writeLock.Unlock()
 	err = binary.Write(self.conn, binary.LittleEndian, cmdLen)
