@@ -27,6 +27,7 @@ import (
 	"hash"
 	"io"
 	"labix.org/v2/mgo/bson"
+	"sync"
 )
 
 const (
@@ -40,6 +41,8 @@ type commandIO struct {
 	readAuth       hash.Hash
 	cryptReader    io.Reader
 	conn io.ReadWriter
+
+	writeLock *sync.Mutex
 }
 
 func (self *commandIO) writeThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
@@ -140,6 +143,7 @@ func (self *commandIO) encodeCommand(cmd *command, compress bool) (data []byte, 
 	return
 }
 
+// WriteCommand() is goroutine-safe. i.e. Multiple goroutine could write concurrently.
 func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error {
 	var flag uint16
 	flag = 0
@@ -155,6 +159,8 @@ func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error 
 	}
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
+	self.writeLock.Lock()
+	defer self.writeLock.Unlock()
 	err = binary.Write(self.conn, binary.LittleEndian, cmdLen)
 	if err != nil {
 		return err
@@ -174,6 +180,7 @@ func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error 
 	return nil
 }
 
+// ReadCommand() is not goroutine-safe.
 func (self *commandIO) ReadCommand() (cmd *command, err error) {
 	var cmdLen uint16
 	var flag uint16
@@ -207,6 +214,7 @@ func newCommandIO(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn io.R
 	ret.writeAuth = hmac.New(sha256.New, writeAuthKey)
 	ret.readAuth = hmac.New(sha256.New, readAuthKey)
 	ret.conn = conn
+	ret.writeLock = new(sync.Mutex)
 
 	writeBlkCipher, _ := aes.NewCipher(writeKey)
 	readBlkCipher, _ := aes.NewCipher(readKey)
