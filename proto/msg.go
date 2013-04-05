@@ -21,8 +21,8 @@ import (
 )
 
 type Message struct {
-	Header map[string]string ",omitempty"
-	Body   []byte            ",omitempty"
+	Header map[string]string "h,omitempty"
+	Body   []byte            "b,omitempty"
 }
 
 func (a *Message) Eq(b *Message) bool {
@@ -53,9 +53,9 @@ const (
 )
 
 type command struct {
-	Type    uint16   ",omitempty"
-	Params  [][]byte ",omitempty"
-	Message *Message ",omitempty"
+	Type    uint16   "t,omitempty"
+	Params  [][]byte "p,omitempty"
+	Message *Message "m,omitempty"
 }
 
 func (self *command) eq(cmd *command) bool {
