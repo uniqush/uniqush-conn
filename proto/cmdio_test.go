@@ -91,7 +91,7 @@ func getBufferCommandIOs(t *testing.T) (io1, io2 *commandIO, buffer *bytes.Buffe
 }
 
 func getNetworkCommandIOs(t *testing.T) (io1, io2 *commandIO) {
-	sks, cks, s2c, c2s := exchangeKeysOrReport(t)
+	sks, cks, s2c, c2s := exchangeKeysOrReport(t, true)
 	if sks == nil || cks == nil || s2c == nil || c2s == nil {
 		return
 	}
