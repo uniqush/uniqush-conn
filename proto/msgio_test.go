@@ -23,26 +23,9 @@ import (
 	"fmt"
 	"io"
 	"testing"
-	"time"
 )
 
-type fakeAuthorizer struct {
-}
-
-func (self *fakeAuthorizer) Authenticate(service, name, token string) (bool, error) {
-	if service != "service" {
-		return false, nil
-	}
-	if name != "username" {
-		return false, nil
-	}
-	if token != "token" {
-		return false, nil
-	}
-	return true, nil
-}
-
-func testMessageExchange(addr string, token string, msgs ...*Message) error {
+func testMessageExchange(addr string, msgs ...*Message) error {
 	c2sConn, s2cConn, err := buildServerClient(addr)
 	if err != nil {
 		return err
@@ -62,11 +45,13 @@ func testMessageExchange(addr string, token string, msgs ...*Message) error {
 		defer func() {
 			ch <- true
 		}()
-		cliConn, err := Dial(c2sConn, pub, "service", "username", token)
+		ks, err := ClientKeyExchange(pub, c2sConn)
 		if err != nil {
-			es = fmt.Errorf("Client: Auth error: %v", err)
+			es = fmt.Errorf("Client: key ex error: %v", err)
 			return
 		}
+		cmdio := ks.ClientCommandIO(c2sConn)
+		cliConn := NewConn(cmdio, "service", "username", c2sConn, nil)
 		for i, msg := range msgs {
 			m, err := cliConn.ReadMessage()
 			if err != nil {
@@ -84,14 +69,13 @@ func testMessageExchange(addr string, token string, msgs ...*Message) error {
 		defer func() {
 			ch <- true
 		}()
-		auth := &fakeAuthorizer{}
-		servConn, err := AuthConn(s2cConn, priv, auth, 800*time.Millisecond)
+		ks, err := ServerKeyExchange(priv, s2cConn)
 		if err != nil {
-			es = fmt.Errorf("Server: Auth error: %v", err)
+			es = fmt.Errorf("Server: key ex error: %v", err)
 			return
 		}
-		// Make sure we have cleared the deadline
-		time.Sleep(1 * time.Second)
+		cmdio := ks.ServerCommandIO(s2cConn)
+		servConn := NewConn(cmdio, "service", "username", s2cConn, nil)
 		for _, msg := range msgs {
 			err := servConn.WriteMessage(msg, true, true)
 			if err != nil {
@@ -128,18 +112,10 @@ func randomMessage() *Message {
 
 func TestExchangingSingleMessage(t *testing.T) {
 	msg := randomMessage()
-	err := testMessageExchange("127.0.0.1:8088", "token", msg)
+	err := testMessageExchange("127.0.0.1:8088", msg)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
 	return
 }
 
-func TestAuthFail(t *testing.T) {
-	msg := randomMessage()
-	err := testMessageExchange("127.0.0.1:8088", "wrong token", msg)
-	if err == nil {
-		t.Errorf("Should auth faile")
-	}
-	return
-}
