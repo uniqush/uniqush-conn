@@ -33,6 +33,7 @@ type Authenticator interface {
 
 var ErrAuthFail = errors.New("authentication failed")
 
+// The conn will be closed if any error occur
 func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeout time.Duration) (c Conn, err error) {
 	conn.SetDeadline(time.Now().Add(timeout))
 	defer func() {
