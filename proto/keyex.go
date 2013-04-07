@@ -59,7 +59,10 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	username := string(cmd.Params[1])
 	token := string(cmd.Params[2])
 	ok, err := auth.Authenticate(service, username, token)
-	if err != nil || !ok {
+	if err != nil {
+		return
+	}
+	if !ok {
 		err = ErrAuthFail
 		return
 	}
