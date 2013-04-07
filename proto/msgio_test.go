@@ -18,12 +18,12 @@
 package proto
 
 import (
-	"testing"
-	"fmt"
-	"time"
 	"crypto/rand"
-	"io"
 	"crypto/rsa"
+	"fmt"
+	"io"
+	"testing"
+	"time"
 )
 
 type fakeAuthorizer struct {
@@ -41,7 +41,6 @@ func (self *fakeAuthorizer) Authenticate(service, name, token string) (bool, err
 	}
 	return true, nil
 }
-
 
 func testMessageExchange(addr string, token string, msgs ...*Message) error {
 	c2sConn, s2cConn, err := buildServerClient(addr)
@@ -86,7 +85,7 @@ func testMessageExchange(addr string, token string, msgs ...*Message) error {
 			ch <- true
 		}()
 		auth := &fakeAuthorizer{}
-		servConn, err := AuthConn(s2cConn, priv, auth, 800 * time.Millisecond)
+		servConn, err := AuthConn(s2cConn, priv, auth, 800*time.Millisecond)
 		if err != nil {
 			es = fmt.Errorf("Server: Auth error: %v", err)
 			return
@@ -144,5 +143,3 @@ func TestAuthFail(t *testing.T) {
 	}
 	return
 }
-
-

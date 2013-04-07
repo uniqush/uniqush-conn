@@ -17,8 +17,7 @@
 
 package proto
 
-import (
-)
+import ()
 
 type Message struct {
 	Header map[string]string "h,omitempty"
@@ -38,7 +37,7 @@ func (a *Message) Eq(b *Message) bool {
 			return false
 		}
 	}
-	return bytesEq(a.Body, b. Body)
+	return bytesEq(a.Body, b.Body)
 }
 
 const (
@@ -55,7 +54,7 @@ const (
 
 type command struct {
 	Type    uint16   "t,omitempty"
-	Params  [][]byte "p,omitempty"
+	Params  []string "p,omitempty"
 	Message *Message "m,omitempty"
 }
 
@@ -67,10 +66,9 @@ func (self *command) eq(cmd *command) bool {
 		return false
 	}
 	for i, p := range self.Params {
-		if !bytesEq(cmd.Params[i], p) {
+		if cmd.Params[i] != p {
 			return false
 		}
 	}
 	return self.Message.Eq(cmd.Message)
 }
-

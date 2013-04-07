@@ -100,10 +100,10 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string)
 
 	cmd := new(command)
 	cmd.Type = cmdtype_AUTH
-	cmd.Params = make([][]byte, 3)
-	cmd.Params[0] = []byte(service)
-	cmd.Params[1] = []byte(username)
-	cmd.Params[2] = []byte(token)
+	cmd.Params = make([]string, 3)
+	cmd.Params[0] = service
+	cmd.Params[1] = username
+	cmd.Params[2] = token
 
 	// don't compress, but encrypt it
 	cmdio.WriteCommand(cmd, false, true)
@@ -119,4 +119,3 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string)
 	err = nil
 	return
 }
-

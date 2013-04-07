@@ -18,13 +18,13 @@
 package proto
 
 import (
-	"testing"
-	"fmt"
 	"bytes"
-	"io"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/hmac"
+	"fmt"
+	"io"
+	"testing"
 )
 
 type opBetweenWriteAndRead interface {
@@ -59,7 +59,7 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encry
 	}
 	if op != nil {
 		op.Op()
-		startRead<-true
+		startRead <- true
 	}
 
 	for err := range errCh {
@@ -70,7 +70,7 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encry
 }
 
 func getBufferCommandIOs(t *testing.T) (io1, io2 *commandIO, buffer *bytes.Buffer, ks *keySet) {
-	keybuf := make([]byte, 2 * (authKeyLen + encrKeyLen))
+	keybuf := make([]byte, 2*(authKeyLen+encrKeyLen))
 	io.ReadFull(rand.Reader, keybuf)
 	sen := keybuf[:encrKeyLen]
 	keybuf = keybuf[encrKeyLen:]
@@ -121,7 +121,6 @@ func TestExchangingFullCommandNoCompress(t *testing.T) {
 	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
 }
 
-
 func TestExchangingFullCommandNoEncrypt(t *testing.T) {
 	cmd := randomCommand()
 	compress := true
@@ -132,7 +131,7 @@ func TestExchangingFullCommandNoEncrypt(t *testing.T) {
 }
 
 type bufPrinter struct {
-	buf *bytes.Buffer
+	buf     *bytes.Buffer
 	authKey []byte
 }
 
@@ -159,7 +158,6 @@ func TestExchangingFullCommandOverNetwork(t *testing.T) {
 	testSendingCommands(t, nil, compress, encrypt, io2, io1, cmd)
 }
 
-
 func TestExchangingFullCommandInBuffer(t *testing.T) {
 	cmd := randomCommand()
 	compress := true
@@ -176,9 +174,9 @@ func TestExchangingFullCommandInBuffer(t *testing.T) {
 func randomCommand() *command {
 	cmd := new(command)
 	cmd.Type = 1
-	cmd.Params = make([][]byte, 2)
-	cmd.Params[0] = []byte{1,2,3}
-	cmd.Params[1] = []byte{2,2,3}
+	cmd.Params = make([]string, 2)
+	cmd.Params[0] = "123"
+	cmd.Params[1] = "223"
 	cmd.Message = new(Message)
 	cmd.Message.Header = make(map[string]string, 2)
 	cmd.Message.Header["a"] = "hello"
@@ -223,7 +221,6 @@ func TestConcurrentWrite(t *testing.T) {
 	}
 	<-done
 }
-
 
 func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 	b.StopTimer()

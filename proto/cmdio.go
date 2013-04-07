@@ -33,9 +33,9 @@ import (
 type commandIO struct {
 	writeAuth   hash.Hash
 	cryptWriter io.Writer
-	readAuth       hash.Hash
-	cryptReader    io.Reader
-	conn io.ReadWriter
+	readAuth    hash.Hash
+	cryptReader io.Reader
+	conn        io.ReadWriter
 
 	writeLock *sync.Mutex
 }

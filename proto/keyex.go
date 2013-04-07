@@ -22,13 +22,13 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"errors"
 	"github.com/monnand/dhkx"
 	pss "github.com/monnand/rsa"
 	"io"
 	"net"
-	"time"
-	"errors"
 	"strings"
+	"time"
 )
 
 type Authenticator interface {
@@ -56,9 +56,9 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	if len(cmd.Params) != 3 {
 		return
 	}
-	service := string(cmd.Params[0])
-	username := string(cmd.Params[1])
-	token := string(cmd.Params[2])
+	service := cmd.Params[0]
+	username := cmd.Params[1]
+	token := cmd.Params[2]
 
 	// Username and service should not contain "\n"
 	if strings.Contains(service, "\n") || strings.Contains(username, "\n") {

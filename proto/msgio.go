@@ -18,9 +18,9 @@
 package proto
 
 import (
-	"net"
-	"io"
 	"github.com/nu7hatch/gouuid"
+	"io"
+	"net"
 )
 
 type MessageWriter interface {
@@ -44,12 +44,12 @@ type Conn interface {
 }
 
 type messageIO struct {
-	conn net.Conn
-	cmdio *commandIO
-	service string
+	conn     net.Conn
+	cmdio    *commandIO
+	service  string
 	username string
-	id string
-	msgChan chan interface{}
+	id       string
+	msgChan  chan interface{}
 }
 
 func (self *messageIO) processCommand(cmd *command) error {
@@ -131,5 +131,3 @@ func newMessageChannel(cmdio *commandIO, srv, usr string, conn net.Conn) Conn {
 	go ret.collectMessage()
 	return ret
 }
-
-
