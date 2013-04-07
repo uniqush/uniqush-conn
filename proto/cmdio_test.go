@@ -31,7 +31,7 @@ type opBetweenWriteAndRead interface {
 	Op()
 }
 
-func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encrypt bool, from, to *commandIO, cmds ...*command) {
+func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encrypt bool, from, to *commandIO, cmds ...*Command) {
 	errCh := make(chan error)
 	startRead := make(chan bool)
 	go func() {
@@ -171,8 +171,8 @@ func TestExchangingFullCommandInBuffer(t *testing.T) {
 	testSendingCommands(t, op, compress, encrypt, io2, io1, cmd)
 }
 
-func randomCommand() *command {
-	cmd := new(command)
+func randomCommand() *Command {
+	cmd := new(Command)
 	cmd.Type = 1
 	cmd.Params = make([]string, 2)
 	cmd.Params[0] = "123"
@@ -187,7 +187,7 @@ func randomCommand() *command {
 }
 
 func TestExchangingMultiFullCommandOverNetwork(t *testing.T) {
-	cmds := make([]*command, 100)
+	cmds := make([]*Command, 100)
 	for i, _ := range cmds {
 		cmd := randomCommand()
 		cmds[i] = cmd
@@ -202,7 +202,7 @@ func TestExchangingMultiFullCommandOverNetwork(t *testing.T) {
 
 func TestConcurrentWrite(t *testing.T) {
 	N := 100
-	cmds := make([]*command, N)
+	cmds := make([]*Command, N)
 	for i, _ := range cmds {
 		cmd := randomCommand()
 		cmds[i] = cmd
@@ -224,7 +224,7 @@ func TestConcurrentWrite(t *testing.T) {
 
 func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 	b.StopTimer()
-	cmds := make([]*command, b.N)
+	cmds := make([]*Command, b.N)
 	for i, _ := range cmds {
 		cmd := randomCommand()
 		cmds[i] = cmd
@@ -247,7 +247,7 @@ func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 
 func BenchmarkExchangingMultiFullCommandNoEncrypt(b *testing.B) {
 	b.StopTimer()
-	cmds := make([]*command, b.N)
+	cmds := make([]*Command, b.N)
 	for i, _ := range cmds {
 		cmd := randomCommand()
 		cmds[i] = cmd
@@ -270,7 +270,7 @@ func BenchmarkExchangingMultiFullCommandNoEncrypt(b *testing.B) {
 
 func BenchmarkExchangingMultiFullCommandNoEncryptNoCompress(b *testing.B) {
 	b.StopTimer()
-	cmds := make([]*command, b.N)
+	cmds := make([]*Command, b.N)
 	for i, _ := range cmds {
 		cmd := randomCommand()
 		cmds[i] = cmd

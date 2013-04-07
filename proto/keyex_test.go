@@ -107,14 +107,14 @@ func exchangeKeysOrReport(t *testing.T, succ bool) (serverKeySet, clientKeySet *
 	ch := make(chan bool)
 	go func() {
 		start := time.Now()
-		serverKeySet, es = serverKeyExchange(priv, client)
+		serverKeySet, es = ServerKeyExchange(priv, client)
 		delta := time.Since(start)
 		fmt.Printf("Key exchange: Server used %v\n", delta)
 		ch <- true
 	}()
 	go func() {
 		start := time.Now()
-		clientKeySet, ec = clientKeyExchange(pub, server)
+		clientKeySet, ec = ClientKeyExchange(pub, server)
 		delta := time.Since(start)
 		fmt.Printf("Key exchange: Client used %v\n", delta)
 		if ec != nil {

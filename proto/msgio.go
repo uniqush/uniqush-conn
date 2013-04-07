@@ -51,20 +51,20 @@ type Conn interface {
 }
 
 type messageIO struct {
-	conn     net.Conn
-	cmdio    *commandIO
-	service  string
-	username string
-	id       string
+	conn      net.Conn
+	cmdio     *commandIO
+	service   string
+	username  string
+	id        string
 	invisible int32
-	msgChan  chan interface{}
+	msgChan   chan interface{}
 }
 
 func (self *messageIO) Invisible() bool {
 	return atomic.LoadInt32(&self.invisible) == 1
 }
 
-func (self *messageIO) processCommand(cmd *command) error {
+func (self *messageIO) processCommand(cmd *Command) error {
 	switch cmd.Type {
 	case cmdtype_BYE:
 		return io.EOF
@@ -105,7 +105,7 @@ func (self *messageIO) collectMessage() {
 }
 
 func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error {
-	cmd := new(command)
+	cmd := new(Command)
 	cmd.Type = cmdtype_DATA
 	cmd.Message = msg
 	return self.cmdio.WriteCommand(cmd, compress, encrypt)

@@ -88,12 +88,12 @@ func (self *keySet) checkServerHMAC(data, mac []byte) error {
 }
 
 func (self *keySet) getClientCommandIO(conn io.ReadWriter) *commandIO {
-	ret := newCommandIO(self.clientEncrKey, self.clientAuthKey, self.serverEncrKey, self.serverAuthKey, conn)
+	ret := NewCommandIO(self.clientEncrKey, self.clientAuthKey, self.serverEncrKey, self.serverAuthKey, conn)
 	return ret
 }
 
 func (self *keySet) getServerCommandIO(conn io.ReadWriter) *commandIO {
-	ret := newCommandIO(self.serverEncrKey, self.serverAuthKey, self.clientEncrKey, self.clientAuthKey, conn)
+	ret := NewCommandIO(self.serverEncrKey, self.serverAuthKey, self.clientEncrKey, self.clientAuthKey, conn)
 	return ret
 }
 

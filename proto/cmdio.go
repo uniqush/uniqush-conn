@@ -106,7 +106,7 @@ func (self *commandIO) readAndCmpHmac(mac []byte) error {
 	return nil
 }
 
-func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *command, err error) {
+func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *Command, err error) {
 	decoded := data
 	if !compress {
 		decoded, err = snappy.Decode(nil, data)
@@ -114,7 +114,7 @@ func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *command, 
 			return
 		}
 	}
-	cmd = new(command)
+	cmd = new(Command)
 	err = bson.Unmarshal(decoded, cmd)
 	if err != nil {
 		return
@@ -122,7 +122,7 @@ func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *command, 
 	return
 }
 
-func (self *commandIO) encodeCommand(cmd *command, compress bool) (data []byte, err error) {
+func (self *commandIO) encodeCommand(cmd *Command, compress bool) (data []byte, err error) {
 	bsonEncoded, err := bson.Marshal(cmd)
 	if err != nil {
 		return
@@ -139,7 +139,7 @@ func (self *commandIO) encodeCommand(cmd *command, compress bool) (data []byte, 
 }
 
 // WriteCommand() is goroutine-safe. i.e. Multiple goroutine could write concurrently.
-func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error {
+func (self *commandIO) WriteCommand(cmd *Command, compress, encrypt bool) error {
 	var flag uint16
 	flag = 0
 	if compress {
@@ -179,7 +179,7 @@ func (self *commandIO) WriteCommand(cmd *command, compress, encrypt bool) error 
 }
 
 // ReadCommand() is not goroutine-safe.
-func (self *commandIO) ReadCommand() (cmd *command, err error) {
+func (self *commandIO) ReadCommand() (cmd *Command, err error) {
 	var cmdLen uint16
 	var flag uint16
 	err = binary.Read(self.conn, binary.LittleEndian, &cmdLen)
@@ -207,7 +207,7 @@ func (self *commandIO) ReadCommand() (cmd *command, err error) {
 	return
 }
 
-func newCommandIO(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn io.ReadWriter) *commandIO {
+func NewCommandIO(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn io.ReadWriter) *commandIO {
 	ret := new(commandIO)
 	ret.writeAuth = hmac.New(sha256.New, writeAuthKey)
 	ret.readAuth = hmac.New(sha256.New, readAuthKey)

@@ -22,70 +22,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"errors"
 	"github.com/monnand/dhkx"
 	pss "github.com/monnand/rsa"
 	"io"
 	"net"
-	"strings"
-	"time"
 )
-
-type Authenticator interface {
-	Authenticate(srv, usr, token string) (bool, error)
-}
-
-var ErrAuthFail = errors.New("authentication failed")
-
-func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeout time.Duration) (c Conn, err error) {
-	conn.SetDeadline(time.Now().Add(timeout))
-	defer conn.SetDeadline(time.Time{})
-
-	ks, err := serverKeyExchange(privkey, conn)
-	if err != nil {
-		return
-	}
-	cmdio := ks.getServerCommandIO(conn)
-	cmd, err := cmdio.ReadCommand()
-	if err != nil {
-		return
-	}
-	if cmd.Type != cmdtype_AUTH {
-		return
-	}
-	if len(cmd.Params) != 3 {
-		return
-	}
-	service := cmd.Params[0]
-	username := cmd.Params[1]
-	token := cmd.Params[2]
-
-	// Username and service should not contain "\n"
-	if strings.Contains(service, "\n") || strings.Contains(username, "\n") {
-		err = ErrAuthFail
-		return
-	}
-
-	ok, err := auth.Authenticate(service, username, token)
-	if err != nil {
-		return
-	}
-	if !ok {
-		err = ErrAuthFail
-		return
-	}
-
-	cmd.Type = cmdtype_AUTHOK
-	cmd.Params = nil
-	cmd.Message = nil
-	err = cmdio.WriteCommand(cmd, false, true)
-	if err != nil {
-		return
-	}
-	c = newMessageChannel(cmdio, service, username, conn)
-	err = nil
-	return
-}
 
 // The authentication here is quite similar with, if not same as, tarsnap's auth algorithm.
 //
@@ -102,7 +43,7 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 //
 // Now, we can use K to derive any key we need on server and client side.
 // master key, mkey = MGF1(nonce || K, 48)
-func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err error) {
+func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err error) {
 	group, _ := dhkx.GetGroup(dhGroupID)
 	priv, _ := group.GeneratePrivateKey(nil)
 
@@ -181,5 +122,69 @@ func serverKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	if err != nil {
 		return
 	}
+	return
+}
+
+func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err error) {
+	// Generate a DH key
+	group, _ := dhkx.GetGroup(dhGroupID)
+	priv, _ := group.GeneratePrivateKey(nil)
+	mypub := leftPaddingZero(priv.Bytes(), dhPubkeyLen)
+
+	// Receive the data from server, which contains:
+	// - Server's DH public key: g ^ x
+	// - Signature of server's DH public key RSASSA-PSS(g ^ x)
+	// - nonce
+	siglen := (pubKey.N.BitLen() + 7) / 8
+	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen)
+	n, err := io.ReadFull(conn, keyExPkt)
+	if err != nil {
+		return
+	}
+	if n != len(keyExPkt) {
+		err = ErrBadKeyExchangePacket
+		return
+	}
+
+	serverPubData := keyExPkt[:dhPubkeyLen]
+	signature := keyExPkt[dhPubkeyLen : dhPubkeyLen+siglen]
+	nonce := keyExPkt[dhPubkeyLen+siglen:]
+
+	sha := sha256.New()
+	hashed := make([]byte, sha.Size())
+	sha.Write(serverPubData)
+	hashed = sha.Sum(hashed[:0])
+
+	// Verify the signature
+	err = pss.VerifyPSS(pubKey, crypto.SHA256, hashed, signature, pssSaltLen)
+
+	if err != nil {
+		return
+	}
+
+	// Generate the shared key from server's DH public key and client DH private key
+	serverpub := dhkx.NewPublicKey(serverPubData)
+	K, err := group.ComputeKey(serverpub, priv)
+	if err != nil {
+		return
+	}
+
+	ks, err = generateKeys(K.Bytes(), nonce)
+	if err != nil {
+		return
+	}
+
+	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen]
+	copy(keyExPkt, mypub)
+	err = ks.clientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	if err != nil {
+		return
+	}
+
+	// Send the client message to server, which contains:
+	// - Client's DH public key: g ^ y
+	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
+	err = writen(conn, keyExPkt)
+
 	return
 }

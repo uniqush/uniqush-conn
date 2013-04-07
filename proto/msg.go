@@ -59,13 +59,13 @@ const (
 	cmdtype_FWD
 )
 
-type command struct {
+type Command struct {
 	Type    uint16   "t,omitempty"
 	Params  []string "p,omitempty"
 	Message *Message "m,omitempty"
 }
 
-func (self *command) eq(cmd *command) bool {
+func (self *Command) eq(cmd *Command) bool {
 	if self.Type != cmd.Type {
 		return false
 	}
