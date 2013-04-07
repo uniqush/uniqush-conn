@@ -24,7 +24,6 @@ import (
 	"net"
 	"time"
 	"strings"
-	"fmt"
 )
 
 type Authenticator interface {
