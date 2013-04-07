@@ -21,6 +21,7 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"io"
 	"net"
+	"sync/atomic"
 )
 
 type MessageWriter interface {
@@ -41,6 +42,12 @@ type Conn interface {
 	Service() string
 	Username() string
 	UniqId() string
+
+	// If a connection is visible, then the device(s) under the service/user
+	// will not receive any push notification.
+	// Otherwise, the message will be still delivered through this connection,
+	// but the notifications will be sent as well.
+	Invisible() bool
 }
 
 type messageIO struct {
@@ -49,13 +56,22 @@ type messageIO struct {
 	service  string
 	username string
 	id       string
+	invisible int32
 	msgChan  chan interface{}
+}
+
+func (self *messageIO) Invisible() bool {
+	return atomic.LoadInt32(&self.invisible) == 1
 }
 
 func (self *messageIO) processCommand(cmd *command) error {
 	switch cmd.Type {
 	case cmdtype_BYE:
 		return io.EOF
+	case cmdtype_INVIS:
+		atomic.StoreInt32(&self.invisible, 1)
+	case cmdtype_VIS:
+		atomic.StoreInt32(&self.invisible, 0)
 	}
 	return nil
 }

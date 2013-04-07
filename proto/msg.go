@@ -43,13 +43,20 @@ func (a *Message) Eq(b *Message) bool {
 const (
 	cmdflag_COMPRESS = 1 << iota
 	cmdflag_ENCRYPT
+	cmdflag_NEEDACK
 )
 
 const (
 	cmdtype_DATA = iota
 	cmdtype_AUTH
 	cmdtype_AUTHOK
+	cmdtype_ACK
 	cmdtype_BYE
+	cmdtype_INVIS
+	cmdtype_VIS
+	cmdtype_DIGEST_MODE
+	cmdtype_DIGEST
+	cmdtype_FWD
 )
 
 type command struct {
