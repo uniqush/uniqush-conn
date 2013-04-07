@@ -21,9 +21,12 @@ import (
 	"crypto/rsa"
 	"net"
 	"github.com/uniqush/uniqush-conn/proto"
+	"time"
 )
 
-func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string) (c Conn, err error) {
+func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string, timeout time.Duration) (c Conn, err error) {
+	conn.SetDeadline(time.Now().Add(timeout))
+	defer conn.SetDeadline(time.Time{})
 	ks, err := proto.ClientKeyExchange(pubkey, conn)
 	if err != nil {
 		return
