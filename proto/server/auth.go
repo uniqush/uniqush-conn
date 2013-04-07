@@ -24,6 +24,7 @@ import (
 	"net"
 	"time"
 	"strings"
+	"fmt"
 )
 
 type Authenticator interface {
@@ -34,10 +35,16 @@ var ErrAuthFail = errors.New("authentication failed")
 
 func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeout time.Duration) (c Conn, err error) {
 	conn.SetDeadline(time.Now().Add(timeout))
-	defer conn.SetDeadline(time.Time{})
+	defer func() {
+		conn.SetDeadline(time.Time{})
+		if err != nil {
+			conn.Close()
+		}
+	}()
 
 	ks, err := proto.ServerKeyExchange(privkey, conn)
 	if err != nil {
+		conn.Close()
 		return
 	}
 	cmdio := ks.ServerCommandIO(conn)

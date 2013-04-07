@@ -61,44 +61,73 @@ func connectServer(addr string, pub *rsa.PublicKey, service, username, token str
 	return
 }
 
-func TestAuthOK(t *testing.T) {
-	addr := "127.0.0.1:8088"
+func buildServerClientConns(addr string, token string, timeout time.Duration) (servConn Conn, cliConn client.Conn, err error) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		t.Errorf("Bad key generation: %v", err)
 		return
 	}
 	pub := &priv.PublicKey
-	service := "service"
-	username := "username"
-	token := "token"
+
+	auth := new(singleUserAuth)
+	auth.service = "service"
+	auth.username = "username"
+	auth.token = "token"
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
+	var ec error
+	var es error
 	go func() {
-		auth := new(singleUserAuth)
-		auth.service = service
-		auth.username = username
-		auth.token = token
-		conn, err := getClient(addr, priv, auth, 3 * time.Second)
-		if err != nil {
-			t.Errorf("Server: Auth error: %v\n", err)
-		}
-		conn.Close()
+		servConn, es = getClient(addr, priv, auth, timeout)
 		wg.Done()
 	}()
 
 	time.Sleep(1 * time.Second)
 
 	go func() {
-		conn, err := connectServer(addr, pub, service, username, token, 3 * time.Second)
-		if err != nil {
-			t.Errorf("Client: Auth error: %v\n", err)
-		}
-		conn.Close()
+		cliConn, ec = connectServer(addr, pub, auth.service, auth.username, token, timeout)
 		wg.Done()
 	}()
 	wg.Wait()
+	if es != nil {
+		err = es
+		return
+	}
+	if ec != nil {
+		err = ec
+		return
+	}
+	return
+}
+
+func TestAuthOK(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3 * time.Second)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	if servConn != nil {
+		servConn.Close()
+	}
+	if cliConn != nil {
+		cliConn.Close()
+	}
+}
+
+func TestAuthFail(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "wrong token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3 * time.Second)
+	if err == nil {
+		t.Errorf("Error: Should be failed")
+	}
+	if servConn != nil {
+		servConn.Close()
+	}
+	if cliConn != nil {
+		cliConn.Close()
+	}
 }
 

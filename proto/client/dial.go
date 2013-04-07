@@ -26,7 +26,14 @@ import (
 
 func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string, timeout time.Duration) (c Conn, err error) {
 	conn.SetDeadline(time.Now().Add(timeout))
-	defer conn.SetDeadline(time.Time{})
+	defer func() {
+		conn.SetDeadline(time.Time{})
+		if err != nil {
+			conn.Close()
+		}
+	}()
+
+
 	ks, err := proto.ClientKeyExchange(pubkey, conn)
 	if err != nil {
 		return
