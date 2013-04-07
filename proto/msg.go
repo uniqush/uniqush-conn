@@ -47,16 +47,16 @@ const (
 )
 
 const (
-	cmdtype_DATA = iota
-	cmdtype_AUTH
-	cmdtype_AUTHOK
-	cmdtype_ACK
-	cmdtype_BYE
-	cmdtype_INVIS
-	cmdtype_VIS
-	cmdtype_DIGEST_MODE
-	cmdtype_DIGEST
-	cmdtype_FWD
+	CMD_DATA = iota
+	CMD_AUTH
+	CMD_AUTHOK
+	CMD_ACK
+	CMD_BYE
+	CMD_INVIS
+	CMD_VIS
+	CMD_DIGEST_MODE
+	CMD_DIGEST
+	CMD_FWD
 )
 
 type Command struct {

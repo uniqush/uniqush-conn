@@ -19,9 +19,11 @@ package server
 
 import (
 	"crypto/rsa"
-	. "github.com/uniqush/uniqush-conn/proto"
-	"io"
+	"errors"
+	"github.com/uniqush/uniqush-conn/proto"
 	"net"
+	"time"
+	"strings"
 )
 
 type Authenticator interface {
@@ -34,16 +36,16 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	conn.SetDeadline(time.Now().Add(timeout))
 	defer conn.SetDeadline(time.Time{})
 
-	ks, err := ServerKeyExchange(privkey, conn)
+	ks, err := proto.ServerKeyExchange(privkey, conn)
 	if err != nil {
 		return
 	}
-	cmdio := ks.getServerCommandIO(conn)
+	cmdio := ks.ServerCommandIO(conn)
 	cmd, err := cmdio.ReadCommand()
 	if err != nil {
 		return
 	}
-	if cmd.Type != cmdtype_AUTH {
+	if cmd.Type != proto.CMD_AUTH {
 		return
 	}
 	if len(cmd.Params) != 3 {
@@ -68,14 +70,14 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 		return
 	}
 
-	cmd.Type = cmdtype_AUTHOK
+	cmd.Type = proto.CMD_AUTHOK
 	cmd.Params = nil
 	cmd.Message = nil
 	err = cmdio.WriteCommand(cmd, false, true)
 	if err != nil {
 		return
 	}
-	c = newMessageChannel(cmdio, service, username, conn)
+	c = NewConn(cmdio, service, username, conn)
 	err = nil
 	return
 }

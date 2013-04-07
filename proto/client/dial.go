@@ -27,10 +27,10 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string)
 	if err != nil {
 		return
 	}
-	cmdio := ks.getClientCommandIO(conn)
+	cmdio := ks.ClientCommandIO(conn)
 
 	cmd := new(Command)
-	cmd.Type = cmdtype_AUTH
+	cmd.Type = CMD_AUTH
 	cmd.Params = make([]string, 3)
 	cmd.Params[0] = service
 	cmd.Params[1] = username
@@ -43,10 +43,10 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string)
 	if err != nil {
 		return
 	}
-	if cmd.Type != cmdtype_AUTHOK {
+	if cmd.Type != CMD_AUTHOK {
 		return
 	}
-	c = newMessageChannel(cmdio, service, username, conn)
+	c = NewConn(cmdio, service, username, conn)
 	err = nil
 	return
 }

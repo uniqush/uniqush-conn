@@ -31,7 +31,7 @@ type opBetweenWriteAndRead interface {
 	Op()
 }
 
-func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encrypt bool, from, to *commandIO, cmds ...*Command) {
+func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encrypt bool, from, to *CommandIO, cmds ...*Command) {
 	errCh := make(chan error)
 	startRead := make(chan bool)
 	go func() {
@@ -69,7 +69,7 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encry
 	}
 }
 
-func getBufferCommandIOs(t *testing.T) (io1, io2 *commandIO, buffer *bytes.Buffer, ks *keySet) {
+func getBufferCommandIOs(t *testing.T) (io1, io2 *CommandIO, buffer *bytes.Buffer, ks *keySet) {
 	keybuf := make([]byte, 2*(authKeyLen+encrKeyLen))
 	io.ReadFull(rand.Reader, keybuf)
 	sen := keybuf[:encrKeyLen]
@@ -83,21 +83,21 @@ func getBufferCommandIOs(t *testing.T) (io1, io2 *commandIO, buffer *bytes.Buffe
 
 	buffer = new(bytes.Buffer)
 	ks = newKeySet(sen, sau, cen, cau)
-	scmdio := ks.getServerCommandIO(buffer)
-	ccmdio := ks.getClientCommandIO(buffer)
+	scmdio := ks.ServerCommandIO(buffer)
+	ccmdio := ks.ClientCommandIO(buffer)
 	io1 = scmdio
 	io2 = ccmdio
 	return
 }
 
-func getNetworkCommandIOs(t *testing.T) (io1, io2 *commandIO) {
+func getNetworkCommandIOs(t *testing.T) (io1, io2 *CommandIO) {
 	sks, cks, s2c, c2s := exchangeKeysOrReport(t, true)
 	if sks == nil || cks == nil || s2c == nil || c2s == nil {
 		return
 	}
 
-	scmdio := sks.getServerCommandIO(s2c)
-	ccmdio := cks.getClientCommandIO(c2s)
+	scmdio := sks.ServerCommandIO(s2c)
+	ccmdio := cks.ClientCommandIO(c2s)
 	io1 = scmdio
 	io2 = ccmdio
 	return

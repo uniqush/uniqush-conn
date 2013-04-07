@@ -30,7 +30,7 @@ import (
 	"sync"
 )
 
-type commandIO struct {
+type CommandIO struct {
 	writeAuth   hash.Hash
 	cryptWriter io.Writer
 	readAuth    hash.Hash
@@ -40,7 +40,7 @@ type commandIO struct {
 	writeLock *sync.Mutex
 }
 
-func (self *commandIO) writeThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
+func (self *CommandIO) writeThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
 	writer := self.cryptWriter
 	if !encrypt {
 		writer = self.conn
@@ -58,7 +58,7 @@ func (self *commandIO) writeThenHmac(data []byte, encrypt bool) (mac []byte, err
 	return
 }
 
-func (self *commandIO) readThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
+func (self *CommandIO) readThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
 	reader := self.cryptReader
 	if !encrypt {
 		reader = self.conn
@@ -81,14 +81,14 @@ func (self *commandIO) readThenHmac(data []byte, encrypt bool) (mac []byte, err 
 	return
 }
 
-func (self *commandIO) writeHmac(mac []byte) error {
+func (self *CommandIO) writeHmac(mac []byte) error {
 	if len(mac) == 0 {
 		return nil
 	}
 	return writen(self.conn, mac)
 }
 
-func (self *commandIO) readAndCmpHmac(mac []byte) error {
+func (self *CommandIO) readAndCmpHmac(mac []byte) error {
 	if len(mac) == 0 {
 		return nil
 	}
@@ -106,7 +106,7 @@ func (self *commandIO) readAndCmpHmac(mac []byte) error {
 	return nil
 }
 
-func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *Command, err error) {
+func (self *CommandIO) decodeCommand(data []byte, compress bool) (cmd *Command, err error) {
 	decoded := data
 	if !compress {
 		decoded, err = snappy.Decode(nil, data)
@@ -122,7 +122,7 @@ func (self *commandIO) decodeCommand(data []byte, compress bool) (cmd *Command, 
 	return
 }
 
-func (self *commandIO) encodeCommand(cmd *Command, compress bool) (data []byte, err error) {
+func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, err error) {
 	bsonEncoded, err := bson.Marshal(cmd)
 	if err != nil {
 		return
@@ -139,7 +139,7 @@ func (self *commandIO) encodeCommand(cmd *Command, compress bool) (data []byte, 
 }
 
 // WriteCommand() is goroutine-safe. i.e. Multiple goroutine could write concurrently.
-func (self *commandIO) WriteCommand(cmd *Command, compress, encrypt bool) error {
+func (self *CommandIO) WriteCommand(cmd *Command, compress, encrypt bool) error {
 	var flag uint16
 	flag = 0
 	if compress {
@@ -179,7 +179,7 @@ func (self *commandIO) WriteCommand(cmd *Command, compress, encrypt bool) error 
 }
 
 // ReadCommand() is not goroutine-safe.
-func (self *commandIO) ReadCommand() (cmd *Command, err error) {
+func (self *CommandIO) ReadCommand() (cmd *Command, err error) {
 	var cmdLen uint16
 	var flag uint16
 	err = binary.Read(self.conn, binary.LittleEndian, &cmdLen)
@@ -207,8 +207,8 @@ func (self *commandIO) ReadCommand() (cmd *Command, err error) {
 	return
 }
 
-func NewCommandIO(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn io.ReadWriter) *commandIO {
-	ret := new(commandIO)
+func NewCommandIO(writeKey, writeAuthKey, readKey, readAuthKey []byte, conn io.ReadWriter) *CommandIO {
+	ret := new(CommandIO)
 	ret.writeAuth = hmac.New(sha256.New, writeAuthKey)
 	ret.readAuth = hmac.New(sha256.New, readAuthKey)
 	ret.conn = conn

@@ -21,7 +21,6 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"io"
 	"net"
-	"sync/atomic"
 )
 
 type MessageWriter interface {
@@ -37,43 +36,36 @@ type MessageReadWriter interface {
 	MessageWriter
 }
 
+type ControlCommandProcessor interface {
+	ProcessCommand(cmd *Command) error
+}
+
 type Conn interface {
 	MessageReadWriter
 	Service() string
 	Username() string
 	UniqId() string
-
-	// If a connection is visible, then the device(s) under the service/user
-	// will not receive any push notification.
-	// Otherwise, the message will be still delivered through this connection,
-	// but the notifications will be sent as well.
-	Invisible() bool
 }
 
 type messageIO struct {
-	conn      net.Conn
-	cmdio     *commandIO
-	service   string
-	username  string
-	id        string
-	invisible int32
-	msgChan   chan interface{}
-}
-
-func (self *messageIO) Invisible() bool {
-	return atomic.LoadInt32(&self.invisible) == 1
+	conn     net.Conn
+	cmdio    *CommandIO
+	service  string
+	username string
+	id       string
+	msgChan  chan interface{}
+	proc     ControlCommandProcessor
 }
 
 func (self *messageIO) processCommand(cmd *Command) error {
 	switch cmd.Type {
-	case cmdtype_BYE:
+	case CMD_BYE:
 		return io.EOF
-	case cmdtype_INVIS:
-		atomic.StoreInt32(&self.invisible, 1)
-	case cmdtype_VIS:
-		atomic.StoreInt32(&self.invisible, 0)
 	}
-	return nil
+	if self.proc == nil {
+		return nil
+	}
+	return self.proc.ProcessCommand(cmd)
 }
 
 func (self *messageIO) collectMessage() {
@@ -92,7 +84,7 @@ func (self *messageIO) collectMessage() {
 		if cmd == nil {
 			continue
 		}
-		if cmd.Type == cmdtype_DATA {
+		if cmd.Type == CMD_DATA {
 			self.msgChan <- cmd.Message
 			continue
 		}
@@ -106,7 +98,7 @@ func (self *messageIO) collectMessage() {
 
 func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error {
 	cmd := new(Command)
-	cmd.Type = cmdtype_DATA
+	cmd.Type = CMD_DATA
 	cmd.Message = msg
 	return self.cmdio.WriteCommand(cmd, compress, encrypt)
 }
@@ -134,7 +126,7 @@ func (self *messageIO) ReadMessage() (msg *Message, err error) {
 	return
 }
 
-func newMessageChannel(cmdio *commandIO, srv, usr string, conn net.Conn) Conn {
+func NewConn(cmdio *CommandIO, srv, usr string, conn net.Conn, proc ControlCommandProcessor) Conn {
 	bufSz := 1024
 	ret := new(messageIO)
 	ret.conn = conn
@@ -142,6 +134,7 @@ func newMessageChannel(cmdio *commandIO, srv, usr string, conn net.Conn) Conn {
 	ret.service = srv
 	ret.username = usr
 	ret.msgChan = make(chan interface{}, bufSz)
+	ret.proc = proc
 	cid, _ := uuid.NewV4()
 	ret.id = cid.String()
 	go ret.collectMessage()
