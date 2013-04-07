@@ -20,6 +20,7 @@ package proto
 import (
 	"net"
 	"io"
+	"github.com/nu7hatch/gouuid"
 )
 
 type MessageWriter interface {
@@ -39,6 +40,7 @@ type Conn interface {
 	MessageReadWriter
 	Service() string
 	Username() string
+	UniqId() string
 }
 
 type messageIO struct {
@@ -46,6 +48,7 @@ type messageIO struct {
 	cmdio *commandIO
 	service string
 	username string
+	id string
 	msgChan chan interface{}
 }
 
@@ -92,6 +95,10 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 	return self.cmdio.WriteCommand(cmd, compress, encrypt)
 }
 
+func (self *messageIO) UniqId() string {
+	return self.id
+}
+
 func (self *messageIO) Service() string {
 	return self.service
 }
@@ -119,6 +126,8 @@ func newMessageChannel(cmdio *commandIO, srv, usr string, conn net.Conn) Conn {
 	ret.service = srv
 	ret.username = usr
 	ret.msgChan = make(chan interface{}, bufSz)
+	cid, _ := uuid.NewV4()
+	ret.id = cid.String()
 	go ret.collectMessage()
 	return ret
 }
