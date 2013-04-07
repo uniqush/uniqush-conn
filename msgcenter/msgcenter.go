@@ -38,7 +38,7 @@ type ControlMessage struct {
 	Service string
 	User    string
 	Command int
-	Params  [][]byte
+	Params  []string
 }
 
 type MessageCenter struct {
