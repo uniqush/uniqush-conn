@@ -18,10 +18,10 @@
 package msgcenter
 
 import (
-	"github.com/uniqush/uniqush-conn/proto"
-	"github.com/petar/GoLLRB/llrb"
-	"fmt"
 	"bytes"
+	"fmt"
+	"github.com/petar/GoLLRB/llrb"
+	"github.com/uniqush/uniqush-conn/proto"
 )
 
 type connMap interface {
@@ -109,8 +109,8 @@ func (self *treeBasedConnMap) DelConn(conn proto.Conn) {
 	if i < 0 {
 		return
 	}
-	cl[i] = cl[len(cl) - 1]
-	cl = cl[:len(cl) - 1]
+	cl[i] = cl[len(cl)-1]
+	cl = cl[:len(cl)-1]
 	return
 }
 
@@ -119,4 +119,3 @@ func newTreeBasedConnMap() connMap {
 	ret.tree = llrb.New(lessConnList)
 	return ret
 }
-

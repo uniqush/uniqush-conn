@@ -18,43 +18,43 @@
 package msgcenter
 
 import (
+	"crypto/rsa"
+	"errors"
+	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
-	"crypto/rsa"
+	"strings"
 	"sync/atomic"
 	"time"
-	"strings"
-	"fmt"
-	"errors"
 )
 
 type MessageContainer struct {
 	Service string
-	User string
+	User    string
 	Message *proto.Message
 }
 
 type ControlMessage struct {
 	Service string
-	User string
+	User    string
 	Command int
-	Params [][]byte
+	Params  [][]byte
 }
 
 type MessageCenter struct {
-	ln net.Listener
-	priv *rsa.PrivateKey
-	auth proto.Authenticator
+	ln          net.Listener
+	priv        *rsa.PrivateKey
+	auth        proto.Authenticator
 	authTimeout time.Duration
-	maxNrConns int32
+	maxNrConns  int32
 
 	msgInQueue chan<- *MessageContainer
-	ctrlQueue chan<- *ControlMessage
-	errChan chan<- error
+	ctrlQueue  chan<- *ControlMessage
+	errChan    chan<- error
 
-	nrConns int32
-	msgOutQueue chan *writeMessageReq
-	connInQueue chan proto.Conn
+	nrConns      int32
+	msgOutQueue  chan *writeMessageReq
+	connInQueue  chan proto.Conn
 	connOutQueue chan proto.Conn
 }
 
@@ -66,7 +66,6 @@ func NewMessageCenter(ln net.Listener,
 	msgChan chan<- *MessageContainer,
 	ctrlChan chan<- *ControlMessage,
 	errChan chan<- error) *MessageCenter {
-
 	ret := new(MessageCenter)
 	ret.ln = ln
 	ret.priv = privkey
@@ -82,12 +81,12 @@ func NewMessageCenter(ln net.Listener,
 }
 
 type writeMessageReq struct {
-	srv string
-	usr string
-	msg *proto.Message
+	srv      string
+	usr      string
+	msg      *proto.Message
 	compress bool
-	encrypt bool
-	errChan chan error
+	encrypt  bool
+	errChan  chan error
 }
 
 var ErrBadMessage = errors.New("malformed message")
@@ -194,4 +193,3 @@ func (self *MessageCenter) receiveConnections() {
 		go self.serveClient(conn)
 	}
 }
-
