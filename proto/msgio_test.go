@@ -43,7 +43,7 @@ func (self *fakeAuthorizer) Authenticate(service, name, token string) (bool, err
 }
 
 
-func testMessageExchange(addr string, msgs ...*Message) error {
+func testMessageExchange(addr string, token string, msgs ...*Message) error {
 	c2sConn, s2cConn, err := buildServerClient(addr)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 		defer func() {
 			ch <- true
 		}()
-		cliConn, err := Dial(c2sConn, pub, "service", "username", "token")
+		cliConn, err := Dial(c2sConn, pub, "service", "username", token)
 		if err != nil {
 			es = fmt.Errorf("Client: Auth error: %v", err)
 			return
@@ -129,9 +129,18 @@ func randomMessage() *Message {
 
 func TestExchangingSingleMessage(t *testing.T) {
 	msg := randomMessage()
-	err := testMessageExchange("127.0.0.1:8088", msg)
+	err := testMessageExchange("127.0.0.1:8088", "token", msg)
 	if err != nil {
 		t.Errorf("%v", err)
+	}
+	return
+}
+
+func TestAuthFail(t *testing.T) {
+	msg := randomMessage()
+	err := testMessageExchange("127.0.0.1:8088", "wrong token", msg)
+	if err == nil {
+		t.Errorf("Should auth faile")
 	}
 	return
 }
