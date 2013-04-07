@@ -28,6 +28,7 @@ import (
 	"net"
 	"time"
 	"errors"
+	"strings"
 )
 
 type Authenticator interface {
@@ -58,6 +59,13 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	service := string(cmd.Params[0])
 	username := string(cmd.Params[1])
 	token := string(cmd.Params[2])
+
+	// Username and service should not contain "\n"
+	if strings.Contains(service, "\n") || strings.Contains(username, "\n") {
+		err = ErrAuthFail
+		return
+	}
+
 	ok, err := auth.Authenticate(service, username, token)
 	if err != nil {
 		return
