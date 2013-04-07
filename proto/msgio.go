@@ -42,6 +42,7 @@ type ControlCommandProcessor interface {
 
 type Conn interface {
 	MessageReadWriter
+	Close() error
 	Service() string
 	Username() string
 	UniqId() string
@@ -55,6 +56,10 @@ type messageIO struct {
 	id       string
 	msgChan  chan interface{}
 	proc     ControlCommandProcessor
+}
+
+func (self *messageIO) Close() error {
+	return self.conn.Close()
 }
 
 func (self *messageIO) processCommand(cmd *Command) error {
