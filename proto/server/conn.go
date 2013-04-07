@@ -26,20 +26,20 @@ type Conn interface {
 	proto.Conn
 }
 
-type serverConnection struct {
+type serverConn struct {
 	proto.Conn
 	cmdio *proto.CommandIO
 }
 
-func (self *serverConnection) ProcessCommand(cmd *proto.Command) error {
+func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
 	return nil
 }
 
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
-	sc := new(serverConnection)
+	sc := new(serverConn)
 	sc.cmdio = cmdio
 	c := proto.NewConn(cmdio, service, username, conn, sc)
 	sc.Conn = c
-	return c
+	return sc
 }
 
