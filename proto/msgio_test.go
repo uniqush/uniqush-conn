@@ -65,7 +65,7 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 		}()
 		cliConn, err := Dial(c2sConn, pub, "service", "username", "token")
 		if err != nil {
-			ec = err
+			es = fmt.Errorf("Client: Auth error: %v", err)
 			return
 		}
 		for i, msg := range msgs {
@@ -86,11 +86,13 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 			ch <- true
 		}()
 		auth := &fakeAuthorizer{}
-		servConn, err := AuthConn(s2cConn, priv, auth, 10 * time.Second)
+		servConn, err := AuthConn(s2cConn, priv, auth, 800 * time.Millisecond)
 		if err != nil {
-			es = err
+			es = fmt.Errorf("Server: Auth error: %v", err)
 			return
 		}
+		// Make sure we have cleared the deadline
+		time.Sleep(1 * time.Second)
 		for _, msg := range msgs {
 			err := servConn.WriteMessage(msg, true, true)
 			if err != nil {
@@ -99,14 +101,18 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 			}
 		}
 	}()
-	<-ch
-	<-ch
-
-	if es != nil {
-		return es
-	}
-	if ec != nil {
-		return ec
+	i := 0
+	for _ = range ch {
+		if es != nil {
+			return es
+		}
+		if ec != nil {
+			return ec
+		}
+		i++
+		if i >= 2 {
+			break
+		}
 	}
 	return nil
 }
