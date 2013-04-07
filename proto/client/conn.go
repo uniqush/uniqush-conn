@@ -18,36 +18,16 @@
 package client
 
 import (
-	"crypto/rsa"
-	"net"
 	"github.com/uniqush/uniqush-conn/proto"
+	"net"
 )
 
-func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string) (c Conn, err error) {
-	ks, err := proto.ClientKeyExchange(pubkey, conn)
-	if err != nil {
-		return
-	}
-	cmdio := ks.ClientCommandIO(conn)
-
-	cmd := new(proto.Command)
-	cmd.Type = proto.CMD_AUTH
-	cmd.Params = make([]string, 3)
-	cmd.Params[0] = service
-	cmd.Params[1] = username
-	cmd.Params[2] = token
-
-	// don't compress, but encrypt it
-	cmdio.WriteCommand(cmd, false, true)
-
-	cmd, err = cmdio.ReadCommand()
-	if err != nil {
-		return
-	}
-	if cmd.Type != proto.CMD_AUTHOK {
-		return
-	}
-	c = NewConn(cmdio, service, username, conn)
-	err = nil
-	return
+type Conn interface {
+	proto.Conn
 }
+
+func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
+	c := proto.NewConn(cmdio, service, username, conn, nil)
+	return c
+}
+
