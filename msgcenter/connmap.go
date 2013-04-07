@@ -99,9 +99,9 @@ func (self *treeBasedConnMap) DelConn(conn proto.Conn) {
 	if cl == nil {
 		return
 	}
-	var i int
-	i = -1
-	for i, c := range cl {
+	i := -1
+	var c proto.Conn
+	for i, c = range cl {
 		if c.UniqId() == conn.UniqId() {
 			break
 		}

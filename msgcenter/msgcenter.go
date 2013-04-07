@@ -25,6 +25,7 @@ import (
 	"time"
 	"strings"
 	"fmt"
+	"errors"
 )
 
 type MessageContainer struct {
@@ -61,7 +62,7 @@ func NewMessageCenter(ln net.Listener,
 	privkey *rsa.PrivateKey,
 	auth proto.Authenticator,
 	authTimeout time.Duration,
-	maxNrConn int,
+	maxNrConns int,
 	msgChan chan<- *MessageContainer,
 	ctrlChan chan<- *ControlMessage,
 	errChan chan<- error) *MessageCenter {
@@ -71,7 +72,7 @@ func NewMessageCenter(ln net.Listener,
 	ret.priv = privkey
 	ret.auth = auth
 	ret.authTimeout = authTimeout
-	ret.maxNrConn = maxNrConn
+	ret.maxNrConns = int32(maxNrConns)
 	ret.msgInQueue = msgChan
 	ret.ctrlQueue = ctrlChan
 	ret.errChan = errChan
@@ -86,7 +87,7 @@ type writeMessageReq struct {
 	msg *proto.Message
 	compress bool
 	encrypt bool
-	errChan chan<- error
+	errChan chan error
 }
 
 var ErrBadMessage = errors.New("malformed message")
@@ -150,11 +151,9 @@ func (self *MessageCenter) messageWriter() {
 func (self *MessageCenter) serveClient(c net.Conn) {
 	defer c.Close()
 	defer atomic.AddInt32(&self.nrConns, -1)
-	conn, err := AuthConn(c, self.priv, self.auth, self.timeout
+	conn, err := proto.AuthConn(c, self.priv, self.auth, self.authTimeout)
 	if err != nil {
-		if self.errChan != nil {
-			self.errChan <- fmt.Errorf("Connection from %v failed: %v", c.RemoteAddr(), err)
-		}
+		self.errChan <- fmt.Errorf("Connection from %v failed: %v", c.RemoteAddr(), err)
 		return
 	}
 	username := conn.Username()
@@ -167,9 +166,7 @@ func (self *MessageCenter) serveClient(c net.Conn) {
 	for {
 		msg, err := conn.ReadMessage()
 		if err != nil {
-			if self.errChan != nil {
-				self.errChan <- fmt.Errorf("[Service=%v][User=%v][Addr=%v] Read failed: %v", service, username, c.RemoteAddr(), err)
-			}
+			self.errChan <- fmt.Errorf("[Service=%v][User=%v][Addr=%v] Read failed: %v", service, username, c.RemoteAddr(), err)
 			return
 		}
 		// XXX A memory pool? Maybe.
@@ -185,11 +182,11 @@ func (self *MessageCenter) receiveConnections() {
 	for {
 		conn, err := self.ln.Accept()
 		if err != nil {
-			self.erroChan <- err
+			self.errChan <- err
 			return
 		}
 		if self.maxNrConns > 0 && atomic.LoadInt32(&self.nrConns) >= self.maxNrConns {
-			self.erroChan <- fmt.Errorf("[Addr=%v] Refuse the connection: exceed maximum number of connections", conn.RemoteAddr())
+			self.errChan <- fmt.Errorf("[Addr=%v] Refuse the connection: exceed maximum number of connections", conn.RemoteAddr())
 			conn.Close()
 			continue
 		}
