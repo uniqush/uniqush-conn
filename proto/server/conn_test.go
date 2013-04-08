@@ -18,13 +18,13 @@
 package server
 
 import (
-	"testing"
-	"github.com/uniqush/uniqush-conn/proto"
-	"sync"
-	"fmt"
 	"crypto/rand"
-	"time"
+	"fmt"
+	"github.com/uniqush/uniqush-conn/proto"
 	"io"
+	"sync"
+	"testing"
+	"time"
 )
 
 func sendTestMessages(s2c, c2s proto.Conn, serverToClient bool, msgs ...*proto.Message) error {
@@ -92,7 +92,7 @@ func randomMessage() *proto.Message {
 func TestMessageSendServerToClient(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
-	servConn, cliConn, err := buildServerClientConns(addr, token, 3 * time.Second)
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestMessageSendServerToClient(t *testing.T) {
 func TestMessageSendClientToServer(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
-	servConn, cliConn, err := buildServerClientConns(addr, token, 3 * time.Second)
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -140,4 +140,3 @@ func TestMessageSendClientToServer(t *testing.T) {
 		cliConn.Close()
 	}
 }
-

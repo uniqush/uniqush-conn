@@ -18,13 +18,13 @@
 package server
 
 import (
-	"testing"
-	"crypto/rsa"
 	"crypto/rand"
+	"crypto/rsa"
 	"github.com/uniqush/uniqush-conn/proto/client"
 	"net"
-	"time"
 	"sync"
+	"testing"
+	"time"
 )
 
 type singleUserAuth struct {
@@ -104,7 +104,7 @@ func buildServerClientConns(addr string, token string, timeout time.Duration) (s
 func TestAuthOK(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
-	servConn, cliConn, err := buildServerClientConns(addr, token, 3 * time.Second)
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestAuthOK(t *testing.T) {
 func TestAuthFail(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "wrong token"
-	servConn, cliConn, err := buildServerClientConns(addr, token, 3 * time.Second)
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
 	if err == nil {
 		t.Errorf("Error: Should be failed")
 	}
@@ -130,4 +130,3 @@ func TestAuthFail(t *testing.T) {
 		cliConn.Close()
 	}
 }
-

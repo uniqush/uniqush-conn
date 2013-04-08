@@ -46,4 +46,3 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.Conn = c
 	return sc
 }
-
