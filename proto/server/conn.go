@@ -31,6 +31,10 @@ type serverConn struct {
 	cmdio *proto.CommandIO
 }
 
+func (self *serverConn) WriteMessage(msg *proto.Message, compress, encrypt bool) error {
+	return self.Conn.WriteMessage(msg, compress, encrypt)
+}
+
 func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
 	return nil
 }
