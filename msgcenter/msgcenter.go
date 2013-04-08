@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/proto/server"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -44,7 +45,7 @@ type ControlMessage struct {
 type MessageCenter struct {
 	ln          net.Listener
 	priv        *rsa.PrivateKey
-	auth        proto.Authenticator
+	auth        server.Authenticator
 	authTimeout time.Duration
 	maxNrConns  int32
 
@@ -54,13 +55,13 @@ type MessageCenter struct {
 
 	nrConns      int32
 	msgOutQueue  chan *writeMessageReq
-	connInQueue  chan proto.Conn
-	connOutQueue chan proto.Conn
+	connInQueue  chan server.Conn
+	connOutQueue chan server.Conn
 }
 
 func NewMessageCenter(ln net.Listener,
 	privkey *rsa.PrivateKey,
-	auth proto.Authenticator,
+	auth server.Authenticator,
 	authTimeout time.Duration,
 	maxNrConns int,
 	msgChan chan<- *MessageContainer,
@@ -150,7 +151,7 @@ func (self *MessageCenter) messageWriter() {
 func (self *MessageCenter) serveClient(c net.Conn) {
 	defer c.Close()
 	defer atomic.AddInt32(&self.nrConns, -1)
-	conn, err := proto.AuthConn(c, self.priv, self.auth, self.authTimeout)
+	conn, err := server.AuthConn(c, self.priv, self.auth, self.authTimeout)
 	if err != nil {
 		self.errChan <- fmt.Errorf("Connection from %v failed: %v", c.RemoteAddr(), err)
 		return
