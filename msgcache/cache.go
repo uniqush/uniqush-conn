@@ -19,7 +19,6 @@ package msgcache
 
 import (
 	"github.com/uniqush/uniqush-conn/proto"
-	"time"
 )
 
 type Cache interface {

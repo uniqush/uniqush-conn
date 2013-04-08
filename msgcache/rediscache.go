@@ -37,16 +37,16 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 		db = 0
 	}
 
-	dial := func() {
+	dial := func() (redis.Conn, error) {
 		c, err := redis.Dial("tcp", addr)
 		if err != nil {
 			return nil, err
 		}
-		if err := c.Do("AUTH", password); err != nil {
+		if _, err := c.Do("AUTH", password); err != nil {
 			c.Close()
 			return nil, err
 		}
-		if err := c.Do("SELECT", db); err != nil {
+		if _, err := c.Do("SELECT", db); err != nil {
 			c.Close()
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 
 	ret := new(redisMessageCache)
 	ret.pool = pool
-
+	return ret
 }
 
 func mqKey(service, username string) string {
@@ -87,7 +87,7 @@ func marshalMsg(msg *proto.Message) (buf []byte, err error) {
 }
 
 func unmarshalMsg(buf []byte) (msg *proto.Message, err error) {
-	msg := new(proto.Message)
+	msg = new(proto.Message)
 	err = json.Unmarshal(buf, msg)
 	if err != nil {
 		msg = nil
@@ -115,7 +115,7 @@ func (self *redisMessageCache) Dequeue(service, username string) (msg *proto.Mes
 	}
 	conn := self.pool.Get()
 	defer conn.Close()
-	reply, err := conn.Do("LPOP", key, value)
+	reply, err := conn.Do("LPOP", key)
 	if reply == nil {
 		msg = nil
 		err = nil
