@@ -22,8 +22,8 @@ import (
 	"errors"
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
-	"time"
 	"strings"
+	"time"
 )
 
 type Authenticator interface {
@@ -63,7 +63,8 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	token := cmd.Params[2]
 
 	// Username and service should not contain "\n"
-	if strings.Contains(service, "\n") || strings.Contains(username, "\n") {
+	if strings.Contains(service, "\n") || strings.Contains(username, "\n") ||
+		strings.Contains(service, ":") || strings.Contains(username, ":") {
 		err = ErrAuthFail
 		return
 	}
