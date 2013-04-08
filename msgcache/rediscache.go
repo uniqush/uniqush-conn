@@ -42,9 +42,11 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 		if err != nil {
 			return nil, err
 		}
-		if _, err := c.Do("AUTH", password); err != nil {
-			c.Close()
-			return nil, err
+		if len(password) > 0 {
+			if _, err := c.Do("AUTH", password); err != nil {
+				c.Close()
+				return nil, err
+			}
 		}
 		if _, err := c.Do("SELECT", db); err != nil {
 			c.Close()
