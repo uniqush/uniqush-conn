@@ -19,10 +19,11 @@ package client
 
 import (
 	"crypto/rsa"
-	"net"
-	"github.com/uniqush/uniqush-conn/proto"
-	"time"
 	"errors"
+	"github.com/uniqush/uniqush-conn/proto"
+	"net"
+	"strings"
+	"time"
 )
 
 var ErrBadServiceOrUserName = errors.New("service name or user name should not contain '\\n' or ':'")
@@ -31,7 +32,8 @@ var ErrBadServiceOrUserName = errors.New("service name or user name should not c
 func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string, timeout time.Duration) (c Conn, err error) {
 	if strings.Contains(service, "\n") || strings.Contains(username, "\n") ||
 		strings.Contains(service, ":") || strings.Contains(username, ":") {
-		return ErrBadServiceOrUserName
+		err = ErrBadServiceOrUserName
+		return
 	}
 	conn.SetDeadline(time.Now().Add(timeout))
 	defer func() {
@@ -40,7 +42,6 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string,
 			conn.Close()
 		}
 	}()
-
 
 	ks, err := proto.ClientKeyExchange(pubkey, conn)
 	if err != nil {
