@@ -31,9 +31,10 @@ type Message struct {
 func (self *Message) Size() int {
 	ret := len(self.Body)
 	for k, v := range self.Header {
-		ret += len(k)
-		ret += len(v)
+		ret += len(k) + 1
+		ret += len(v) + 1
 	}
+	ret += 8
 	return ret
 }
 
