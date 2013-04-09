@@ -26,6 +26,11 @@ import (
 
 type Conn interface {
 	proto.Conn
+	// Send the message to client.
+	// If the message is larger than the digest threshold,
+	// then send a digest to the client and cache the whole message
+	// in the message box.
+	SendOrBox(msg *proto.Message, extra map[string]string encrypt bool) error
 }
 
 type serverConn struct {
@@ -37,12 +42,38 @@ type serverConn struct {
 	mcache msgcache.Cache
 }
 
-func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string) (ok bool, err error) {
+func (self *serverConn) writeAutoCompress(msg *proto.Message, encrypt bool, sz int) error {
+	compress := false
+	if self.compressThreshold > 0 && self.compressThreshold < sz {
+		compress = true
+	}
+	return self.WriteMessage(msg, compress, encrypt)
+}
+
+// Send the message to client.
+// If the message is larger than the digest threshold,
+// then send a digest to the client and cache the whole message
+// in the message box.
+func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool) error {
+	sz := msg.Size()
+	ok, err := self.writeDigest(msg, extra, sz)
+	if err != nil {
+		return err
+	}
+
+	// We have sent the digest. Cache the message
+	if ok {
+		err = self.mcache.SetMessageBox(self.Service(), self.Username(), msg)
+		return err
+	}
+	return self.writeAutoCompress(msg, encrypt, sz)
+}
+
+func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int) (ok bool, err error) {
 	ok = false
 	if self.digestThreshold < 0 {
 		return
 	}
-	sz := msg.Size()
 	if sz < self.digestThreshold {
 		return
 	}
@@ -86,11 +117,14 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string)
 	return
 }
 
+func (self *serverConn) sendMessageInBox() error {
+}
+
 func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
 	return nil
 }
 
-func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
+func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn, cache msgcache.Cache) Conn {
 	sc := new(serverConn)
 	sc.cmdio = cmdio
 	c := proto.NewConn(cmdio, service, username, conn, sc)
@@ -98,5 +132,6 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.digestThreshold = -1
 	sc.compressThreshold = 512
 	sc.digestFields = make([]string, 0, 10)
+	sc.mcache = cache
 	return sc
 }

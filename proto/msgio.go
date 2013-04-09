@@ -93,6 +93,11 @@ func (self *messageIO) collectMessage() {
 			self.msgChan <- cmd.Message
 			continue
 		}
+		if cmd.Type == CMD_EMPTY {
+			self.msgChan <- 1
+			continue
+		}
+
 		err = self.processCommand(cmd)
 		if err != nil {
 			self.msgChan <- err
@@ -103,8 +108,13 @@ func (self *messageIO) collectMessage() {
 
 func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error {
 	cmd := new(Command)
-	cmd.Type = CMD_DATA
-	cmd.Message = msg
+
+	if msg == nil {
+		cmd.Type = CMD_EMPTY
+	} else {
+		cmd.Type = CMD_DATA
+		cmd.Message = msg
+	}
 	return self.cmdio.WriteCommand(cmd, compress, encrypt)
 }
 
@@ -127,6 +137,9 @@ func (self *messageIO) ReadMessage() (msg *Message, err error) {
 		msg = t
 	case error:
 		err = t
+	case int:
+		msg = nil
+		err = nil
 	}
 	return
 }

@@ -58,6 +58,12 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 				ec = err
 				return
 			}
+			if m == nil {
+				if msg != nil {
+					ec = fmt.Errorf("%vth message corrupted", i)
+				}
+				continue
+			}
 			if !m.Eq(msg) {
 				ec = fmt.Errorf("%vth message corrupted", i)
 				return
@@ -113,6 +119,14 @@ func randomMessage() *Message {
 func TestExchangingSingleMessage(t *testing.T) {
 	msg := randomMessage()
 	err := testMessageExchange("127.0.0.1:8088", msg)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	return
+}
+
+func TestExchangingEmpty(t *testing.T) {
+	err := testMessageExchange("127.0.0.1:8088", nil)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
