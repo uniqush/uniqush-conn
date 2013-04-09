@@ -118,9 +118,20 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 }
 
 func (self *serverConn) sendMessageInBox() error {
+	msg, err := self.mcache.GetMessageBox(self.Service(), self.Username())
+	if err != nil {
+		return err
+	}
+	return self.WriteMessage(msg, false, true)
 }
 
 func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
+	switch cmd.Type {
+	case proto.CMD_MSG_RETRIEVE:
+		if cmd.Message == nil {
+			return proto.ErrBadPeerImpl
+		}
+	}
 	return nil
 }
 

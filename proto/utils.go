@@ -27,6 +27,7 @@ var ErrZeroEntropy = errors.New("Need more random number")
 var ErrBadServer = errors.New("Unkown Server")
 var ErrCorruptedData = errors.New("corrupted data")
 var ErrBadKeyExchangePacket = errors.New("Bad Key-exchange Packet")
+var ErrBadPeerImpl = errors.New("bad protocol implementation on peer")
 
 // incCounter increments a four byte, big-endian counter.
 func incCounter(c *[4]byte) {
