@@ -159,23 +159,53 @@ func (self *serverConn) sendMessageInBox() error {
 	return self.WriteMessage(msg, false, true)
 }
 
-func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
+func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
 	if cmd == nil {
-		return nil
+		return
 	}
 	switch cmd.Type {
 	case proto.CMD_MSG_RETRIEVE:
 		if len(cmd.Params) < 1 {
-			return proto.ErrBadPeerImpl
+			err = proto.ErrBadPeerImpl
+			return
 		}
 
 		id := cmd.Params[0]
-		var msg *proto.Message
-		if id == "mbox" {
-			self.cache.
+		var rmsg *proto.Message
+		rcmd := new(proto.Command)
+		rcmd.Type = proto.CMD_DATA
+
+		switch id {
+		case "mbox":
+			rmsg, err = self.mcache.GetMessageBox(self.Service(), self.Username())
+		default:
+			rmsg, err = self.mcache.DelFromQueue(self.Service(), self.Username(), id)
 		}
+		if err != nil {
+			return
+		}
+		msz := 0
+		if rmsg == nil {
+			rcmd.Type = proto.CMD_EMPTY
+		} else {
+			if len(rmsg.Sender) != 0 {
+				rcmd.Type = proto.CMD_FWD
+				rcmd.Params = make([]string, 1, 2)
+				rcmd.Params[0] = rmsg.Sender
+				if len(rmsg.SenderService) != 0 {
+					rcmd.Params = append(rcmd.Params, rmsg.SenderService)
+				}
+			}
+			rcmd.Message = rmsg
+			msz = rmsg.Size()
+		}
+		compress := false
+		if msz > self.compressThreshold {
+			compress = true
+		}
+		err = self.cmdio.WriteCommand(rcmd, compress, true)
 	}
-	return nil
+	return
 }
 
 func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
