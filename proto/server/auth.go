@@ -89,3 +89,4 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	err = nil
 	return
 }
+

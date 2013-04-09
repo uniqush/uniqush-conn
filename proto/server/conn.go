@@ -22,15 +22,17 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"net"
 	"fmt"
+	"time"
 )
 
 type Conn interface {
-	proto.Conn
 	// Send the message to client.
 	// If the message is larger than the digest threshold,
 	// then send a digest to the client and cache the whole message
 	// in the message box.
-	SendOrBox(msg *proto.Message, extra map[string]string encrypt bool) error
+	SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool, timeout time.Duration) error
+	SetMessageCache(cache msgcache.Cache)
+	proto.Conn
 }
 
 type serverConn struct {
@@ -54,23 +56,25 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, encrypt bool, sz i
 // If the message is larger than the digest threshold,
 // then send a digest to the client and cache the whole message
 // in the message box.
-func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool) error {
+func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool, timeout time.Duration) error {
 	sz := msg.Size()
-	ok, err := self.writeDigest(msg, extra, sz)
+	sentDigest, err := self.writeDigest(msg, extra, sz)
 	if err != nil {
 		return err
 	}
 
 	// We have sent the digest. Cache the message
-	if ok {
-		err = self.mcache.SetMessageBox(self.Service(), self.Username(), msg)
+	if sentDigest {
+		err = self.mcache.SetMessageBox(self.Service(), self.Username(), msg, timeout)
 		return err
 	}
+
+	// Otherwise, send the message directly
 	return self.writeAutoCompress(msg, encrypt, sz)
 }
 
-func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int) (ok bool, err error) {
-	ok = false
+func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int) (sentDigest bool, err error) {
+	sentDigest = false
 	if self.digestThreshold < 0 {
 		return
 	}
@@ -113,7 +117,7 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 	if err != nil {
 		return
 	}
-	ok = true
+	sentDigest = true
 	return
 }
 
@@ -135,7 +139,11 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
 	return nil
 }
 
-func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn, cache msgcache.Cache) Conn {
+func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
+	self.mcache = cache
+}
+
+func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
 	sc := new(serverConn)
 	sc.cmdio = cmdio
 	c := proto.NewConn(cmdio, service, username, conn, sc)
@@ -143,6 +151,6 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn, ca
 	sc.digestThreshold = -1
 	sc.compressThreshold = 512
 	sc.digestFields = make([]string, 0, 10)
-	sc.mcache = cache
 	return sc
 }
+
