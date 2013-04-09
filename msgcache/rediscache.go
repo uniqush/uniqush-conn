@@ -213,9 +213,6 @@ func (self *redisMessageCache) DelFromQueue(service, username, id string) (msg *
 		return
 	}
 	key := mqKey(service, username)
-	if err != nil {
-		return
-	}
 	conn := self.pool.Get()
 	defer conn.Close()
 
@@ -270,3 +267,49 @@ func (self *redisMessageCache) DelFromQueue(service, username, id string) (msg *
 	msg, err = unmarshalMsg(value)
 	return
 }
+
+func (self *redisMessageCache) SetMessageBox(service, username string, msg *proto.Message, timeout time.Duration) error {
+	key := mboxKey(service, username)
+	value, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	if timeout.Seconds() <= 0.0 {
+		_, err = conn.Do("SET", key, value)
+	} else {
+		_, err = conn.Do("SETEX", key, int64(timeout.Seconds()), value)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *redisMessageCache) GetMessageBox(service, username string) (msg *proto.Message, err error) {
+	key := mboxKey(service, username)
+	conn := self.pool.Get()
+	defer conn.Close()
+	reply, err := conn.Do("GET", key)
+	if err != nil {
+		return
+	}
+	if reply == nil {
+		return
+	}
+
+	value, err := redis.Bytes(reply, err)
+	if err != nil {
+		return
+	}
+	msg = new(proto.Message)
+	err = json.Unmarshal(value, msg)
+	if err != nil {
+		msg = nil
+		return
+	}
+	return
+}
+

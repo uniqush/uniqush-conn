@@ -23,6 +23,7 @@ import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"io"
 	"testing"
+	"time"
 )
 
 func randomMessage() *proto.Message {
@@ -145,4 +146,51 @@ func TestEnqueueClrqueue(t *testing.T) {
 	}
 }
 
+
+func TestMessageBox(t *testing.T) {
+	cache := getCache()
+	msg := randomMessage()
+	srv := "srv"
+	usr := "usr"
+
+	err := cache.SetMessageBox(srv, usr, msg, 0 * time.Second)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	m, err := cache.GetMessageBox(srv, usr)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	if !m.Eq(msg) {
+		t.Errorf("Message not same")
+	}
+}
+
+func TestMessageBoxTimeout(t *testing.T) {
+	cache := getCache()
+	msg := randomMessage()
+	srv := "srv"
+	usr := "usr"
+
+	timeout := 1 * time.Second
+
+	err := cache.SetMessageBox(srv, usr, msg, timeout)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	time.Sleep(timeout)
+	time.Sleep(timeout)
+	m, err := cache.GetMessageBox(srv, usr)
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	if m != nil {
+		t.Errorf("Message still there")
+	}
+}
 

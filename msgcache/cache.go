@@ -19,6 +19,7 @@ package msgcache
 
 import (
 	"github.com/uniqush/uniqush-conn/proto"
+	"time"
 )
 
 type Cache interface {
@@ -26,11 +27,8 @@ type Cache interface {
 	Dequeue(service, username string) (msg *proto.Message, err error)
 	DelFromQueue(service, username, id string) (msg *proto.Message, err error)
 	Clrqueue(service, username string) (msg []*proto.Message, err error)
-	/*
-		SetMessageBox(service, username string, msg *proto.Message) error
-		ClrMessageBox(service, username string) (msg *proto.Message, err error)
 
-		WritePoster(service, username string, msg *proto.Message, timeout time.Duration) error
-		ReadPoster(service, username string) (msg *proto.Message, err error)
-	*/
+	SetMessageBox(service, username string, msg *proto.Message, timeout time.Duration) error
+	GetMessageBox(service, username string) (msg *proto.Message, err error)
 }
+
