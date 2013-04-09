@@ -31,6 +31,7 @@ type Conn interface {
 	// then send a digest to the client and cache the whole message
 	// in the message box.
 	SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool, timeout time.Duration) error
+	SendOrQueue(msg *proto.Message, extra map[string]string, encrypt bool) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	proto.Conn
 }
@@ -58,7 +59,7 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, encrypt bool, sz i
 // in the message box.
 func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool, timeout time.Duration) error {
 	sz := msg.Size()
-	sentDigest, err := self.writeDigest(msg, extra, sz)
+	sentDigest, err := self.writeDigest(msg, extra, sz, "mbox")
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,35 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, e
 	return self.writeAutoCompress(msg, encrypt, sz)
 }
 
-func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int) (sentDigest bool, err error) {
+func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string, encrypt bool) (id string, err error) {
+	sz := msg.Size()
+	sentDigest := false
+	if self.digestThreshold > 0 && sz > self.digestThreshold {
+		sentDigest = true
+	}
+	// We have sent the digest. Cache the message
+	if sentDigest {
+		id, err = self.mcache.Enqueue(self.Service(), self.Username(), msg)
+		if err != nil {
+			return
+		}
+		if len(id) == 0 || id == "mbox" {
+			err = fmt.Errorf("Bad message cache implementation: id=%v", id)
+			return
+		}
+		_, err = self.writeDigest(msg, extra, sz, id)
+		if err != nil {
+			return
+		}
+	}
+	// Otherwise, send the message directly
+	err = self.writeAutoCompress(msg, encrypt, sz)
+	id = ""
+	return
+}
+
+
+func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (sentDigest bool, err error) {
 	sentDigest = false
 	if self.digestThreshold < 0 {
 		return
@@ -84,8 +113,9 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 
 	digest := new(proto.Command)
 	digest.Type = proto.CMD_DIGEST
-	digest.Params = make([]string, 1)
+	digest.Params = make([]string, 2)
 	digest.Params[0] = fmt.Sprintf("%v", sz)
+	digest.Params[1] = id
 
 	dmsg := new(proto.Message)
 

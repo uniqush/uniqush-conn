@@ -23,6 +23,7 @@ import (
 )
 
 type Cache interface {
+	// The id mbox should never be returned
 	Enqueue(service, username string, msg *proto.Message) (id string, err error)
 	Dequeue(service, username string) (msg *proto.Message, err error)
 	DelFromQueue(service, username, id string) (msg *proto.Message, err error)
