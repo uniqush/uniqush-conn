@@ -24,6 +24,15 @@ type Message struct {
 	Body   []byte            "b,omitempty"
 }
 
+func (self *Message) Size() int {
+	ret := len(self.Body)
+	for k, v := range self.Header {
+		ret += len(k)
+		ret += len(v)
+	}
+	return ret
+}
+
 func (a *Message) Eq(b *Message) bool {
 	if len(a.Header) != len(b.Header) {
 		return false
