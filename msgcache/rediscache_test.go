@@ -104,3 +104,45 @@ func TestEnqueueDel(t *testing.T) {
 		}
 	}
 }
+
+func inMsgList(mlist []*proto.Message, msg *proto.Message) bool {
+	for _, m := range mlist {
+		if m.Eq(msg) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestEnqueueClrqueue(t *testing.T) {
+	msgs := multiRandomMessage(10)
+	cache := getCache()
+	srv := "srv"
+	usr := "usr"
+	for _, msg := range msgs {
+		_, err := cache.Enqueue(srv, usr, msg)
+		if err != nil {
+			t.Errorf("Enqueue error: %v", err)
+			return
+		}
+	}
+
+	rmsgs, err := cache.Clrqueue(srv, usr)
+	if err != nil {
+		t.Errorf("Clrqueue error: %v", err)
+		return
+	}
+
+	if len(rmsgs) != len(msgs) {
+		t.Errorf("Clrqueue error: not same length")
+		return
+	}
+
+	for i, msg := range msgs {
+		if !inMsgList(rmsgs, msg) {
+			t.Errorf("%vth message does not in the retrieved list", i)
+		}
+	}
+}
+
+

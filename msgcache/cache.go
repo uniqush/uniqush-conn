@@ -25,10 +25,8 @@ type Cache interface {
 	Enqueue(service, username string, msg *proto.Message) (id string, err error)
 	Dequeue(service, username string) (msg *proto.Message, err error)
 	DelFromQueue(service, username, id string) (msg *proto.Message, err error)
+	Clrqueue(service, username string) (msg []*proto.Message, err error)
 	/*
-		Clrqueue(service, username) (msg []*proto.Message, err error)
-
-
 		SetMessageBox(service, username string, msg *proto.Message) error
 		ClrMessageBox(service, username string) (msg *proto.Message, err error)
 

@@ -203,6 +203,10 @@ func (self *redisMessageCache) Dequeue(service, username string) (msg *proto.Mes
 	return
 }
 
+func (self *redisMessageCache) Clrqueue(service, username string) (msgs []*proto.Message, err error) {
+	return self.dequeueN(service, username, 0)
+}
+
 func (self *redisMessageCache) DelFromQueue(service, username, id string) (msg *proto.Message, err error) {
 	score, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
