@@ -26,7 +26,6 @@ import (
 	"encoding/binary"
 	"hash"
 	"io"
-	"labix.org/v2/mgo/bson"
 	"sync"
 )
 
@@ -114,8 +113,7 @@ func (self *CommandIO) decodeCommand(data []byte, compress bool) (cmd *Command, 
 			return
 		}
 	}
-	cmd = new(Command)
-	err = bson.Unmarshal(decoded, cmd)
+	cmd, err = UnmarshalCommand(decoded)
 	if err != nil {
 		return
 	}
@@ -123,7 +121,7 @@ func (self *CommandIO) decodeCommand(data []byte, compress bool) (cmd *Command, 
 }
 
 func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, err error) {
-	bsonEncoded, err := bson.Marshal(cmd)
+	bsonEncoded, err := cmd.Marshal()
 	if err != nil {
 		return
 	}
