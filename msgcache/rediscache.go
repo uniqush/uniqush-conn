@@ -18,11 +18,12 @@
 package msgcache
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
+	"strconv"
 	"time"
-	"fmt"
-	"encoding/json"
 )
 
 type redisMessageCache struct {
@@ -60,9 +61,9 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 	}
 
 	pool := &redis.Pool{
-		MaxIdle: 3,
-		IdleTimeout: 240 * time.Second,
-		Dial: dial,
+		MaxIdle:      3,
+		IdleTimeout:  240 * time.Second,
+		Dial:         dial,
 		TestOnBorrow: testOnBorrow,
 	}
 
@@ -83,55 +84,185 @@ func posterKey(service, username string) string {
 	return fmt.Sprintf("poster:%v:%v", service, username)
 }
 
-func marshalMsg(msg *proto.Message) (buf []byte, err error) {
-	buf, err = json.Marshal(msg)
+type msgContainer struct {
+	Id  int64
+	Msg *proto.Message
+}
+
+func marshalMsg(msg *proto.Message, id int64) (buf []byte, err error) {
+	mc := new(msgContainer)
+	mc.Id = id
+	mc.Msg = msg
+	buf, err = json.Marshal(mc)
 	return
 }
 
 func unmarshalMsg(buf []byte) (msg *proto.Message, err error) {
-	msg = new(proto.Message)
-	err = json.Unmarshal(buf, msg)
+	mc := new(msgContainer)
+	err = json.Unmarshal(buf, &mc)
 	if err != nil {
-		msg = nil
+		return
 	}
+	msg = mc.Msg
 	return
 }
 
-func (self *redisMessageCache) Enqueue(service, username string, msg *proto.Message) (id int, err error) {
+func (self *redisMessageCache) Enqueue(service, username string, msg *proto.Message) (id string, err error) {
 	key := mqKey(service, username)
-	value, err := marshalMsg(msg)
+	score := time.Now().UnixNano()
+	value, err := marshalMsg(msg, score)
 	if err != nil {
 		return
 	}
 	conn := self.pool.Get()
 	defer conn.Close()
-	reply, err := conn.Do("RPUSH", key, value)
-	id, err = redis.Int(reply, err)
+	_, err = conn.Do("ZADD", key, score, value)
+	if err != nil {
+		return
+	}
+	id = fmt.Sprintf("%v", score)
+	return
+}
+
+func (self *redisMessageCache) dequeueN(service, username string, n int) (msgs []*proto.Message, err error) {
+	key := mqKey(service, username)
+	if err != nil {
+		return
+	}
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	err = conn.Send("MULTI")
+	if err != nil {
+		return
+	}
+	err = conn.Send("ZRANGE", key, 0, n-1)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	err = conn.Send("ZREMRANGEBYRANK", key, 0, n-1)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	mbulk, err := conn.Do("EXEC")
+
+	if err != nil {
+		return
+	}
+	if mbulk == nil {
+		return
+	}
+	mreply, err := redis.Values(mbulk, err)
+	if err != nil {
+		return
+	}
+	if len(mreply) < 2 {
+		return
+	}
+	reply := mreply[0]
+	values, err := redis.Values(reply, err)
+	if err != nil {
+		return
+	}
+	if len(values) == 0 {
+		return
+	}
+
+	msgs = make([]*proto.Message, len(values))
+
+	for i, r := range values {
+		buf, e := redis.Bytes(r, nil)
+		if e != nil {
+			err = e
+			msgs = nil
+			return
+		}
+		msg, e := unmarshalMsg(buf)
+		if e != nil {
+			err = e
+			msgs = nil
+			return
+		}
+		msgs[i] = msg
+	}
 	return
 }
 
 func (self *redisMessageCache) Dequeue(service, username string) (msg *proto.Message, err error) {
+	msgs, err := self.dequeueN(service, username, 1)
+	if err != nil {
+		return
+	}
+	if len(msgs) == 0 {
+		msg = nil
+		return
+	}
+	msg = msgs[0]
+	return
+}
+
+func (self *redisMessageCache) DelFromQueue(service, username, id string) (msg *proto.Message, err error) {
+	score, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return
+	}
 	key := mqKey(service, username)
 	if err != nil {
 		return
 	}
 	conn := self.pool.Get()
 	defer conn.Close()
-	reply, err := conn.Do("LPOP", key)
+
+	err = conn.Send("MULTI")
+	if err != nil {
+		return
+	}
+	err = conn.Send("ZRANGEBYSCORE", key, score, score)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	err = conn.Send("ZREMRANGEBYSCORE", key, score, score)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	reply, err := conn.Do("EXEC")
+	if err != nil {
+		return
+	}
 	if reply == nil {
 		msg = nil
 		err = nil
 		return
 	}
-	value, err := redis.Bytes(reply, err)
+	values, err := redis.Values(reply, err)
+	if err != nil {
+		return
+	}
+	if len(values) < 2 {
+		return
+	}
+
+	rangeReply := values[0]
+	if rangeReply == nil {
+		return
+	}
+
+	msgs, err := redis.Values(rangeReply, err)
+	if len(msgs) == 0 {
+		return
+	}
+
+	value, err := redis.Bytes(msgs[0], nil)
 	if err != nil {
 		return
 	}
 	if value == nil {
-		msg = nil
 		return
 	}
 	msg, err = unmarshalMsg(value)
 	return
 }
-

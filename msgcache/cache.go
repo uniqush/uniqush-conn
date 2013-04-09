@@ -22,18 +22,17 @@ import (
 )
 
 type Cache interface {
-	Enqueue(service, username string, msg *proto.Message) (id int, err error)
+	Enqueue(service, username string, msg *proto.Message) (id string, err error)
 	Dequeue(service, username string) (msg *proto.Message, err error)
+	DelFromQueue(service, username, id string) (msg *proto.Message, err error)
 	/*
-	Clrqueue(service, username) (msg []*proto.Message, err error)
+		Clrqueue(service, username) (msg []*proto.Message, err error)
 
-	DelFromQueue(service, username, idx int) (msg *proto.Message, err error)
 
-	SetMessageBox(service, username string, msg *proto.Message) error
-	ClrMessageBox(service, username string) (msg *proto.Message, err error)
+		SetMessageBox(service, username string, msg *proto.Message) error
+		ClrMessageBox(service, username string) (msg *proto.Message, err error)
 
-	WritePoster(service, username string, msg *proto.Message, timeout time.Duration) error
-	ReadPoster(service, username string) (msg *proto.Message, err error)
+		WritePoster(service, username string, msg *proto.Message, timeout time.Duration) error
+		ReadPoster(service, username string) (msg *proto.Message, err error)
 	*/
 }
-

@@ -18,10 +18,11 @@
 package msgcache
 
 import (
-	"testing"
-	"github.com/uniqush/uniqush-conn/proto"
 	"crypto/rand"
+	"github.com/garyburd/redigo/redis"
+	"github.com/uniqush/uniqush-conn/proto"
 	"io"
+	"testing"
 )
 
 func randomMessage() *proto.Message {
@@ -43,7 +44,12 @@ func multiRandomMessage(N int) []*proto.Message {
 }
 
 func getCache() Cache {
-	return NewRedisMessageCache("", "", 1)
+	db := 1
+	c, _ := redis.Dial("tcp", "localhost:6379")
+	c.Do("SELECT", db)
+	c.Do("FLUSHDB")
+	c.Close()
+	return NewRedisMessageCache("", "", db)
 }
 
 func TestEnqueueDequeue(t *testing.T) {
@@ -70,3 +76,31 @@ func TestEnqueueDequeue(t *testing.T) {
 	}
 }
 
+func TestEnqueueDel(t *testing.T) {
+	N := 10
+	msgs := multiRandomMessage(N)
+	idMap := make(map[string]*proto.Message, N)
+	cache := getCache()
+	srv := "srv"
+	usr := "usr"
+
+	for _, msg := range msgs {
+		id, err := cache.Enqueue(srv, usr, msg)
+		if err != nil {
+			t.Errorf("Enqueue error: %v", err)
+			return
+		}
+		idMap[id] = msg
+	}
+
+	for id, msg := range idMap {
+		m, err := cache.DelFromQueue(srv, usr, id)
+		if err != nil {
+			t.Errorf("Del error: %v", err)
+			return
+		}
+		if !m.Eq(msg) {
+			t.Errorf("message %v does not same", id)
+		}
+	}
+}
