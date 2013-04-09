@@ -37,7 +37,7 @@ type MessageReadWriter interface {
 }
 
 type ControlCommandProcessor interface {
-	ProcessCommand(cmd *Command) error
+	ProcessCommand(cmd *Command) (msg *Message, err error)
 }
 
 type Conn interface {
@@ -62,13 +62,14 @@ func (self *messageIO) Close() error {
 	return self.conn.Close()
 }
 
-func (self *messageIO) processCommand(cmd *Command) error {
+func (self *messageIO) processCommand(cmd *Command) (msg *Message, err error) {
 	switch cmd.Type {
 	case CMD_BYE:
-		return io.EOF
+		err = io.EOF
+		return
 	}
 	if self.proc == nil {
-		return nil
+		return
 	}
 	return self.proc.ProcessCommand(cmd)
 }
@@ -98,10 +99,13 @@ func (self *messageIO) collectMessage() {
 			continue
 		}
 
-		err = self.processCommand(cmd)
+		msg, err := self.processCommand(cmd)
 		if err != nil {
 			self.msgChan <- err
 			return
+		}
+		if msg != nil {
+			self.msgChan <- msg
 		}
 	}
 }

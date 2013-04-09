@@ -22,10 +22,10 @@ import (
 )
 
 type Message struct {
-	Sender string "s,omitempty"
-	SenderService string "v,omitempty"
-	Header map[string]string "h,omitempty"
-	Body   []byte            "b,omitempty"
+	Sender        string            "s,omitempty"
+	SenderService string            "v,omitempty"
+	Header        map[string]string "h,omitempty"
+	Body          []byte            "b,omitempty"
 }
 
 func (self *Message) Size() int {
@@ -65,29 +65,48 @@ const (
 	CMD_EMPTY
 	CMD_AUTH
 	CMD_AUTHOK
-	CMD_ACK
 	CMD_BYE
-	CMD_INVIS
-	CMD_VIS
+
+	// Sent from client.
+	// Telling the server about its
+	// digest perference.
 	CMD_DIGEST_SETTING
+
+	// Sent from server.
+	// Telling the client an
+	// arrival of a message.
 	CMD_DIGEST
+
+	// Sent from client.
+	// Telling the server which cached
+	// message it wants to retrive.
 	CMD_MSG_RETRIEVE
+
+	// Sent from client.
+	// Telling the server to forward a
+	// message to another user.
+	CMD_FWD_REQ
+
+	// Sent from server.
+	// Telling the client the mssage
+	// is originally from another user.
 	CMD_FWD
 )
 
 type Command struct {
-	Type    uint8   "t,omitempty"
+	Type    uint8    "t,omitempty"
 	Params  []string "p,omitempty"
 	Message *Message "m,omitempty"
 }
 
 const (
-	maxNrParams = 16
+	maxNrParams  = 16
 	maxNrHeaders = 0x0000FFFF
 )
 
 var ErrTooManyParams = errors.New("Too many parameters: 16 max")
 var ErrTooManyHeaders = errors.New("Too many headers: 4096 max")
+
 // | Type | NrParams | Reserved | NrHeaders | Params | Header | Body |
 //
 // Type: 8 bit
@@ -97,7 +116,7 @@ var ErrTooManyHeaders = errors.New("Too many headers: 4096 max")
 // Params: list of strings. each string ends with \0. (ACII 0)
 // Header: list of string pairs. each string ends with \0. (ACII 0)
 func (self *Command) Marshal() (data []byte, err error) {
-	if (self == nil) {
+	if self == nil {
 		return
 	}
 	nrParams := len(self.Params)
@@ -144,7 +163,6 @@ func (self *Command) Marshal() (data []byte, err error) {
 	return
 }
 
-
 func (self *Command) eq(cmd *Command) bool {
 	if self.Type != cmd.Type {
 		return false
@@ -179,7 +197,7 @@ func cutString(data []byte) (str, rest []byte, err error) {
 		return
 	}
 	str = data[:idx]
-	rest = data[idx + 1:]
+	rest = data[idx+1:]
 	return
 }
 
@@ -234,4 +252,3 @@ func UnmarshalCommand(data []byte) (cmd *Command, err error) {
 	}
 	return
 }
-

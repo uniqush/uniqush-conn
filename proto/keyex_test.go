@@ -20,7 +20,7 @@ package proto
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"fmt"
+	//"fmt"
 	"net"
 	"testing"
 	"time"
@@ -106,17 +106,17 @@ func exchangeKeysOrReport(t *testing.T, succ bool) (serverKeySet, clientKeySet *
 	var ec error
 	ch := make(chan bool)
 	go func() {
-		start := time.Now()
+		//start := time.Now()
 		serverKeySet, es = ServerKeyExchange(priv, client)
-		delta := time.Since(start)
-		fmt.Printf("Key exchange: Server used %v\n", delta)
+		//delta := time.Since(start)
+		//fmt.Printf("Key exchange: Server used %v\n", delta)
 		ch <- true
 	}()
 	go func() {
-		start := time.Now()
+		//start := time.Now()
 		clientKeySet, ec = ClientKeyExchange(pub, server)
-		delta := time.Since(start)
-		fmt.Printf("Key exchange: Client used %v\n", delta)
+		//delta := time.Since(start)
+		//fmt.Printf("Key exchange: Client used %v\n", delta)
 		if ec != nil {
 			server.Close()
 		}

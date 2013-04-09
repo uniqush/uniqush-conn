@@ -160,10 +160,19 @@ func (self *serverConn) sendMessageInBox() error {
 }
 
 func (self *serverConn) ProcessCommand(cmd *proto.Command) error {
+	if cmd == nil {
+		return nil
+	}
 	switch cmd.Type {
 	case proto.CMD_MSG_RETRIEVE:
-		if cmd.Message == nil {
+		if len(cmd.Params) < 1 {
 			return proto.ErrBadPeerImpl
+		}
+
+		id := cmd.Params[0]
+		var msg *proto.Message
+		if id == "mbox" {
+			self.cache.
 		}
 	}
 	return nil

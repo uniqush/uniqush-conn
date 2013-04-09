@@ -19,8 +19,8 @@ package proto
 
 import (
 	"fmt"
-	"testing"
 	"labix.org/v2/mgo/bson"
+	"testing"
 )
 
 func marshalUnmarshal(cmd *Command) error {
@@ -76,7 +76,7 @@ func TestCommandMarshal(t *testing.T) {
 	cmd.Message.Header["a"] = "h"
 	cmd.Message.Header["b"] = "i"
 	cmd.Message.Header["b"] = "j"
-	cmd.Message.Body = []byte{1,2,3,3}
+	cmd.Message.Body = []byte{1, 2, 3, 3}
 	marshalUnmarshal(cmd)
 }
 
@@ -108,4 +108,3 @@ func BenchmarkCommandMarshalUnmarshalBson(b *testing.B) {
 		bson.Unmarshal(data, c)
 	}
 }
-
