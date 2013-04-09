@@ -31,8 +31,8 @@ type clientConn struct {
 	cmdio *proto.CommandIO
 }
 
-func (self *clientConn) ProcessCommand(cmd *proto.Command) error {
-	return nil
+func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+	return
 }
 
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
@@ -41,4 +41,3 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	cc.Conn = proto.NewConn(cmdio, service, username, conn, cc)
 	return cc
 }
-

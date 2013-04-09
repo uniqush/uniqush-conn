@@ -18,10 +18,10 @@
 package server
 
 import (
-	"github.com/uniqush/uniqush-conn/proto"
-	"github.com/uniqush/uniqush-conn/msgcache"
-	"net"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/msgcache"
+	"github.com/uniqush/uniqush-conn/proto"
+	"net"
 	"time"
 )
 
@@ -38,11 +38,11 @@ type Conn interface {
 
 type serverConn struct {
 	proto.Conn
-	cmdio *proto.CommandIO
-	digestThreshold int
+	cmdio             *proto.CommandIO
+	digestThreshold   int
 	compressThreshold int
-	digestFields []string
-	mcache msgcache.Cache
+	digestFields      []string
+	mcache            msgcache.Cache
 }
 
 func (self *serverConn) writeAutoCompress(msg *proto.Message, encrypt bool, sz int) error {
@@ -100,7 +100,6 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string,
 	id = ""
 	return
 }
-
 
 func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (sentDigest bool, err error) {
 	sentDigest = false
@@ -222,4 +221,3 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.digestFields = make([]string, 0, 10)
 	return sc
 }
-
