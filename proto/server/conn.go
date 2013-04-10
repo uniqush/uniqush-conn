@@ -61,7 +61,7 @@ func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 
 func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
 	sz = msg.Size()
-	if self.digestThreshold > 0 && self.digestThreshold < sz {
+	if self.digestThreshold >= 0 && self.digestThreshold < sz {
 		sendDigest = true
 	}
 	return
@@ -86,10 +86,11 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, t
 		if err != nil {
 			return err
 		}
-	}
-	sendDigest, err := self.writeDigest(msg, extra, sz, "mbox")
-	if err != nil {
-		return err
+		_, err = self.writeDigest(msg, extra, sz, "mbox")
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// Otherwise, send the message directly
@@ -108,9 +109,10 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string)
 		if err != nil {
 			return
 		}
-	}
-	sendDigest, err = self.writeDigest(msg, extra, sz, id)
-	if err != nil {
+		_, err = self.writeDigest(msg, extra, sz, id)
+		if err != nil {
+			return
+		}
 		return
 	}
 

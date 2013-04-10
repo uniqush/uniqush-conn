@@ -65,6 +65,11 @@ func sendTestMessages(s2c, c2s proto.Conn, serverToClient bool, msgs ...*proto.M
 			if ed != nil {
 				return
 			}
+			if msg == nil {
+				msg = new(proto.Message)
+			}
+			msg.Sender = dst.Username()
+			msg.SenderService = dst.Service()
 			if !m.Eq(msg) {
 				ed = fmt.Errorf("corrupted data")
 				return
@@ -186,6 +191,11 @@ func TestDigestSetting(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
+		if m.Id != "mbox" {
+			t.Errorf("Error: wrong Id: %v; %v", m.Id, m)
+		}
+		msg.Sender = servConn.Username()
+		msg.SenderService = servConn.Service()
 		m.Id = ""
 		if !msg.Eq(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
@@ -243,6 +253,11 @@ func TestDigestSettingWithFields(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
+		if m.Id != "mbox" {
+			t.Errorf("Error: wrong Id")
+		}
+		msg.Sender = servConn.Username()
+		msg.SenderService = servConn.Service()
 		m.Id = ""
 		if !msg.Eq(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
@@ -296,6 +311,8 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
+		msg.Sender = servConn.Username()
+		msg.SenderService = servConn.Service()
 		m.Id = ""
 		if !msg.Eq(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
