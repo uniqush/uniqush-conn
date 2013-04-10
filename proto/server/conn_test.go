@@ -498,3 +498,121 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+func TestForwardRequestDifferentService(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(1024, 1024, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	fwdChan := make(chan *ForwardRequest)
+
+	servConn.SetMessageCache(mcache)
+	servConn.SetForwardRequestChannel(fwdChan)
+
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+
+	msg := randomMessage()
+
+	fwd := "random"
+	fwdSrv := "randomService"
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// Server:
+	go func() {
+		fwdreq := <-fwdChan
+		if fwdreq.Receiver != fwd {
+			t.Errorf("Receiver is not correct: %v", fwdreq)
+		}
+		if fwdreq.ReceiverService != fwdSrv {
+			t.Errorf("Receiver Service is not correct: %v", fwdreq)
+		}
+		msg.Sender = cliConn.Username()
+		msg.SenderService = cliConn.Service()
+		if !msg.Eq(fwdreq.Message) {
+			t.Errorf("Error: should same: %v != %v", msg, fwdreq.Message)
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		err := cliConn.ForwardRequest(fwd, fwdSrv, msg)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
+func TestForwardRequestSameService(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(1024, 1024, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	fwdChan := make(chan *ForwardRequest)
+
+	servConn.SetMessageCache(mcache)
+	servConn.SetForwardRequestChannel(fwdChan)
+
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+
+	msg := randomMessage()
+
+	fwd := "random"
+	fwdSrv := cliConn.Service()
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// Server:
+	go func() {
+		fwdreq := <-fwdChan
+		if fwdreq.Receiver != fwd {
+			t.Errorf("Receiver is not correct: %v", fwdreq)
+		}
+		if fwdreq.ReceiverService != fwdSrv {
+			t.Errorf("Receiver Service is not correct: %v", fwdreq)
+		}
+		msg.Sender = cliConn.Username()
+		msg.SenderService = cliConn.Service()
+		if !msg.Eq(fwdreq.Message) {
+			t.Errorf("Error: should same: %v != %v", msg, fwdreq.Message)
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		err := cliConn.ForwardRequest(fwd, fwdSrv, msg)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}

@@ -86,7 +86,7 @@ func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Mess
 	cmd.Type = proto.CMD_FWD_REQ
 	cmd.Params = make([]string, 1, 2)
 	cmd.Params[0] = receiver
-	if service != self.Service() {
+	if len(service) > 0 && service != self.Service() {
 		cmd.Params = append(cmd.Params, service)
 	}
 	cmd.Message = msg

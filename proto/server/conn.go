@@ -193,6 +193,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		} else {
 			fwdreq.ReceiverService = self.Service()
 		}
+		cmd.Message.Id = ""
 		fwdreq.Message = cmd.Message
 		self.fwdChan <- fwdreq
 	case proto.CMD_SETTING:
