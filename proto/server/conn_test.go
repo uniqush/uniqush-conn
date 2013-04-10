@@ -20,9 +20,9 @@ package server
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
-	"github.com/uniqush/uniqush-conn/msgcache"
 	"io"
 	"sync"
 	"testing"
@@ -169,7 +169,7 @@ func TestDigestSetting(t *testing.T) {
 	reqOK := make(chan bool)
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0 * time.Second)
+		err := servConn.SendOrBox(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -179,12 +179,10 @@ func TestDigestSetting(t *testing.T) {
 
 	// Client:
 	go func() {
-		fmt.Printf("Waiting digest..\n")
 		digest := <-diChan
 		if nil == digest {
 			t.Errorf("Error: Empty digest")
 		}
-		fmt.Printf("digest: %v\n", digest)
 		<-reqOK
 		cliConn.RequestMessage(digest.MsgId)
 		m, err := cliConn.ReadMessage()
@@ -199,4 +197,3 @@ func TestDigestSetting(t *testing.T) {
 	}()
 	wg.Wait()
 }
-

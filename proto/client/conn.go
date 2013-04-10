@@ -18,9 +18,9 @@
 package client
 
 import (
+	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
-	"fmt"
 	"strconv"
 )
 
@@ -33,8 +33,8 @@ type Conn interface {
 
 type Digest struct {
 	MsgId string
-	Size int
-	Info map[string]string
+	Size  int
+	Info  map[string]string
 }
 
 type clientConn struct {
@@ -43,9 +43,9 @@ type clientConn struct {
 
 	digestChan chan<- *Digest
 
-	digestThreshold int
+	digestThreshold   int
 	compressThreshold int
-	encrypt bool
+	encrypt           bool
 }
 
 func (self *clientConn) RequestMessage(id string) error {
@@ -65,7 +65,7 @@ func (self *clientConn) Config(digestThreshold, compressThreshold int, encrypt b
 	self.encrypt = encrypt
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_SETTING
-	cmd.Params = make([]string, 3, 3 + len(digestFields))
+	cmd.Params = make([]string, 3, 3+len(digestFields))
 	cmd.Params[0] = fmt.Sprintf("%v", digestThreshold)
 	cmd.Params[1] = fmt.Sprintf("%v", compressThreshold)
 	if encrypt {
@@ -89,7 +89,6 @@ func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		if self.digestChan == nil {
 			return
 		}
-		fmt.Printf("Client: get digest: %v\n", cmd)
 		if len(cmd.Params) < 2 {
 			err = proto.ErrBadPeerImpl
 			return
