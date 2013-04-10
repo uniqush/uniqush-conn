@@ -49,7 +49,7 @@ type serverConn struct {
 
 func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	compress := false
-	if self.compressThreshold > 0 && self.compressThreshold < sz {
+	if self.compressThreshold > 0 && self.compressThreshold < sz && self.mcache != nil{
 		compress = true
 	}
 	return self.WriteMessage(msg, compress, self.encrypt)
@@ -79,7 +79,7 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, t
 func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error) {
 	sz := msg.Size()
 	sentDigest := false
-	if self.digestThreshold > 0 && sz > self.digestThreshold {
+	if self.compressThreshold > 0 && self.compressThreshold < sz && self.mcache != nil{
 		sentDigest = true
 	}
 	// We have sent the digest. Cache the message
@@ -193,8 +193,16 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			err = proto.ErrBadPeerImpl
 			return
 		}
-
 		id := cmd.Params[0]
+
+		// If there is no cache, then send an empty message
+		if self.mcache == nil {
+			m := new(proto.Message)
+			m.Id = id
+			err = self.writeAutoCompress(m, m.Size())
+			return
+		}
+
 		var rmsg *proto.Message
 
 		switch id {
