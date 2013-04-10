@@ -128,7 +128,10 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 
 	if msg != nil {
 		cmd.Params = make([]string, 0, 3)
-		if len(msg.Sender) > 0 {
+		if len(msg.Sender) > 0 &&			// The sender is set
+			(msg.Sender != self.Username() ||	// and it is different from self
+			(len(msg.SenderService) > 0 && msg.SenderService != self.Service())) { // or it is under a different service
+
 			cmd.Type = CMD_FWD
 			cmd.Params = append(cmd.Params, msg.Sender)
 			if len(msg.SenderService) > 0 && msg.SenderService != self.Service() {
