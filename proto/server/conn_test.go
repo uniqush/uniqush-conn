@@ -166,14 +166,12 @@ func TestDigestSetting(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
-	reqOK := make(chan bool)
 	// Server:
 	go func() {
 		err := servConn.SendOrBox(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		reqOK <- true
 		wg.Done()
 	}()
 
@@ -183,7 +181,6 @@ func TestDigestSetting(t *testing.T) {
 		if nil == digest {
 			t.Errorf("Error: Empty digest")
 		}
-		<-reqOK
 		cliConn.RequestMessage(digest.MsgId)
 		m, err := cliConn.ReadMessage()
 		if err != nil {
@@ -223,14 +220,12 @@ func TestDigestSettingWithFields(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
-	reqOK := make(chan bool)
 	// Server:
 	go func() {
 		err := servConn.SendOrBox(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		reqOK <- true
 		wg.Done()
 	}()
 
@@ -243,7 +238,6 @@ func TestDigestSettingWithFields(t *testing.T) {
 		if digest.Info[fields[0]] != msg.Header[fields[0]] {
 			t.Errorf("Error: field not match")
 		}
-		<-reqOK
 		cliConn.RequestMessage(digest.MsgId)
 		m, err := cliConn.ReadMessage()
 		if err != nil {
@@ -282,14 +276,12 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
-	reqOK := make(chan bool)
 	// Server:
 	go func() {
 		_, err := servConn.SendOrQueue(msg, nil)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		reqOK <- true
 		wg.Done()
 	}()
 
@@ -299,7 +291,6 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 		if nil == digest {
 			t.Errorf("Error: Empty digest")
 		}
-		<-reqOK
 		cliConn.RequestMessage(digest.MsgId)
 		m, err := cliConn.ReadMessage()
 		if err != nil {
