@@ -21,6 +21,8 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/proto/client"
+	"github.com/uniqush/uniqush-conn/msgcache"
 	"io"
 	"sync"
 	"testing"
@@ -140,3 +142,61 @@ func TestMessageSendClientToServer(t *testing.T) {
 		cliConn.Close()
 	}
 }
+
+func TestDigestSetting(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(0, 512, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	servConn.SetMessageCache(mcache)
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+	msg := randomMessage()
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	reqOK := make(chan bool)
+	// Server:
+	go func() {
+		err := servConn.SendOrBox(msg, nil, 0 * time.Second)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		reqOK <- true
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		fmt.Printf("Waiting digest..\n")
+		digest := <-diChan
+		if nil == digest {
+			t.Errorf("Error: Empty digest")
+		}
+		fmt.Printf("digest: %v\n", digest)
+		<-reqOK
+		cliConn.RequestMessage(digest.MsgId)
+		m, err := cliConn.ReadMessage()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		m.Id = ""
+		if !msg.Eq(m) {
+			t.Errorf("Error: should same: %v != %v", msg, m)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
+

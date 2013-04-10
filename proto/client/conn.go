@@ -26,8 +26,9 @@ import (
 
 type Conn interface {
 	proto.Conn
-	Config(digestThreshold, compressThreshold int, encrypt bool) error
+	Config(digestThreshold, compressThreshold int, encrypt bool, digestFields []string) error
 	SetDigestChannel(digestChan chan<- *Digest)
+	RequestMessage(id string) error
 }
 
 type Digest struct {
@@ -47,22 +48,33 @@ type clientConn struct {
 	encrypt bool
 }
 
+func (self *clientConn) RequestMessage(id string) error {
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_MSG_RETRIEVE
+	cmd.Params = []string{id}
+	return self.cmdio.WriteCommand(cmd, false, true)
+}
+
 func (self *clientConn) SetDigestChannel(digestChan chan<- *Digest) {
 	self.digestChan = digestChan
 }
 
-func (self *clientConn) Config(digestThreshold, compressThreshold int, encrypt bool) error {
+func (self *clientConn) Config(digestThreshold, compressThreshold int, encrypt bool, digestFields []string) error {
 	self.digestThreshold = digestThreshold
 	self.compressThreshold = compressThreshold
 	self.encrypt = encrypt
 	cmd := new(proto.Command)
-	cmd.Params = make([]string, 3)
+	cmd.Type = proto.CMD_SETTING
+	cmd.Params = make([]string, 3, 3 + len(digestFields))
 	cmd.Params[0] = fmt.Sprintf("%v", digestThreshold)
 	cmd.Params[1] = fmt.Sprintf("%v", compressThreshold)
 	if encrypt {
 		cmd.Params[2] = "1"
 	} else {
 		cmd.Params[2] = "0"
+	}
+	for _, f := range digestFields {
+		cmd.Params = append(cmd.Params, f)
 	}
 	err := self.cmdio.WriteCommand(cmd, false, true)
 	return err
@@ -77,6 +89,7 @@ func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		if self.digestChan == nil {
 			return
 		}
+		fmt.Printf("Client: get digest: %v\n", cmd)
 		if len(cmd.Params) < 2 {
 			err = proto.ErrBadPeerImpl
 			return

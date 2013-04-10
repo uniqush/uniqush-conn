@@ -68,6 +68,7 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, t
 
 	// We have sent the digest. Cache the message
 	if sentDigest {
+		fmt.Printf("Server: msg before sending \n")
 		err = self.mcache.SetMessageBox(self.Service(), self.Username(), msg, timeout)
 		return err
 	}
@@ -103,6 +104,8 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string)
 }
 
 func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (sentDigest bool, err error) {
+
+	fmt.Printf("Size: %v; threshold: %v\n", sz, self.digestThreshold)
 	sentDigest = false
 	if self.digestThreshold < 0 {
 		return
@@ -161,8 +164,10 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			err = proto.ErrBadPeerImpl
 			return
 		}
+		fmt.Printf("Server: client changed settings: %v\n", cmd.Params)
 		if len(cmd.Params[0]) > 0 {
 			self.digestThreshold, err = strconv.Atoi(cmd.Params[0])
+			fmt.Printf("Dt: %v\n", self.digestThreshold)
 			if err != nil {
 				err = proto.ErrBadPeerImpl
 				return

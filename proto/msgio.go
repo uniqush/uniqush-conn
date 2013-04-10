@@ -93,6 +93,9 @@ func (self *messageIO) collectMessage() {
 		}
 		if cmd.Type == CMD_DATA {
 			if len(cmd.Params) > 0 {
+				if cmd.Message == nil {
+					cmd.Message = new(Message)
+				}
 				cmd.Message.Id = cmd.Params[0]
 			}
 			self.msgChan <- cmd.Message
