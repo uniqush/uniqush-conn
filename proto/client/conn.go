@@ -104,6 +104,21 @@ func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			digest.Info = cmd.Message.Header
 		}
 		self.digestChan <- digest
+	case proto.CMD_FWD:
+		if len(cmd.Params) < 1 {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		msg = new(proto.Message)
+		msg.Sender = cmd.Params[0]
+		if len(cmd.Params) > 1 {
+			msg.SenderService = cmd.Params[1]
+		} else {
+			msg.SenderService = self.Service()
+		}
+		if len(cmd.Params) > 2 {
+			msg.Id = cmd.Params[2]
+		}
 	}
 	return
 }

@@ -133,7 +133,7 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 		} else if len(msg.Sender) > 0 {
 			cmd.Type = CMD_FWD
 			cmd.Params = append(cmd.Params, msg.Sender)
-			if len(msg.SenderService) > 0 {
+			if msg.SenderService != self.Service() {
 				cmd.Params = append(cmd.Params, msg.SenderService)
 			}
 		} else {
@@ -141,6 +141,9 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 			cmd.Message = msg
 		}
 		if len(msg.Id) != 0 {
+			if len(msg.Sender) > 0 && len(cmd.Params) == 1 {
+				cmd.Params = append(cmd.Params, self.Service())
+			}
 			cmd.Params = append(cmd.Params, msg.Id)
 		}
 	} else {

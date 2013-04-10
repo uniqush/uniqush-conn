@@ -26,6 +26,12 @@ import (
 	"time"
 )
 
+type ForwardRequest struct {
+	Receiver string
+	ReceiverService string
+	Message * proto.Message
+}
+
 type Conn interface {
 	// Send the message to client.
 	// If the message is larger than the digest threshold,
@@ -34,6 +40,7 @@ type Conn interface {
 	SendOrBox(msg *proto.Message, extra map[string]string, timeout time.Duration) error
 	SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
+	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	proto.Conn
 }
 
@@ -45,6 +52,11 @@ type serverConn struct {
 	encrypt           bool
 	digestFields      []string
 	mcache            msgcache.Cache
+	fwdChan chan<- *ForwardRequest
+}
+
+func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
+	self.fwdChan = fwdChan
 }
 
 func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
@@ -108,7 +120,6 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string)
 }
 
 func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (sentDigest bool, err error) {
-
 	sentDigest = false
 	if self.digestThreshold < 0 {
 		return
@@ -162,6 +173,28 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		return
 	}
 	switch cmd.Type {
+	case proto.CMD_FWD_REQ:
+		if len(cmd.Params) < 1 {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		if self.fwdChan == nil {
+			return
+		}
+		fwdreq := new(ForwardRequest)
+		if cmd.Message == nil {
+			cmd.Message = new(proto.Message)
+		}
+		cmd.Message.Sender = self.Username()
+		cmd.Message.SenderService = self.Service()
+		fwdreq.Receiver = cmd.Params[0]
+		if len(cmd.Params) > 1 {
+			fwdreq.ReceiverService = cmd.Params[1]
+		} else {
+			fwdreq.ReceiverService = self.Service()
+		}
+		fwdreq.Message = cmd.Message
+		self.fwdChan <- fwdreq
 	case proto.CMD_SETTING:
 		if len(cmd.Params) < 3 {
 			err = proto.ErrBadPeerImpl
