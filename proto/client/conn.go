@@ -127,7 +127,10 @@ func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			err = proto.ErrBadPeerImpl
 			return
 		}
-		msg = new(proto.Message)
+		msg = cmd.Message
+		if msg == nil {
+			msg = new(proto.Message)
+		}
 		msg.Sender = cmd.Params[0]
 		if len(cmd.Params) > 1 {
 			msg.SenderService = cmd.Params[1]

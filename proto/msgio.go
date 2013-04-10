@@ -128,20 +128,21 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 
 	if msg != nil {
 		cmd.Params = make([]string, 0, 3)
-		if msg.IsEmpty() {
-			cmd.Type = CMD_EMPTY
-		} else if len(msg.Sender) > 0 {
+		if len(msg.Sender) > 0 {
 			cmd.Type = CMD_FWD
 			cmd.Params = append(cmd.Params, msg.Sender)
-			if msg.SenderService != self.Service() {
+			if len(msg.SenderService) > 0 && msg.SenderService != self.Service() {
 				cmd.Params = append(cmd.Params, msg.SenderService)
 			}
+			cmd.Message = msg
+		} else if msg.IsEmpty() {
+			cmd.Type = CMD_EMPTY
 		} else {
 			cmd.Type = CMD_DATA
 			cmd.Message = msg
 		}
 		if len(msg.Id) != 0 {
-			if len(msg.Sender) > 0 && len(cmd.Params) == 1 {
+			if cmd.Type == CMD_FWD && len(cmd.Params) == 1 {
 				cmd.Params = append(cmd.Params, self.Service())
 			}
 			cmd.Params = append(cmd.Params, msg.Id)

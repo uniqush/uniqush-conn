@@ -304,3 +304,198 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+func TestForwardFromServerSameService(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(1024, 1024, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	servConn.SetMessageCache(mcache)
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+	msg := randomMessage()
+	msg.Sender = "random"
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// Server:
+	go func() {
+		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		m, err := cliConn.ReadMessage()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		msg.SenderService = cliConn.Service()
+		if !msg.Eq(m) {
+			t.Errorf("Error: should same: %v != %v", msg, m)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
+func TestForwardFromServerSameServiceWithId(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(1024, 1024, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	servConn.SetMessageCache(mcache)
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+	msg := randomMessage()
+	msg.Sender = "random"
+	msg.Id = "randomId"
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// Server:
+	go func() {
+		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		m, err := cliConn.ReadMessage()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		msg.SenderService = cliConn.Service()
+		if !msg.Eq(m) {
+			t.Errorf("Error: should same: %v != %v", msg, m)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
+func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(1024, 1024, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	servConn.SetMessageCache(mcache)
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+	msg := randomMessage()
+	msg.Sender = "random"
+	msg.SenderService = "randomService"
+	msg.Id = "randomId"
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// Server:
+	go func() {
+		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		m, err := cliConn.ReadMessage()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		if !msg.Eq(m) {
+			t.Errorf("Error: should same: %v != %v", msg, m)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
+func TestForwardFromServerDifferentService(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(1024, 1024, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	servConn.SetMessageCache(mcache)
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+	msg := randomMessage()
+	msg.Sender = "random"
+	msg.SenderService = "randomService"
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	// Server:
+	go func() {
+		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		m, err := cliConn.ReadMessage()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		if !msg.Eq(m) {
+			t.Errorf("Error: should same: %v != %v", msg, m)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
+
