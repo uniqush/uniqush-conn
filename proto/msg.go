@@ -22,10 +22,15 @@ import (
 )
 
 type Message struct {
+	Id            string            "i,omitempty"
 	Sender        string            "s,omitempty"
 	SenderService string            "v,omitempty"
 	Header        map[string]string "h,omitempty"
 	Body          []byte            "b,omitempty"
+}
+
+func (self *Message) IsEmpty() bool {
+	return len(self.Header) == 0 && len(self.Body) == 0
 }
 
 func (self *Message) Size() int {
@@ -40,6 +45,9 @@ func (self *Message) Size() int {
 
 func (a *Message) Eq(b *Message) bool {
 	if len(a.Header) != len(b.Header) {
+		return false
+	}
+	if a.Id != b.Id {
 		return false
 	}
 	for k, v := range a.Header {
@@ -61,35 +69,73 @@ const (
 )
 
 const (
+	// Params:
+	// 0. [optional] The Id of the message
 	CMD_DATA = iota
+
+	// Params:
+	// 0. [optional] The Id of the message
 	CMD_EMPTY
+
+	// Sent from client.
+	//
+	// Params
+	// 0. service name
+	// 1. username
 	CMD_AUTH
+
 	CMD_AUTHOK
 	CMD_BYE
 
 	// Sent from client.
-	// Telling the server about its
-	// digest perference.
-	CMD_DIGEST_SETTING
+	// Telling the server about its perference.
+	//
+	// Params:
+	// 0. Digest threshold: -1 always send message directly; Empty: not change
+	// 1. Compression threshold: -1 always compress the data; Empty: not change
+	// 2. Encryption (1 - encrypt; 0 - no ecnrypt; others - not change)
+	// >3. [optional] Digest fields
+	CMD_SETTING
 
 	// Sent from server.
 	// Telling the client an
 	// arrival of a message.
+	//
+	// Params:
+	// 0. Size of the message
+	// 1. The id of the message
+	//
+	// Message.Header:
+	// Other digest info
 	CMD_DIGEST
 
 	// Sent from client.
 	// Telling the server which cached
 	// message it wants to retrive.
+	//
+	// Params:
+	// 0. The message id
 	CMD_MSG_RETRIEVE
 
 	// Sent from client.
 	// Telling the server to forward a
 	// message to another user.
+	//
+	// Params:
+	// 0. Reciever's name
+	// 1. [optional] Reciever's service name.
+	//    If empty, then same service as the client
 	CMD_FWD_REQ
 
 	// Sent from server.
 	// Telling the client the mssage
 	// is originally from another user.
+	//
+	// Params:
+	// 0. Sender's name
+	// 1. [optional] Sender's service name.
+	//    If empty, then same service as the client
+	// 2. [optional] The Id of the message in the cache.
 	CMD_FWD
 )
 

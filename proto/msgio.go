@@ -91,11 +91,20 @@ func (self *messageIO) collectMessage() {
 			continue
 		}
 		if cmd.Type == CMD_DATA {
+			if len(cmd.Params) > 0 {
+				cmd.Message.Id = cmd.Params[0]
+			}
 			self.msgChan <- cmd.Message
 			continue
 		}
 		if cmd.Type == CMD_EMPTY {
-			self.msgChan <- 1
+			if len(cmd.Params) == 0 {
+				self.msgChan <- 1
+			} else {
+				msg := new(Message)
+				msg.Id = cmd.Params[0]
+				self.msgChan <- msg
+			}
 			continue
 		}
 
@@ -113,11 +122,25 @@ func (self *messageIO) collectMessage() {
 func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error {
 	cmd := new(Command)
 
-	if msg == nil {
-		cmd.Type = CMD_EMPTY
+	if msg != nil {
+		cmd.Params = make([]string, 0, 3)
+		if msg.IsEmpty() {
+			cmd.Type = CMD_EMPTY
+		} else if len(msg.Sender) > 0 {
+			cmd.Type = CMD_FWD
+			cmd.Params = append(cmd.Params, msg.Sender)
+			if len(msg.SenderService) > 0 {
+				cmd.Params = append(cmd.Params, msg.SenderService)
+			}
+		} else {
+			cmd.Type = CMD_DATA
+			cmd.Message = msg
+		}
+		if len(msg.Id) != 0 {
+			cmd.Params = append(cmd.Params, msg.Id)
+		}
 	} else {
-		cmd.Type = CMD_DATA
-		cmd.Message = msg
+		cmd.Type = CMD_EMPTY
 	}
 	return self.cmdio.WriteCommand(cmd, compress, encrypt)
 }

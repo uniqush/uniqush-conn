@@ -22,6 +22,7 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -30,8 +31,8 @@ type Conn interface {
 	// If the message is larger than the digest threshold,
 	// then send a digest to the client and cache the whole message
 	// in the message box.
-	SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool, timeout time.Duration) error
-	SendOrQueue(msg *proto.Message, extra map[string]string, encrypt bool) (id string, err error)
+	SendOrBox(msg *proto.Message, extra map[string]string, timeout time.Duration) error
+	SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	proto.Conn
 }
@@ -41,23 +42,34 @@ type serverConn struct {
 	cmdio             *proto.CommandIO
 	digestThreshold   int
 	compressThreshold int
+	encrypt           bool
 	digestFields      []string
 	mcache            msgcache.Cache
 }
 
-func (self *serverConn) writeAutoCompress(msg *proto.Message, encrypt bool, sz int) error {
+func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	compress := false
 	if self.compressThreshold > 0 && self.compressThreshold < sz {
 		compress = true
 	}
-	return self.WriteMessage(msg, compress, encrypt)
+	if len(msg.Sender) == 0 {
+		return self.WriteMessage(msg, compress, self.encrypt)
+	}
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_FWD
+	cmd.Params = make([]string, 1, 2)
+	cmd.Params[0] = msg.Sender
+	if len(msg.SenderService) != 0 {
+		cmd.Params = append(cmd.Params, msg.SenderService)
+	}
+	return self.cmdio.WriteCommand(cmd, compress, self.encrypt)
 }
 
 // Send the message to client.
 // If the message is larger than the digest threshold,
 // then send a digest to the client and cache the whole message
 // in the message box.
-func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, encrypt bool, timeout time.Duration) error {
+func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, timeout time.Duration) error {
 	sz := msg.Size()
 	sentDigest, err := self.writeDigest(msg, extra, sz, "mbox")
 	if err != nil {
@@ -71,10 +83,10 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, e
 	}
 
 	// Otherwise, send the message directly
-	return self.writeAutoCompress(msg, encrypt, sz)
+	return self.writeAutoCompress(msg, sz)
 }
 
-func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string, encrypt bool) (id string, err error) {
+func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error) {
 	sz := msg.Size()
 	sentDigest := false
 	if self.digestThreshold > 0 && sz > self.digestThreshold {
@@ -87,16 +99,15 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string,
 			return
 		}
 		if len(id) == 0 || id == "mbox" {
+			id = ""
 			err = fmt.Errorf("Bad message cache implementation: id=%v", id)
 			return
 		}
 		_, err = self.writeDigest(msg, extra, sz, id)
-		if err != nil {
-			return
-		}
+		return
 	}
 	// Otherwise, send the message directly
-	err = self.writeAutoCompress(msg, encrypt, sz)
+	err = self.writeAutoCompress(msg, sz)
 	id = ""
 	return
 }
@@ -150,19 +161,48 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 	return
 }
 
-func (self *serverConn) sendMessageInBox() error {
-	msg, err := self.mcache.GetMessageBox(self.Service(), self.Username())
-	if err != nil {
-		return err
-	}
-	return self.WriteMessage(msg, false, true)
-}
-
 func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
 	if cmd == nil {
 		return
 	}
 	switch cmd.Type {
+	case proto.CMD_SETTING:
+		if len(cmd.Params) < 3 {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		if len(cmd.Params[0]) > 0 {
+			self.digestThreshold, err = strconv.Atoi(cmd.Params[0])
+			if err != nil {
+				err = proto.ErrBadPeerImpl
+				return
+			}
+		}
+		if len(cmd.Params[1]) > 0 {
+			self.compressThreshold, err = strconv.Atoi(cmd.Params[1])
+			if err != nil {
+				err = proto.ErrBadPeerImpl
+				return
+			}
+		}
+		if len(cmd.Params[2]) > 0 {
+			encrypt, e := strconv.Atoi(cmd.Params[2])
+			if e != nil {
+				err = proto.ErrBadPeerImpl
+				return
+			}
+			if encrypt == 0 {
+				self.encrypt = false
+			} else if encrypt == 1 {
+				self.encrypt = true
+			}
+		}
+		if len(cmd.Params) > 3 {
+			self.digestFields = make([]string, len(cmd.Params)-3)
+			for i, f := range cmd.Params[3:] {
+				self.digestFields[i] = f
+			}
+		}
 	case proto.CMD_MSG_RETRIEVE:
 		if len(cmd.Params) < 1 {
 			err = proto.ErrBadPeerImpl
@@ -171,8 +211,6 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 
 		id := cmd.Params[0]
 		var rmsg *proto.Message
-		rcmd := new(proto.Command)
-		rcmd.Type = proto.CMD_DATA
 
 		switch id {
 		case "mbox":
@@ -183,26 +221,10 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		if err != nil {
 			return
 		}
-		msz := 0
-		if rmsg == nil {
-			rcmd.Type = proto.CMD_EMPTY
-		} else {
-			if len(rmsg.Sender) != 0 {
-				rcmd.Type = proto.CMD_FWD
-				rcmd.Params = make([]string, 1, 2)
-				rcmd.Params[0] = rmsg.Sender
-				if len(rmsg.SenderService) != 0 {
-					rcmd.Params = append(rcmd.Params, rmsg.SenderService)
-				}
-			}
-			rcmd.Message = rmsg
-			msz = rmsg.Size()
+
+		if rmsg != nil {
+			err = self.writeAutoCompress(rmsg, rmsg.Size())
 		}
-		compress := false
-		if msz > self.compressThreshold {
-			compress = true
-		}
-		err = self.cmdio.WriteCommand(rcmd, compress, true)
 	}
 	return
 }
@@ -219,5 +241,6 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.digestThreshold = -1
 	sc.compressThreshold = 512
 	sc.digestFields = make([]string, 0, 10)
+	sc.encrypt = true
 	return sc
 }
