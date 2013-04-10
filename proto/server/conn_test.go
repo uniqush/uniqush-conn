@@ -291,9 +291,12 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
+	var msgId string
+
 	// Server:
 	go func() {
-		_, err := servConn.SendOrQueue(msg, nil)
+		var err error
+		msgId, err = servConn.SendOrQueue(msg, nil)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -313,6 +316,9 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 		}
 		msg.Sender = servConn.Username()
 		msg.SenderService = servConn.Service()
+		if m.Id != msgId {
+			t.Errorf("Error: wrong Id")
+		}
 		m.Id = ""
 		if !msg.Eq(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
