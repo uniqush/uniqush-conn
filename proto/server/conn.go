@@ -46,6 +46,13 @@ type serverConn struct {
 	digestFields      []string
 	mcache            msgcache.Cache
 }
+func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
+	sz = msg.Size()
+	if self.digestThreshold > 0 && self.digestThreshold < sz {
+		sendDigest = true
+	}
+	return
+}
 
 func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	compress := false
@@ -60,15 +67,15 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 // then send a digest to the client and cache the whole message
 // in the message box.
 func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, timeout time.Duration) error {
-	sz := msg.Size()
-	sentDigest, err := self.writeDigest(msg, extra, sz, "mbox")
-	if err != nil {
-		return err
+	sz, sendDigest := self.shouldDigest(msg)
+	if sendDigest {
+		err := self.mcache.SetMessageBox(self.Service(), self.Username(), msg, timeout)
+		if err != nil {
+			return err
+		}
 	}
-
-	// We have sent the digest. Cache the message
-	if sentDigest {
-		err = self.mcache.SetMessageBox(self.Service(), self.Username(), msg, timeout)
+	sendDigest, err := self.writeDigest(msg, extra, sz, "mbox")
+	if err != nil {
 		return err
 	}
 
@@ -77,28 +84,25 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, t
 }
 
 func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error) {
-	sz := msg.Size()
-	sentDigest := false
-	if self.compressThreshold > 0 && self.compressThreshold < sz && self.mcache != nil {
-		sentDigest = true
-	}
-	// We have sent the digest. Cache the message
-	if sentDigest {
+	sz, sendDigest := self.shouldDigest(msg)
+	if sendDigest {
 		id, err = self.mcache.Enqueue(self.Service(), self.Username(), msg)
-		if err != nil {
-			return
-		}
 		if len(id) == 0 || id == "mbox" {
 			id = ""
 			err = fmt.Errorf("Bad message cache implementation: id=%v", id)
 			return
 		}
-		_, err = self.writeDigest(msg, extra, sz, id)
+		if err != nil {
+			return
+		}
+	}
+	sendDigest, err = self.writeDigest(msg, extra, sz, id)
+	if err != nil {
 		return
 	}
+
 	// Otherwise, send the message directly
 	err = self.writeAutoCompress(msg, sz)
-	id = ""
 	return
 }
 
