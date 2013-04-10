@@ -98,17 +98,20 @@ func (self *messageIO) collectMessage() {
 				}
 				cmd.Message.Id = cmd.Params[0]
 			}
-			self.msgChan <- cmd.Message
+			msg := cmd.Message
+			msg.Sender = self.Username()
+			msg.SenderService = self.Service()
+			self.msgChan <- msg
 			continue
 		}
 		if cmd.Type == CMD_EMPTY {
-			if len(cmd.Params) == 0 {
-				self.msgChan <- 1
-			} else {
-				msg := new(Message)
+			msg := new(Message)
+			msg.Sender = self.Username()
+			msg.SenderService = self.Service()
+			if len(cmd.Params) != 0 {
 				msg.Id = cmd.Params[0]
-				self.msgChan <- msg
 			}
+			self.msgChan <- msg
 			continue
 		}
 

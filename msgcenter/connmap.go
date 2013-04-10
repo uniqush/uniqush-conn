@@ -18,6 +18,7 @@
 package msgcenter
 
 import (
+	"errors"
 	"bytes"
 	"fmt"
 	"github.com/petar/GoLLRB/llrb"
@@ -25,13 +26,13 @@ import (
 )
 
 type connMap interface {
-	AddConn(conn proto.Conn)
-	GetConn(service, username string) []proto.Conn
+	AddConn(conn proto.Conn, maxNrConnsPerUser int, maxNrUsers int) error
+	GetConn(username string) []proto.Conn
 	DelConn(conn proto.Conn)
 }
 
 func connKey(conn proto.Conn) string {
-	return fmt.Sprintf("%v\n%v", conn.Service(), conn.Username())
+	return conn.Username()
 }
 
 func lessConnList(a, b interface{}) bool {
@@ -63,8 +64,8 @@ type treeBasedConnMap struct {
 	tree *llrb.Tree
 }
 
-func (self *treeBasedConnMap) GetConn(service, user string) []proto.Conn {
-	key := fmt.Sprintf("%v\n%v", service, user)
+func (self *treeBasedConnMap) GetConn(user string) []proto.Conn {
+	key := user
 	clif := self.tree.Get(key)
 	cl, ok := clif.([]proto.Conn)
 	if !ok || cl == nil {
@@ -73,29 +74,38 @@ func (self *treeBasedConnMap) GetConn(service, user string) []proto.Conn {
 	return cl
 }
 
-func (self *treeBasedConnMap) AddConn(conn proto.Conn) {
+var ErrTooManyUsers = errors.New("too many users")
+var ErrTooManyConnForThisUser = errors.New("too many connections under this user")
+
+func (self *treeBasedConnMap) AddConn(conn proto.Conn, maxNrConnsPerUser int, maxNrUsers int) error {
 	if conn == nil {
-		return
+		return nil
 	}
-	cl := self.GetConn(conn.Service(), conn.Username())
+	cl := self.GetConn(conn.Username())
 	if cl == nil {
+		if maxNrUsers > 0 && self.tree.Len() >= maxNrUsers {
+			return ErrTooManyUsers
+		}
 		cl = make([]proto.Conn, 0, 3)
+	}
+	if maxNrConnsPerUser > 0 && len(cl) >= maxNrConnsPerUser {
+		return ErrTooManyConnForThisUser
 	}
 	for _, c := range cl {
 		if c.UniqId() == conn.UniqId() {
-			return
+			return nil
 		}
 	}
 	cl = append(cl, conn)
 	self.tree.ReplaceOrInsert(cl)
-	return
+	return nil
 }
 
 func (self *treeBasedConnMap) DelConn(conn proto.Conn) {
 	if conn == nil {
 		return
 	}
-	cl := self.GetConn(conn.Service(), conn.Username())
+	cl := self.GetConn(conn.Username())
 	if cl == nil {
 		return
 	}
@@ -107,6 +117,10 @@ func (self *treeBasedConnMap) DelConn(conn proto.Conn) {
 		}
 	}
 	if i < 0 {
+		return
+	}
+	if len(cl) == 1 {
+		self.tree.Delete(connKey(conn))
 		return
 	}
 	cl[i] = cl[len(cl)-1]

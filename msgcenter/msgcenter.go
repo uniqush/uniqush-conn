@@ -29,55 +29,77 @@ import (
 	"time"
 )
 
-type MessageContainer struct {
-	Service string
-	User    string
-	Message *proto.Message
-}
-
-type ControlMessage struct {
-	Service string
-	User    string
-	Command int
-	Params  []string
+type eventConnIn struct {
+	errChan chan error
+	conn server.Conn
 }
 
 type MessageCenter struct {
-	ln          net.Listener
-	priv        *rsa.PrivateKey
-	auth        server.Authenticator
-	authTimeout time.Duration
-	maxNrConns  int32
+	serviceName string
+	msgChan chan<- *proto.Message
+	errChan chan<- error
+	fwdChan chan<- *server.ForwardRequest
 
-	msgInQueue chan<- *MessageContainer
-	ctrlQueue  chan<- *ControlMessage
-	errChan    chan<- error
-
-	nrConns      int32
-	msgOutQueue  chan *writeMessageReq
-	connInQueue  chan server.Conn
-	connOutQueue chan server.Conn
+	connIn chan *eventConnIn
+	connLeave chan server.Conn
 }
 
-func NewMessageCenter(ln net.Listener,
-	privkey *rsa.PrivateKey,
-	auth server.Authenticator,
-	authTimeout time.Duration,
-	maxNrConns int,
-	msgChan chan<- *MessageContainer,
-	ctrlChan chan<- *ControlMessage,
-	errChan chan<- error) *MessageCenter {
+var ErrTooManyConns = errors.New("too many connections")
+
+func (self *MessageCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
+	connMap := newTreeBasedConnMap()
+	nrConns := 0
+	for {
+		select {
+		case connInEvt := <-self.connIn:
+			if maxNrConns > 0 && nrConns >= maxNrConns {
+				connInEvt.errChan <- ErrTooManyConns
+				continue
+			}
+			err := connMap.AddConn(connInEvt, maxNrConnsPerUser, maxNrUsers)
+			if err != nil {
+				connInEvt.errChan <- err
+				continue
+			}
+			nrConns++
+			connInEvt.errChan <- nil
+		}
+	}
+}
+
+func (self *MessageCenter) serveConn(conn server.Conn) {
+	conn.SetForwardRequestChannel(self.fwdChan)
+	for {
+		msg, err := conn.ReadMessage()
+		if msg == nil {
+			msg = new(proto.Message)
+		}
+	}
+}
+
+func (self *MessageCenter) NewConn(conn server.Conn) error {
+	evt := new(eventConnIn)
+	ch := make(chan error)
+	evt.conn = conn
+	evt.errChan = ch
+	self.connIn <- evt
+	err := <-ch
+	if err == nil {
+		go self.serveConn(conn)
+	}
+	return err
+}
+
+func NewMessageCenter(serviceName string, maxNrConns, maxNrConnsPerUser, maxNrUsers int, msgChan chan<- *proto.Message, errChan chan<- error) *MessageCenter {
 	ret := new(MessageCenter)
-	ret.ln = ln
-	ret.priv = privkey
-	ret.auth = auth
-	ret.authTimeout = authTimeout
-	ret.maxNrConns = int32(maxNrConns)
-	ret.msgInQueue = msgChan
-	ret.ctrlQueue = ctrlChan
+	ret.serviceName = serviceName
+	ret.maxNrConns = maxNrConns
+	ret.msgChan = msgChan
+
+	ret.connIn = make(chan *eventConnIn)
+	ret.connLeave = make(chan server.Conn)
 	ret.errChan = errChan
-	go ret.receiveConnections()
-	go ret.messageWriter()
+	go self.process(maxNrConns, maxNrConnsPerUser, maxNrUsers)
 	return ret
 }
 
@@ -94,103 +116,3 @@ var ErrBadMessage = errors.New("malformed message")
 var ErrBadService = errors.New("malformed service name")
 var ErrBadUsername = errors.New("malformed username")
 var ErrNoConn = errors.New("no connection to the specified user")
-
-func (self *MessageCenter) SendMessage(service, username string, msg *proto.Message, compress, encrypt bool) error {
-	if msg == nil {
-		return ErrBadMessage
-	}
-	if strings.Contains(service, "\n") {
-		return ErrBadService
-	}
-	if strings.Contains(username, "\n") {
-		return ErrBadUsername
-	}
-	req := new(writeMessageReq)
-	req.srv = service
-	req.usr = username
-	req.msg = msg
-	req.errChan = make(chan error)
-	req.compress = compress
-	req.encrypt = encrypt
-	self.msgOutQueue <- req
-	err := <-req.errChan
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (self *MessageCenter) messageWriter() {
-	connMap := newTreeBasedConnMap()
-	for {
-		select {
-		case conn := <-self.connInQueue:
-			connMap.AddConn(conn)
-		case conn := <-self.connOutQueue:
-			connMap.DelConn(conn)
-		case req := <-self.msgOutQueue:
-			conns := connMap.GetConn(req.srv, req.usr)
-			if len(conns) == 0 {
-				req.errChan <- ErrNoConn
-				continue
-			}
-			go func() {
-				for _, c := range conns {
-					err := c.WriteMessage(req.msg, req.compress, req.encrypt)
-					if err != nil {
-						req.errChan <- err
-						break
-					}
-				}
-				close(req.errChan)
-			}()
-		}
-	}
-}
-
-func (self *MessageCenter) serveClient(c net.Conn) {
-	defer c.Close()
-	defer atomic.AddInt32(&self.nrConns, -1)
-	conn, err := server.AuthConn(c, self.priv, self.auth, self.authTimeout)
-	if err != nil {
-		self.errChan <- fmt.Errorf("Connection from %v failed: %v", c.RemoteAddr(), err)
-		return
-	}
-	username := conn.Username()
-	service := conn.Service()
-	self.connInQueue <- conn
-	defer func() {
-		self.connOutQueue <- conn
-	}()
-
-	for {
-		msg, err := conn.ReadMessage()
-		if err != nil {
-			self.errChan <- fmt.Errorf("[Service=%v][User=%v][Addr=%v] Read failed: %v", service, username, c.RemoteAddr(), err)
-			return
-		}
-		// XXX A memory pool? Maybe.
-		m := new(MessageContainer)
-		m.Service = service
-		m.User = username
-		m.Message = msg
-		self.msgInQueue <- m
-	}
-}
-
-func (self *MessageCenter) receiveConnections() {
-	for {
-		conn, err := self.ln.Accept()
-		if err != nil {
-			self.errChan <- err
-			return
-		}
-		if self.maxNrConns > 0 && atomic.LoadInt32(&self.nrConns) >= self.maxNrConns {
-			self.errChan <- fmt.Errorf("[Addr=%v] Refuse the connection: exceed maximum number of connections", conn.RemoteAddr())
-			conn.Close()
-			continue
-		}
-		atomic.AddInt32(&self.nrConns, 1)
-		go self.serveClient(conn)
-	}
-}

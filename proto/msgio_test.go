@@ -64,6 +64,11 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 				}
 				continue
 			}
+			if msg == nil {
+				msg = new(Message)
+			}
+			msg.Sender = cliConn.Username()
+			msg.SenderService = cliConn.Service()
 			if !m.Eq(msg) {
 				ec = fmt.Errorf("%vth message corrupted", i)
 				return
