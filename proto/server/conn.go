@@ -176,14 +176,9 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			}
 		}
 		if len(cmd.Params[2]) > 0 {
-			encrypt, e := strconv.Atoi(cmd.Params[2])
-			if e != nil {
-				err = proto.ErrBadPeerImpl
-				return
-			}
-			if encrypt == 0 {
+			if cmd.Params[2] == "0" {
 				self.encrypt = false
-			} else if encrypt == 1 {
+			} else if cmd.Params[2] == "1" {
 				self.encrypt = true
 			}
 		}
