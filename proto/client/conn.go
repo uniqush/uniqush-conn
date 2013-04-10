@@ -29,6 +29,7 @@ type Conn interface {
 	Config(digestThreshold, compressThreshold int, encrypt bool, digestFields []string) error
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
+	ForwardRequest(receiver, service string, msg *proto.Message) error
 }
 
 type Digest struct {
@@ -80,6 +81,23 @@ func (self *clientConn) Config(digestThreshold, compressThreshold int, encrypt b
 	return err
 }
 
+func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Message) error {
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_FWD_REQ
+	cmd.Params = make([]string, 1, 2)
+	cmd.Params[0] = receiver
+	if service != self.Service() {
+		cmd.Params = append(cmd.Params, service)
+	}
+	cmd.Message = msg
+	sz := msg.Size()
+	compress := false
+	if self.compressThreshold > 0 && self.compressThreshold < sz {
+		compress = true
+	}
+	return self.cmdio.WriteCommand(cmd, compress, self.encrypt)
+}
+
 func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
 	if cmd == nil {
 		return
@@ -127,5 +145,7 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	cc := new(clientConn)
 	cc.cmdio = cmdio
 	cc.Conn = proto.NewConn(cmdio, service, username, conn, cc)
+	cc.encrypt = true
+	cc.compressThreshold = 512
 	return cc
 }

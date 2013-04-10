@@ -69,7 +69,7 @@ func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest boo
 
 func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	compress := false
-	if self.compressThreshold > 0 && self.compressThreshold < sz && self.mcache != nil {
+	if self.compressThreshold > 0 && self.compressThreshold < sz {
 		compress = true
 	}
 	return self.WriteMessage(msg, compress, self.encrypt)
