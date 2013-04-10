@@ -52,17 +52,7 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	if self.compressThreshold > 0 && self.compressThreshold < sz {
 		compress = true
 	}
-	if len(msg.Sender) == 0 {
-		return self.WriteMessage(msg, compress, self.encrypt)
-	}
-	cmd := new(proto.Command)
-	cmd.Type = proto.CMD_FWD
-	cmd.Params = make([]string, 1, 2)
-	cmd.Params[0] = msg.Sender
-	if len(msg.SenderService) != 0 {
-		cmd.Params = append(cmd.Params, msg.SenderService)
-	}
-	return self.cmdio.WriteCommand(cmd, compress, self.encrypt)
+	return self.WriteMessage(msg, compress, self.encrypt)
 }
 
 // Send the message to client.
@@ -222,9 +212,11 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			return
 		}
 
-		if rmsg != nil {
-			err = self.writeAutoCompress(rmsg, rmsg.Size())
+		if rmsg == nil {
+			rmsg = new(proto.Message)
 		}
+		rmsg.Id = id
+		err = self.writeAutoCompress(rmsg, rmsg.Size())
 	}
 	return
 }

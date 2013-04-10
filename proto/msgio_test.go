@@ -113,7 +113,7 @@ func randomMessage() *Message {
 	msg.Header = make(map[string]string, 2)
 	msg.Header["aaa"] = "hello"
 	msg.Header["aa"] = "hell"
-	if msg.Body[0] % 2 == 0 {
+	if msg.Body[0]%2 == 0 {
 		msg.Id = "messageId"
 	}
 	return msg

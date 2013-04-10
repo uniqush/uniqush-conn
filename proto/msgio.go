@@ -21,7 +21,6 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"io"
 	"net"
-	"fmt"
 )
 
 type MessageWriter interface {
