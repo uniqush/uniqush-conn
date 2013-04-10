@@ -50,6 +50,12 @@ func (a *Message) Eq(b *Message) bool {
 	if a.Id != b.Id {
 		return false
 	}
+	if a.Sender != b.Sender {
+		return false
+	}
+	if a.SenderService != b.SenderService {
+		return false
+	}
 	for k, v := range a.Header {
 		if bv, ok := b.Header[k]; ok {
 			if bv != v {

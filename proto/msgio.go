@@ -21,6 +21,7 @@ import (
 	"github.com/nu7hatch/gouuid"
 	"io"
 	"net"
+	"fmt"
 )
 
 type MessageWriter interface {
@@ -69,6 +70,7 @@ func (self *messageIO) processCommand(cmd *Command) (msg *Message, err error) {
 		return
 	}
 	if self.proc == nil {
+		err = ErrBadPeerImpl
 		return
 	}
 	return self.proc.ProcessCommand(cmd)

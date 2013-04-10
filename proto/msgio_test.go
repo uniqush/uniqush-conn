@@ -128,6 +128,16 @@ func TestExchangingSingleMessage(t *testing.T) {
 	return
 }
 
+func TestExchangingSingleMessageWithSender(t *testing.T) {
+	msg := randomMessage()
+	msg.Sender = "newsender"
+	err := testMessageExchange("127.0.0.1:8088", msg)
+	if err == nil {
+		t.Errorf("should be error, because we didn't process forward command")
+	}
+	return
+}
+
 func TestExchangingEmpty(t *testing.T) {
 	err := testMessageExchange("127.0.0.1:8088", nil)
 	if err != nil {
