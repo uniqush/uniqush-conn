@@ -27,9 +27,9 @@ import (
 )
 
 type ForwardRequest struct {
-	Receiver string
+	Receiver        string
 	ReceiverService string
-	Message * proto.Message
+	Message         *proto.Message
 }
 
 type Conn interface {
@@ -52,7 +52,7 @@ type serverConn struct {
 	encrypt           bool
 	digestFields      []string
 	mcache            msgcache.Cache
-	fwdChan chan<- *ForwardRequest
+	fwdChan           chan<- *ForwardRequest
 }
 
 func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
