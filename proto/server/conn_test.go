@@ -313,4 +313,3 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	}()
 	wg.Wait()
 }
-

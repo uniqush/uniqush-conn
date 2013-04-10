@@ -46,6 +46,7 @@ type serverConn struct {
 	digestFields      []string
 	mcache            msgcache.Cache
 }
+
 func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
 	sz = msg.Size()
 	if self.digestThreshold > 0 && self.digestThreshold < sz {
