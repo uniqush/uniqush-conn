@@ -40,19 +40,27 @@ type EventConnError struct {
 	C   server.Conn
 }
 
+func (self *EventConnError) Service() string {
+	return self.C.Service()
+}
+
+func (self *EventConnError) Username() string {
+	return self.C.Username()
+}
+
+func (self *EventConnError) Error() string {
+	return fmt.Sprintf("[Service=%v][User=%v] %v", self.C.Service(), self.C.Username(), self.Err)
+}
+
 type ServiceConfig struct {
 	MaxNrConns        int
 	MaxNrUsers        int
 	MaxNrConnsPerUser int
 }
 
-type ReadMessageError struct {
-	conn server.Conn
-	err  error
-}
-
-func (self *ReadMessageError) Error() string {
-	return fmt.Sprintf("%v: %v: %v", self.conn.Service(), self.conn.Username(), self.err)
+type writeMessageResponse struct {
+	err error
+	n int
 }
 
 type writeMessageRequest struct {
@@ -60,7 +68,8 @@ type writeMessageRequest struct {
 	msg     *proto.Message
 	mailbox bool
 	timeout time.Duration
-	errChan chan<- error
+	extra map[string]string
+	resChan chan<- *writeMessageResponse
 }
 
 type ServiceCenter struct {
@@ -75,6 +84,7 @@ type ServiceCenter struct {
 }
 
 var ErrTooManyConns = errors.New("too many connections")
+var ErrInvalidConnType = errors.New("invalid connection type")
 
 func (self *ServiceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
@@ -98,8 +108,65 @@ func (self *ServiceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			leaveEvt.conn.Close()
 			nrConns--
 			self.connErrChan <- &EventConnError{C: leaveEvt.conn, Err: leaveEvt.err}
+		case wreq := <-self.writeReqChan:
+			wres := new(writeMessageResponse)
+			wres.n = 0
+			conns := connMap.GetConn(wreq.user)
+			for _, conn := range conns {
+				if conn == nil {
+					continue
+				}
+				var err error
+				sconn, ok := conn.(server.Conn)
+				if !ok {
+					wres.err = ErrInvalidConnType
+					break
+				}
+				if wreq.mailbox {
+					err = sconn.SendOrBox(wreq.msg, wreq.extra, wreq.timeout)
+				} else {
+					_, err = sconn.SendOrQueue(wreq.msg, wreq.extra)
+				}
+				if err != nil {
+					wres.err = err
+					break
+				}
+				wres.n++
+			}
+			wreq.resChan <- wres
 		}
 	}
+}
+
+func (self *ServiceCenter) SendOrBox(username string, msg *proto.Message, extra map[string]string, timeout time.Duration) (n int, err error) {
+	req := new(writeMessageRequest)
+	ch := make(chan *writeMessageResponse)
+	req.msg = msg
+	req.mailbox = true
+	req.user = username
+	req.timeout = timeout
+	req.resChan = ch
+	req.extra = extra
+	self.writeReqChan <- req
+	res := <-ch
+	n = res.n
+	err = res.err
+	return
+}
+
+func (self *ServiceCenter) SendOrQueue(username string, msg *proto.Message, extra map[string]string) (n int, err error) {
+	req := new(writeMessageRequest)
+	ch := make(chan *writeMessageResponse)
+	req.msg = msg
+	req.mailbox = false
+	req.extra = extra
+	req.user = username
+	req.resChan = ch
+	self.writeReqChan <- req
+	res := <-ch
+	n = res.n
+	err = res.err
+	return
 }
 
 func (self *ServiceCenter) serveConn(conn server.Conn) {
@@ -145,16 +212,3 @@ func NewServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *p
 	return ret
 }
 
-type writeMessageReq struct {
-	srv      string
-	usr      string
-	msg      *proto.Message
-	compress bool
-	encrypt  bool
-	errChan  chan error
-}
-
-var ErrBadMessage = errors.New("malformed message")
-var ErrBadService = errors.New("malformed service name")
-var ErrBadUsername = errors.New("malformed username")
-var ErrNoConn = errors.New("no connection to the specified user")
