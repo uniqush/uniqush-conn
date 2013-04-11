@@ -143,6 +143,32 @@ const (
 	//    If empty, then same service as the client
 	// 2. [optional] The Id of the message in the cache.
 	CMD_FWD
+
+	// Sent from client.
+	//
+	// Params:
+	// 0. 1: visible; 0: invisible;
+	//
+	// If a client if invisible to the server,
+	// then sending any message to this client will
+	// not be considered as a message.
+	//
+	// Well... Imagine a scenario:
+	//
+	// Alice has two devices.
+	//
+	// If the app on any device is online, then any message
+	// will be delivered to the device and no notification
+	// will be pushed to other devices.
+	//
+	// However, if the app is "invisible" to the server,
+	// then it will be considered as off online even if
+	// there is a connection between the server and the client.
+	//
+	// (It is only considered as off line when we want to know if
+	// we should push a notification. But it counts for other purpose,
+	// say, number of connections under the user.)
+	CMD_SET_VISIBILITY
 )
 
 type Command struct {

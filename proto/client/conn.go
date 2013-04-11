@@ -30,6 +30,7 @@ type Conn interface {
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
 	ForwardRequest(receiver, service string, msg *proto.Message) error
+	SetVisibility(v bool) error
 }
 
 type Digest struct {
@@ -47,6 +48,17 @@ type clientConn struct {
 	digestThreshold   int
 	compressThreshold int
 	encrypt           bool
+}
+
+func (self *clientConn) SetVisibility(v bool) error {
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_SET_VISIBILITY
+	if v {
+		cmd.Params = []string{"1"}
+	} else {
+		cmd.Params = []string{"0"}
+	}
+	return self.cmdio.WriteCommand(cmd, false, true)
 }
 
 func (self *clientConn) RequestMessage(id string) error {

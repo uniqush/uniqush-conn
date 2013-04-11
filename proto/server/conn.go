@@ -23,6 +23,8 @@ import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,18 +43,26 @@ type Conn interface {
 	SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
+	Visible() bool
 	proto.Conn
 }
 
 type serverConn struct {
 	proto.Conn
 	cmdio             *proto.CommandIO
-	digestThreshold   int
-	compressThreshold int
-	encrypt           bool
+	digestThreshold   int32
+	compressThreshold int32
+	encrypt           int32
+	visible           int32
+	digestFielsLock   sync.Mutex
 	digestFields      []string
 	mcache            msgcache.Cache
 	fwdChan           chan<- *ForwardRequest
+}
+
+func (self *serverConn) Visible() bool {
+	v := atomic.LoadInt32(&self.visible)
+	return v > 0
 }
 
 func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
@@ -61,7 +71,8 @@ func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 
 func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
 	sz = msg.Size()
-	if self.digestThreshold >= 0 && self.digestThreshold < sz {
+	d := atomic.LoadInt32(&self.digestThreshold)
+	if d >= 0 && d < int32(sz) {
 		sendDigest = true
 	}
 	return
@@ -69,10 +80,12 @@ func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest boo
 
 func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	compress := false
-	if self.compressThreshold > 0 && self.compressThreshold < sz {
+	c := atomic.LoadInt32(&self.compressThreshold)
+	if c > 0 && c < int32(sz) {
 		compress = true
 	}
-	return self.WriteMessage(msg, compress, self.encrypt)
+	encrypt := atomic.LoadInt32(&self.encrypt) > 0
+	return self.WriteMessage(msg, compress, encrypt)
 }
 
 // Send the message to client.
@@ -86,7 +99,7 @@ func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, t
 		if err != nil {
 			return err
 		}
-		_, err = self.writeDigest(msg, extra, sz, "mbox")
+		err = self.writeDigest(msg, extra, sz, "mbox")
 		if err != nil {
 			return err
 		}
@@ -109,7 +122,7 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string)
 		if err != nil {
 			return
 		}
-		_, err = self.writeDigest(msg, extra, sz, id)
+		err = self.writeDigest(msg, extra, sz, id)
 		if err != nil {
 			return
 		}
@@ -121,15 +134,7 @@ func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string)
 	return
 }
 
-func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (sentDigest bool, err error) {
-	sentDigest = false
-	if self.digestThreshold < 0 {
-		return
-	}
-	if sz < self.digestThreshold {
-		return
-	}
-
+func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (err error) {
 	digest := new(proto.Command)
 	digest.Type = proto.CMD_DIGEST
 	digest.Params = make([]string, 2)
@@ -140,6 +145,8 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 
 	header := make(map[string]string, len(extra))
 
+	self.digestFielsLock.Lock()
+	defer self.digestFielsLock.Unlock()
 	for _, f := range self.digestFields {
 		if len(msg.Header) > 0 {
 			if v, ok := msg.Header[f]; ok {
@@ -158,15 +165,16 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 	}
 
 	compress := false
-	if self.compressThreshold > 0 && self.compressThreshold < sz {
+	c := atomic.LoadInt32(&self.compressThreshold)
+	if c > 0 && c < int32(sz) {
 		compress = true
 	}
+	encrypt := atomic.LoadInt32(&self.encrypt) > 0
 
-	err = self.cmdio.WriteCommand(digest, compress, true)
+	err = self.cmdio.WriteCommand(digest, compress, encrypt)
 	if err != nil {
 		return
 	}
-	sentDigest = true
 	return
 }
 
@@ -175,6 +183,21 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		return
 	}
 	switch cmd.Type {
+	case proto.CMD_SET_VISIBILITY:
+		if len(cmd.Params) < 1 {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		var v int32
+		v = -1
+		if cmd.Params[0] == "0" {
+			v = 0
+		} else if cmd.Params[0] == "1" {
+			v = 1
+		}
+		if v >= 0 {
+			atomic.StoreInt32(&self.visible, v)
+		}
 	case proto.CMD_FWD_REQ:
 		if len(cmd.Params) < 1 {
 			err = proto.ErrBadPeerImpl
@@ -204,27 +227,39 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			return
 		}
 		if len(cmd.Params[0]) > 0 {
-			self.digestThreshold, err = strconv.Atoi(cmd.Params[0])
+			var d int
+			d, err = strconv.Atoi(cmd.Params[0])
 			if err != nil {
 				err = proto.ErrBadPeerImpl
 				return
 			}
+			atomic.StoreInt32(&self.digestThreshold, int32(d))
+
 		}
 		if len(cmd.Params[1]) > 0 {
-			self.compressThreshold, err = strconv.Atoi(cmd.Params[1])
+			var c int
+			c, err = strconv.Atoi(cmd.Params[1])
 			if err != nil {
 				err = proto.ErrBadPeerImpl
 				return
 			}
+			atomic.StoreInt32(&self.compressThreshold, int32(c))
 		}
 		if len(cmd.Params[2]) > 0 {
+			var e int32
+			e = -1
 			if cmd.Params[2] == "0" {
-				self.encrypt = false
+				e = 0
 			} else if cmd.Params[2] == "1" {
-				self.encrypt = true
+				e = 1
+			}
+			if e >= 0 {
+				atomic.StoreInt32(&self.encrypt, e)
 			}
 		}
 		if len(cmd.Params) > 3 {
+			self.digestFielsLock.Lock()
+			defer self.digestFielsLock.Unlock()
 			self.digestFields = make([]string, len(cmd.Params)-3)
 			for i, f := range cmd.Params[3:] {
 				self.digestFields[i] = f
@@ -278,6 +313,7 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.digestThreshold = -1
 	sc.compressThreshold = 512
 	sc.digestFields = make([]string, 0, 10)
-	sc.encrypt = true
+	sc.encrypt = 1
+	sc.visible = 1
 	return sc
 }
