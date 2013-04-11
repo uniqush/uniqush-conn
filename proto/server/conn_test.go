@@ -474,6 +474,32 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 	wg.Wait()
 }
 
+func TestSetVisibility(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	v := true
+	cliConn.SetVisibility(v)
+	time.Sleep(100 * time.Microsecond)
+	if servConn.Visible() != v {
+		t.Errorf("Not same visibility")
+	}
+
+	v = false
+	cliConn.SetVisibility(v)
+	time.Sleep(100 * time.Microsecond)
+	if servConn.Visible() != v {
+		t.Errorf("Not same visibility")
+	}
+
+}
+
 func TestForwardFromServerDifferentService(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
