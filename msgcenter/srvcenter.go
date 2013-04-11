@@ -18,35 +18,65 @@
 package msgcenter
 
 import (
-	"crypto/rsa"
 	"errors"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
-	"net"
-	"strings"
-	"sync/atomic"
 	"time"
 )
 
 type eventConnIn struct {
 	errChan chan error
-	conn server.Conn
+	conn    server.Conn
 }
 
-type MessageCenter struct {
-	serviceName string
-	msgChan chan<- *proto.Message
-	errChan chan<- error
-	fwdChan chan<- *server.ForwardRequest
+type eventConnLeave struct {
+	conn server.Conn
+	err  error
+}
 
-	connIn chan *eventConnIn
-	connLeave chan server.Conn
+type EventConnError struct {
+	Err error
+	C   server.Conn
+}
+
+type ServiceConfig struct {
+	MaxNrConns        int
+	MaxNrUsers        int
+	MaxNrConnsPerUser int
+}
+
+type ReadMessageError struct {
+	conn server.Conn
+	err  error
+}
+
+func (self *ReadMessageError) Error() string {
+	return fmt.Sprintf("%v: %v: %v", self.conn.Service(), self.conn.Username(), self.err)
+}
+
+type writeMessageRequest struct {
+	user    string
+	msg     *proto.Message
+	mailbox bool
+	timeout time.Duration
+	errChan chan<- error
+}
+
+type ServiceCenter struct {
+	serviceName string
+	msgChan     chan<- *proto.Message
+	fwdChan     chan<- *server.ForwardRequest
+	connErrChan chan<- *EventConnError
+
+	writeReqChan chan *writeMessageRequest
+	connIn       chan *eventConnIn
+	connLeave    chan *eventConnLeave
 }
 
 var ErrTooManyConns = errors.New("too many connections")
 
-func (self *MessageCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
+func (self *ServiceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
 	nrConns := 0
 	for {
@@ -56,28 +86,39 @@ func (self *MessageCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				connInEvt.errChan <- ErrTooManyConns
 				continue
 			}
-			err := connMap.AddConn(connInEvt, maxNrConnsPerUser, maxNrUsers)
+			err := connMap.AddConn(connInEvt.conn, maxNrConnsPerUser, maxNrUsers)
 			if err != nil {
 				connInEvt.errChan <- err
 				continue
 			}
 			nrConns++
 			connInEvt.errChan <- nil
+		case leaveEvt := <-self.connLeave:
+			connMap.DelConn(leaveEvt.conn)
+			leaveEvt.conn.Close()
+			nrConns--
+			self.connErrChan <- &EventConnError{C: leaveEvt.conn, Err: leaveEvt.err}
 		}
 	}
 }
 
-func (self *MessageCenter) serveConn(conn server.Conn) {
+func (self *ServiceCenter) serveConn(conn server.Conn) {
 	conn.SetForwardRequestChannel(self.fwdChan)
+	var err error
+	defer func() {
+		self.connLeave <- &eventConnLeave{conn: conn, err: err}
+	}()
 	for {
-		msg, err := conn.ReadMessage()
-		if msg == nil {
-			msg = new(proto.Message)
+		var msg *proto.Message
+		msg, err = conn.ReadMessage()
+		if err != nil {
+			return
 		}
+		self.msgChan <- msg
 	}
 }
 
-func (self *MessageCenter) NewConn(conn server.Conn) error {
+func (self *ServiceCenter) NewConn(conn server.Conn) error {
 	evt := new(eventConnIn)
 	ch := make(chan error)
 	evt.conn = conn
@@ -90,16 +131,17 @@ func (self *MessageCenter) NewConn(conn server.Conn) error {
 	return err
 }
 
-func NewMessageCenter(serviceName string, maxNrConns, maxNrConnsPerUser, maxNrUsers int, msgChan chan<- *proto.Message, errChan chan<- error) *MessageCenter {
-	ret := new(MessageCenter)
+func NewServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *ServiceCenter {
+	ret := new(ServiceCenter)
 	ret.serviceName = serviceName
-	ret.maxNrConns = maxNrConns
 	ret.msgChan = msgChan
+	ret.connErrChan = connErrChan
+	ret.fwdChan = fwdChan
 
 	ret.connIn = make(chan *eventConnIn)
-	ret.connLeave = make(chan server.Conn)
-	ret.errChan = errChan
-	go self.process(maxNrConns, maxNrConnsPerUser, maxNrUsers)
+	ret.connLeave = make(chan *eventConnLeave)
+	ret.writeReqChan = make(chan *writeMessageRequest)
+	go ret.process(conf.MaxNrConns, conf.MaxNrConnsPerUser, conf.MaxNrUsers)
 	return ret
 }
 

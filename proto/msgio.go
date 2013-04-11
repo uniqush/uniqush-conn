@@ -76,7 +76,6 @@ func (self *messageIO) processCommand(cmd *Command) (msg *Message, err error) {
 }
 
 func (self *messageIO) collectMessage() {
-	defer self.conn.Close()
 	for {
 		cmd, err := self.cmdio.ReadCommand()
 		if err != nil {
@@ -178,9 +177,6 @@ func (self *messageIO) ReadMessage() (msg *Message, err error) {
 		msg = t
 	case error:
 		err = t
-	case int:
-		msg = nil
-		err = nil
 	}
 	return
 }

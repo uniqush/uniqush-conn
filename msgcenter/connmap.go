@@ -18,9 +18,8 @@
 package msgcenter
 
 import (
-	"errors"
 	"bytes"
-	"fmt"
+	"errors"
 	"github.com/petar/GoLLRB/llrb"
 	"github.com/uniqush/uniqush-conn/proto"
 )
