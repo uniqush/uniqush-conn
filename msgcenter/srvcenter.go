@@ -23,6 +23,7 @@ import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"time"
+	"strings"
 )
 
 type eventConnIn struct {
@@ -188,6 +189,10 @@ func (self *ServiceCenter) serveConn(conn server.Conn) {
 }
 
 func (self *ServiceCenter) NewConn(conn server.Conn) error {
+	usr := conn.Username()
+	if len(usr) == 0 || strings.Contains(usr, ":") || strings.Contains(usr, "\n") {
+		return fmt.Errorf("[Username=%v] Invalid Username")
+	}
 	evt := new(eventConnIn)
 	ch := make(chan error)
 	evt.conn = conn
