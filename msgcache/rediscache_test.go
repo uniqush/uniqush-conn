@@ -146,14 +146,13 @@ func TestEnqueueClrqueue(t *testing.T) {
 	}
 }
 
-
 func TestMessageBox(t *testing.T) {
 	cache := getCache()
 	msg := randomMessage()
 	srv := "srv"
 	usr := "usr"
 
-	err := cache.SetMessageBox(srv, usr, msg, 0 * time.Second)
+	err := cache.SetMessageBox(srv, usr, msg, 0*time.Second)
 	if err != nil {
 		t.Errorf("%v", err)
 		return
@@ -193,4 +192,3 @@ func TestMessageBoxTimeout(t *testing.T) {
 		t.Errorf("Message still there")
 	}
 }
-

@@ -32,4 +32,3 @@ type Cache interface {
 	SetMessageBox(service, username string, msg *proto.Message, timeout time.Duration) error
 	GetMessageBox(service, username string) (msg *proto.Message, err error)
 }
-

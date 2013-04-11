@@ -312,4 +312,3 @@ func (self *redisMessageCache) GetMessageBox(service, username string) (msg *pro
 	}
 	return
 }
-
