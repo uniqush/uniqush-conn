@@ -60,7 +60,7 @@ type ServiceConfig struct {
 
 type writeMessageResponse struct {
 	err error
-	n int
+	n   int
 }
 
 type writeMessageRequest struct {
@@ -68,7 +68,7 @@ type writeMessageRequest struct {
 	msg     *proto.Message
 	mailbox bool
 	timeout time.Duration
-	extra map[string]string
+	extra   map[string]string
 	resChan chan<- *writeMessageResponse
 }
 
@@ -131,7 +131,9 @@ func (self *ServiceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					wres.err = err
 					break
 				}
-				wres.n++
+				if sconn.Visible() {
+					wres.n++
+				}
 			}
 			wreq.resChan <- wres
 		}
@@ -211,4 +213,3 @@ func NewServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *p
 	go ret.process(conf.MaxNrConns, conf.MaxNrConnsPerUser, conf.MaxNrUsers)
 	return ret
 }
-
