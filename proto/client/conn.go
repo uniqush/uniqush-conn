@@ -31,6 +31,7 @@ type Conn interface {
 	RequestMessage(id string) error
 	ForwardRequest(receiver, service string, msg *proto.Message) error
 	SetVisibility(v bool) error
+	SendMessage(msg *proto.Message) error
 }
 
 type Digest struct {
@@ -91,6 +92,15 @@ func (self *clientConn) Config(digestThreshold, compressThreshold int, encrypt b
 	}
 	err := self.cmdio.WriteCommand(cmd, false, true)
 	return err
+}
+
+func (self *clientConn) SendMessage(msg *proto.Message) error {
+	sz := msg.Size()
+	compress := false
+	if self.compressThreshold > 0 && self.compressThreshold < sz {
+		compress = true
+	}
+	return self.WriteMessage(msg, compress, self.encrypt)
 }
 
 func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Message) error {
