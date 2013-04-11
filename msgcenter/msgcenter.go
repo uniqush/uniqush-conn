@@ -19,14 +19,14 @@ package msgcenter
 
 import (
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"net"
+	"strings"
 	"sync"
 	"time"
-	"errors"
-	"strings"
 )
 
 var ErrNoService = errors.New("invalid service")
@@ -37,7 +37,7 @@ type ServiceConfigReader interface {
 
 type MessageCenter struct {
 	srvCentersLock   sync.Mutex
-	serviceCenterMap map[string]*ServiceCenter
+	serviceCenterMap map[string]*serviceCenter
 
 	ln            net.Listener
 	auth          server.Authenticator

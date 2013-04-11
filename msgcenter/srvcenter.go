@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
-	"time"
 	"strings"
+	"time"
 )
 
 type eventConnIn struct {
@@ -73,7 +73,7 @@ type writeMessageRequest struct {
 	resChan chan<- *writeMessageResponse
 }
 
-type ServiceCenter struct {
+type serviceCenter struct {
 	serviceName string
 	msgChan     chan<- *proto.Message
 	fwdChan     chan<- *server.ForwardRequest
@@ -87,7 +87,7 @@ type ServiceCenter struct {
 var ErrTooManyConns = errors.New("too many connections")
 var ErrInvalidConnType = errors.New("invalid connection type")
 
-func (self *ServiceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
+func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
 	nrConns := 0
 	for {
@@ -141,7 +141,7 @@ func (self *ServiceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 	}
 }
 
-func (self *ServiceCenter) SendOrBox(username string, msg *proto.Message, extra map[string]string, timeout time.Duration) (n int, err error) {
+func (self *serviceCenter) SendOrBox(username string, msg *proto.Message, extra map[string]string, timeout time.Duration) (n int, err error) {
 	req := new(writeMessageRequest)
 	ch := make(chan *writeMessageResponse)
 	req.msg = msg
@@ -157,7 +157,7 @@ func (self *ServiceCenter) SendOrBox(username string, msg *proto.Message, extra 
 	return
 }
 
-func (self *ServiceCenter) SendOrQueue(username string, msg *proto.Message, extra map[string]string) (n int, err error) {
+func (self *serviceCenter) SendOrQueue(username string, msg *proto.Message, extra map[string]string) (n int, err error) {
 	req := new(writeMessageRequest)
 	ch := make(chan *writeMessageResponse)
 	req.msg = msg
@@ -172,7 +172,7 @@ func (self *ServiceCenter) SendOrQueue(username string, msg *proto.Message, extr
 	return
 }
 
-func (self *ServiceCenter) serveConn(conn server.Conn) {
+func (self *serviceCenter) serveConn(conn server.Conn) {
 	conn.SetForwardRequestChannel(self.fwdChan)
 	var err error
 	defer func() {
@@ -188,7 +188,7 @@ func (self *ServiceCenter) serveConn(conn server.Conn) {
 	}
 }
 
-func (self *ServiceCenter) NewConn(conn server.Conn) error {
+func (self *serviceCenter) NewConn(conn server.Conn) error {
 	usr := conn.Username()
 	if len(usr) == 0 || strings.Contains(usr, ":") || strings.Contains(usr, "\n") {
 		return fmt.Errorf("[Username=%v] Invalid Username")
@@ -205,8 +205,8 @@ func (self *ServiceCenter) NewConn(conn server.Conn) error {
 	return err
 }
 
-func NewServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *ServiceCenter {
-	ret := new(ServiceCenter)
+func NewServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *serviceCenter {
+	ret := new(serviceCenter)
 	ret.serviceName = serviceName
 	ret.msgChan = msgChan
 	ret.connErrChan = connErrChan
