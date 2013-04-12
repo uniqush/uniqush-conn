@@ -94,21 +94,29 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 		select {
 		case connInEvt := <-self.connIn:
 			if maxNrConns > 0 && nrConns >= maxNrConns {
-				connInEvt.errChan <- ErrTooManyConns
+				if connInEvt.errChan != nil {
+					connInEvt.errChan <- ErrTooManyConns
+				}
 				continue
 			}
 			err := connMap.AddConn(connInEvt.conn, maxNrConnsPerUser, maxNrUsers)
 			if err != nil {
-				connInEvt.errChan <- err
+				if connInEvt.errChan != nil {
+					connInEvt.errChan <- err
+				}
 				continue
 			}
 			nrConns++
-			connInEvt.errChan <- nil
+			if connInEvt.errChan != nil {
+				connInEvt.errChan <- nil
+			}
 		case leaveEvt := <-self.connLeave:
 			connMap.DelConn(leaveEvt.conn)
 			leaveEvt.conn.Close()
 			nrConns--
-			self.connErrChan <- &EventConnError{C: leaveEvt.conn, Err: leaveEvt.err}
+			if self.connErrChan != nil {
+				self.connErrChan <- &EventConnError{C: leaveEvt.conn, Err: leaveEvt.err}
+			}
 		case wreq := <-self.writeReqChan:
 			wres := new(writeMessageResponse)
 			wres.n = 0
@@ -136,7 +144,9 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					wres.n++
 				}
 			}
-			wreq.resChan <- wres
+			if wreq.resChan != nil {
+				wreq.resChan <- wres
+			}
 		}
 	}
 }
@@ -184,7 +194,9 @@ func (self *serviceCenter) serveConn(conn server.Conn) {
 		if err != nil {
 			return
 		}
-		self.msgChan <- msg
+		if self.msgChan != nil {
+			self.msgChan <- msg
+		}
 	}
 }
 

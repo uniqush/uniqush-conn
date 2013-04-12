@@ -53,12 +53,16 @@ type MessageCenter struct {
 func (self *MessageCenter) serveConn(c net.Conn) {
 	conn, err := server.AuthConn(c, self.privkey, self.auth, self.authtimeout)
 	if err != nil {
-		self.errChan <- fmt.Errorf("[Addr=%v] %v", c.RemoteAddr(), err)
+		if self.errChan != nil {
+			self.errChan <- fmt.Errorf("[Addr=%v] %v", c.RemoteAddr(), err)
+		}
 		c.Close()
 	}
 	srv := conn.Service()
 	if len(srv) == 0 || strings.Contains(srv, ":") || strings.Contains(srv, "\n") {
-		self.errChan <- fmt.Errorf("[Service=%v] bad service name", srv)
+		if self.errChan != nil {
+			self.errChan <- fmt.Errorf("[Service=%v] bad service name", srv)
+		}
 		return
 	}
 
@@ -67,7 +71,9 @@ func (self *MessageCenter) serveConn(c net.Conn) {
 	if !ok {
 		config := self.srvConfReader.ReadConfig(srv)
 		if config == nil {
-			self.errChan <- fmt.Errorf("[Service=%v] Cannot find its config info", srv)
+			if self.errChan != nil {
+				self.errChan <- fmt.Errorf("[Service=%v] Cannot find its config info", srv)
+			}
 			self.srvCentersLock.Unlock()
 			return
 		}
@@ -120,7 +126,9 @@ func (self *MessageCenter) Start() {
 	for {
 		conn, err := self.ln.Accept()
 		if err != nil {
-			self.errChan <- err
+			if self.errChan != nil {
+				self.errChan <- err
+			}
 			continue
 		}
 		go self.serveConn(conn)
