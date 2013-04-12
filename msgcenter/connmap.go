@@ -38,27 +38,22 @@ func connKey(conn minimalConn) string {
 	return conn.Username()
 }
 
+func getKey(a interface{}) string {
+	switch t := a.(type) {
+	case string:
+		return t
+	case []minimalConn:
+		if len(t) > 0 {
+			return connKey(t[0])
+		}
+	}
+	return ""
+}
+
 func lessConnList(a, b interface{}) bool {
-	cl1, ok := a.([]minimalConn)
-	if !ok {
-		return true
-	}
-	cl2, ok := b.([]minimalConn)
-	if !ok {
-		return false
-	}
-	if len(cl1) == 0 {
-		return true
-	}
-	if len(cl2) == 0 {
-		return false
-	}
-	conn1 := cl1[0]
-	conn2 := cl2[0]
 
-	akey := connKey(conn1)
-	bkey := connKey(conn2)
-
+	akey := getKey(a)
+	bkey := getKey(b)
 	cmp := bytes.Compare([]byte(akey), []byte(bkey))
 	return cmp < 0
 }
@@ -84,7 +79,8 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, m
 	if conn == nil {
 		return nil
 	}
-	cl := self.GetConn(conn.Username())
+	var cl []minimalConn
+	cl = self.GetConn(conn.Username())
 	if cl == nil {
 		if maxNrUsers > 0 && self.tree.Len() >= maxNrUsers {
 			return ErrTooManyUsers
