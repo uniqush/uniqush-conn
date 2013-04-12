@@ -43,17 +43,8 @@ func (self *Message) Size() int {
 	return ret
 }
 
-func (a *Message) Eq(b *Message) bool {
+func (a *Message) EqContent(b *Message) bool {
 	if len(a.Header) != len(b.Header) {
-		return false
-	}
-	if a.Id != b.Id {
-		return false
-	}
-	if a.Sender != b.Sender {
-		return false
-	}
-	if a.SenderService != b.SenderService {
 		return false
 	}
 	for k, v := range a.Header {
@@ -66,6 +57,22 @@ func (a *Message) Eq(b *Message) bool {
 		}
 	}
 	return bytesEq(a.Body, b.Body)
+}
+
+func (a *Message) Eq(b *Message) bool {
+	if !a.EqContent(b) {
+		return false
+	}
+	if a.Id != b.Id {
+		return false
+	}
+	if a.Sender != b.Sender {
+		return false
+	}
+	if a.SenderService != b.SenderService {
+		return false
+	}
+	return true
 }
 
 const (

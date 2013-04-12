@@ -71,7 +71,7 @@ func (self *MessageCenter) serveConn(c net.Conn) {
 			self.srvCentersLock.Unlock()
 			return
 		}
-		center = NewServiceCenter(srv, config, self.msgChan, self.fwdChan, self.connErrChan)
+		center = newServiceCenter(srv, config, self.msgChan, self.fwdChan, self.connErrChan)
 		self.serviceCenterMap[srv] = center
 	}
 	self.srvCentersLock.Unlock()
@@ -128,13 +128,13 @@ func (self *MessageCenter) Start() {
 }
 
 func NewMessageCenter(ln net.Listener,
-	auth server.Authenticator,
-	authtimeout time.Duration,
+	privkey *rsa.PrivateKey,
 	msgChan chan<- *proto.Message,
 	fwdChan chan<- *server.ForwardRequest,
 	connErrChan chan<- *EventConnError,
 	errChan chan<- error,
-	privkey *rsa.PrivateKey,
+	authtimeout time.Duration,
+	auth server.Authenticator,
 	srvConfReader ServiceConfigReader) *MessageCenter {
 
 	self := new(MessageCenter)

@@ -205,7 +205,7 @@ func (self *serviceCenter) NewConn(conn server.Conn) error {
 	return err
 }
 
-func NewServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *serviceCenter {
+func newServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *serviceCenter {
 	ret := new(serviceCenter)
 	ret.serviceName = serviceName
 	ret.msgChan = msgChan
