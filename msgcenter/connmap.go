@@ -21,25 +21,29 @@ import (
 	"bytes"
 	"errors"
 	"github.com/petar/GoLLRB/llrb"
-	"github.com/uniqush/uniqush-conn/proto"
 )
 
-type connMap interface {
-	AddConn(conn proto.Conn, maxNrConnsPerUser int, maxNrUsers int) error
-	GetConn(username string) []proto.Conn
-	DelConn(conn proto.Conn)
+type minimalConn interface {
+	Username() string
+	UniqId() string
 }
 
-func connKey(conn proto.Conn) string {
+type connMap interface {
+	AddConn(conn minimalConn, maxNrConnsPerUser int, maxNrUsers int) error
+	GetConn(username string) []minimalConn
+	DelConn(conn minimalConn)
+}
+
+func connKey(conn minimalConn) string {
 	return conn.Username()
 }
 
 func lessConnList(a, b interface{}) bool {
-	cl1, ok := a.([]proto.Conn)
+	cl1, ok := a.([]minimalConn)
 	if !ok {
 		return true
 	}
-	cl2, ok := b.([]proto.Conn)
+	cl2, ok := b.([]minimalConn)
 	if !ok {
 		return false
 	}
@@ -63,10 +67,10 @@ type treeBasedConnMap struct {
 	tree *llrb.Tree
 }
 
-func (self *treeBasedConnMap) GetConn(user string) []proto.Conn {
+func (self *treeBasedConnMap) GetConn(user string) []minimalConn {
 	key := user
 	clif := self.tree.Get(key)
-	cl, ok := clif.([]proto.Conn)
+	cl, ok := clif.([]minimalConn)
 	if !ok || cl == nil {
 		return nil
 	}
@@ -76,7 +80,7 @@ func (self *treeBasedConnMap) GetConn(user string) []proto.Conn {
 var ErrTooManyUsers = errors.New("too many users")
 var ErrTooManyConnForThisUser = errors.New("too many connections under this user")
 
-func (self *treeBasedConnMap) AddConn(conn proto.Conn, maxNrConnsPerUser int, maxNrUsers int) error {
+func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, maxNrUsers int) error {
 	if conn == nil {
 		return nil
 	}
@@ -85,7 +89,7 @@ func (self *treeBasedConnMap) AddConn(conn proto.Conn, maxNrConnsPerUser int, ma
 		if maxNrUsers > 0 && self.tree.Len() >= maxNrUsers {
 			return ErrTooManyUsers
 		}
-		cl = make([]proto.Conn, 0, 3)
+		cl = make([]minimalConn, 0, 3)
 	}
 	if maxNrConnsPerUser > 0 && len(cl) >= maxNrConnsPerUser {
 		return ErrTooManyConnForThisUser
@@ -100,7 +104,7 @@ func (self *treeBasedConnMap) AddConn(conn proto.Conn, maxNrConnsPerUser int, ma
 	return nil
 }
 
-func (self *treeBasedConnMap) DelConn(conn proto.Conn) {
+func (self *treeBasedConnMap) DelConn(conn minimalConn) {
 	if conn == nil {
 		return
 	}
@@ -109,7 +113,7 @@ func (self *treeBasedConnMap) DelConn(conn proto.Conn) {
 		return
 	}
 	i := -1
-	var c proto.Conn
+	var c minimalConn
 	for i, c = range cl {
 		if c.UniqId() == conn.UniqId() {
 			break
