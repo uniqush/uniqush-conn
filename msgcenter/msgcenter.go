@@ -155,6 +155,6 @@ func NewMessageCenter(ln net.Listener,
 	self.errChan = errChan
 	self.privkey = privkey
 	self.srvConfReader = srvConfReader
-
+	self.serviceCenterMap = make(map[string] *serviceCenter, 128)
 	return self
 }

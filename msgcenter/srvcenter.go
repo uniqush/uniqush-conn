@@ -93,6 +93,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 	for {
 		select {
 		case connInEvt := <-self.connIn:
+			fmt.Printf("Connection in: %v\n", connInEvt.conn.Username())
 			if maxNrConns > 0 && nrConns >= maxNrConns {
 				if connInEvt.errChan != nil {
 					connInEvt.errChan <- ErrTooManyConns
@@ -107,6 +108,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				continue
 			}
 			nrConns++
+			fmt.Printf("%v connections in total\n", nrConns)
 			if connInEvt.errChan != nil {
 				connInEvt.errChan <- nil
 			}
@@ -118,9 +120,11 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				self.connErrChan <- &EventConnError{C: leaveEvt.conn, Err: leaveEvt.err}
 			}
 		case wreq := <-self.writeReqChan:
+			fmt.Printf("Write request: %v\n", wreq)
 			wres := new(writeMessageResponse)
 			wres.n = 0
 			conns := connMap.GetConn(wreq.user)
+			fmt.Printf("There are %v connections for user %v\n", len(conns), wreq.user)
 			for _, conn := range conns {
 				if conn == nil {
 					continue
@@ -179,6 +183,7 @@ func (self *serviceCenter) SendOrQueue(username string, msg *proto.Message, extr
 	res := <-ch
 	n = res.n
 	err = res.err
+	fmt.Printf("send message to user %v; err=%v;\n", username, err)
 	return
 }
 
