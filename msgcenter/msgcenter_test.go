@@ -161,3 +161,64 @@ func TestServerSendToClients(t *testing.T) {
 	server2client(center, clients, errChan, msg)
 	wg.Wait()
 }
+
+func receiveAndCompareMessages(msgChan <-chan *proto.Message, msgs map[string]*proto.Message, errChan chan<- error) {
+	for msg := range msgChan {
+		if m, ok := msgs[msg.Sender]; ok {
+			if !m.EqContent(msg) {
+				errChan <- fmt.Errorf("user %v should receive %v; but got %v", msg.Sender, m, msg)
+			}
+		} else {
+			errChan <- fmt.Errorf("Received message from unknown user: %v.", msg.Sender)
+		}
+	}
+}
+
+func TestClientsSendToServer(t *testing.T) {
+	addr := "127.0.0.1:8965"
+	N := 10
+	connErrChan := make(chan *EventConnError)
+	errChan := make(chan error)
+	go reportConnError(connErrChan, t)
+	defer close(connErrChan)
+	go reportError(errChan, t)
+	defer close(errChan)
+
+	msgChan := make(chan *proto.Message)
+	center, pubkey, err := getMessageCenter(addr, msgChan, nil, connErrChan, errChan)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+	go center.Start()
+
+	clients := make([]client.Conn, N)
+	msgs := make(map[string]*proto.Message, N)
+
+	for i, _ := range clients {
+		username := fmt.Sprintf("user-%v", i)
+		client, err := connectServer(addr, username, pubkey, nil)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		msg := randomMessage()
+		msgs[username] = msg
+		clients[i] = client
+	}
+
+	go receiveAndCompareMessages(msgChan, msgs, errChan)
+	defer close(msgChan)
+
+	wg := new(sync.WaitGroup)
+	wg.Add(N)
+	for _, client := range clients {
+		msg := msgs[client.Username()]
+		go func() {
+			client.SendMessage(msg)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
