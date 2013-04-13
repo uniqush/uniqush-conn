@@ -74,13 +74,11 @@ func server2client(center *MessageCenter, clients []client.Conn, errChan chan<- 
 		if client == nil {
 			continue
 		}
-		for i, msg := range msgs {
-			fmt.Printf("Send %vth message to client %v: ", i, client.Username())
-			n, err := center.SendOrQueue(client.Service(), client.Username(), msg, nil)
+		for _, msg := range msgs {
+			_, err := center.SendOrQueue(client.Service(), client.Username(), msg, nil)
 			if err != nil {
 				errChan <- err
 			}
-			fmt.Printf("%v message sent \n", n)
 		}
 	}
 }
