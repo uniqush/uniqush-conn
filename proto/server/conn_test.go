@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/msgcache"
+	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
 	"io"
@@ -28,6 +29,15 @@ import (
 	"testing"
 	"time"
 )
+
+func getCache() msgcache.Cache {
+	db := 1
+	c, _ := redis.Dial("tcp", "localhost:6379")
+	c.Do("SELECT", db)
+	c.Do("FLUSHDB")
+	c.Close()
+	return msgcache.NewRedisMessageCache("", "", db)
+}
 
 func sendTestMessages(s2c, c2s proto.Conn, serverToClient bool, msgs ...*proto.Message) error {
 	wg := new(sync.WaitGroup)
@@ -162,7 +172,7 @@ func TestDigestSetting(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -171,9 +181,12 @@ func TestDigestSetting(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
+	var id string
+
 	// Server:
 	go func() {
-		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		var err error
+		id, err = servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -191,7 +204,7 @@ func TestDigestSetting(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		if m.Id != "mbox" {
+		if m.Id != id {
 			t.Errorf("Error: wrong Id: %v; %v", m.Id, m)
 		}
 		msg.Sender = servConn.Username()
@@ -220,7 +233,7 @@ func TestDigestSettingWithFields(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -230,9 +243,12 @@ func TestDigestSettingWithFields(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
+	var id string
+
 	// Server:
 	go func() {
-		_, err := servConn.SendPoster(msg, nil, 0*time.Second, "poster", true)
+		var err error
+		id, err = servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -253,7 +269,7 @@ func TestDigestSettingWithFields(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		if m.Id != "mbox" {
+		if m.Id != id {
 			t.Errorf("Error: wrong Id")
 		}
 		msg.Sender = servConn.Username()
@@ -281,8 +297,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
-	mcache.Clrqueue("service", "username")
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -342,7 +357,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -390,7 +405,7 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -439,7 +454,7 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -514,7 +529,7 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	servConn.SetMessageCache(mcache)
 	diChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(diChan)
@@ -562,7 +577,7 @@ func TestForwardRequestDifferentService(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	fwdChan := make(chan *ForwardRequest)
 
 	servConn.SetMessageCache(mcache)
@@ -621,7 +636,7 @@ func TestForwardRequestSameService(t *testing.T) {
 	}
 	// Wait it to be effect
 	time.Sleep(1 * time.Second)
-	mcache := msgcache.NewRedisMessageCache("", "", 1)
+	mcache := getCache()
 	fwdChan := make(chan *ForwardRequest)
 
 	servConn.SetMessageCache(mcache)
