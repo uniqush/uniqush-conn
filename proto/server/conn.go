@@ -38,9 +38,9 @@ type Conn interface {
 	// Send the message to client.
 	// If the message is larger than the digest threshold,
 	// then send a digest to the client and cache the whole message
-	// in the message box.
-	SendOrBox(msg *proto.Message, extra map[string]string, timeout time.Duration) error
-	SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error)
+	// in the .
+	SendMail(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error)
+	SendPoster(msg *proto.Message, extra map[string]string, key string, ttl time.Duration, setposter bool) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	Visible() bool
@@ -88,39 +88,36 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	return self.WriteMessage(msg, compress, encrypt)
 }
 
-// Send the message to client.
-// If the message is larger than the digest threshold,
-// then send a digest to the client and cache the whole message
-// in the message box.
-func (self *serverConn) SendOrBox(msg *proto.Message, extra map[string]string, timeout time.Duration) error {
+func (self *serverConn) SendMail(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
 	sz, sendDigest := self.shouldDigest(msg)
 	if sendDigest {
-		err := self.mcache.SetMessageBox(self.Service(), self.Username(), msg, timeout)
+		id, err = self.mcache.SetMail(self.Service(), self.Username(), msg, ttl)
 		if err != nil {
-			return err
+			return
 		}
-		err = self.writeDigest(msg, extra, sz, "mbox")
+		err = self.writeDigest(msg, extra, sz, id)
 		if err != nil {
-			return err
+			return
 		}
-		return nil
+		return
 	}
 
 	// Otherwise, send the message directly
-	return self.writeAutoCompress(msg, sz)
+	err = self.writeAutoCompress(msg, sz)
+	return
 }
 
-func (self *serverConn) SendOrQueue(msg *proto.Message, extra map[string]string) (id string, err error) {
+func (self *serverConn) SendPoster(msg *proto.Message, extra map[string]string, key string, ttl time.Duration, setposter bool) (id string, err error) {
 	sz, sendDigest := self.shouldDigest(msg)
 	if sendDigest {
-		id, err = self.mcache.Enqueue(self.Service(), self.Username(), msg)
-		if len(id) == 0 || id == "mbox" {
-			id = ""
-			err = fmt.Errorf("Bad message cache implementation: id=%v", id)
-			return
-		}
-		if err != nil {
-			return
+		if setposter {
+			if len(key) == 0 {
+				key = "defaultPoster"
+			}
+			id, err = self.mcache.SetPoster(self.Service(), self.Username(), key, msg, ttl)
+			if err != nil {
+				return
+			}
 		}
 		err = self.writeDigest(msg, extra, sz, id)
 		if err != nil {
@@ -282,12 +279,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 
 		var rmsg *proto.Message
 
-		switch id {
-		case "mbox":
-			rmsg, err = self.mcache.GetMessageBox(self.Service(), self.Username())
-		default:
-			rmsg, err = self.mcache.DelFromQueue(self.Service(), self.Username(), id)
-		}
+		rmsg, err = self.mcache.GetOrDel(self.Service(), self.Username(), id)
 		if err != nil {
 			return
 		}

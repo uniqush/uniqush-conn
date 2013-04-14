@@ -173,7 +173,7 @@ func TestDigestSetting(t *testing.T) {
 
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -232,7 +232,7 @@ func TestDigestSettingWithFields(t *testing.T) {
 
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		_, err := servConn.SendPoster(msg, nil, 0*time.Second, "poster", true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -296,7 +296,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	// Server:
 	go func() {
 		var err error
-		msgId, err = servConn.SendOrQueue(msg, nil)
+		msgId, err = servConn.SendMail(msg, nil, 0 * time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -335,7 +335,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 
-	// We always want to receive digest
+	// We always want to receive the message 
 	err = cliConn.Config(1024, 1024, true, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
@@ -354,7 +354,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -403,7 +403,7 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -453,7 +453,7 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -527,7 +527,7 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 
 	// Server:
 	go func() {
-		err := servConn.SendOrBox(msg, nil, 0*time.Second)
+		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
