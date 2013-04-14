@@ -20,8 +20,8 @@ package server
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/garyburd/redigo/redis"
+	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
 	"io"
@@ -311,7 +311,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	// Server:
 	go func() {
 		var err error
-		msgId, err = servConn.SendMail(msg, nil, 0 * time.Second)
+		msgId, err = servConn.SendMail(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -350,7 +350,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 
-	// We always want to receive the message 
+	// We always want to receive the message
 	err = cliConn.Config(1024, 1024, true, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
