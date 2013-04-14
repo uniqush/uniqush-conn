@@ -85,3 +85,80 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
+func TestGetDel(t *testing.T) {
+	N := 10
+	msgs := multiRandomMessage(N)
+	cache := getCache()
+	srv := "srv"
+	usr := "usr"
+
+	ids := make([]string, N)
+
+	for i := 0; i < N; i++ {
+		ids[i] = fmt.Sprintf("%v", i)
+	}
+	for i, msg := range msgs {
+		err := cache.Set(srv, usr, ids[i], msg, 0 * time.Second)
+		if err != nil {
+			t.Errorf("Set error: %v", err)
+			return
+		}
+	}
+	for i, msg := range msgs {
+		m, err := cache.Del(srv, usr, ids[i])
+		if err != nil {
+			t.Errorf("Del error: %v", err)
+			return
+		}
+		if !m.Eq(msg) {
+			t.Errorf("%vth message does not same", i)
+		}
+	}
+	for i, id := range ids {
+		m, err := cache.Get(srv, usr, id)
+		if err != nil {
+			t.Errorf("Get error: %v", err)
+			return
+		}
+		if m != nil {
+			t.Errorf("%vth message should be deleted", i)
+		}
+	}
+
+}
+
+func TestSetTTL(t *testing.T) {
+	N := 10
+	msgs := multiRandomMessage(N)
+	cache := getCache()
+	srv := "srv"
+	usr := "usr"
+
+	ids := make([]string, N)
+
+	for i := 0; i < N; i++ {
+		ids[i] = fmt.Sprintf("%v", i)
+	}
+	for i, msg := range msgs {
+		err := cache.Set(srv, usr, ids[i], msg, 1 * time.Second)
+		if err != nil {
+			t.Errorf("Set error: %v", err)
+			return
+		}
+	}
+
+	time.Sleep(2 * time.Second)
+
+	for i, id := range ids {
+		m, err := cache.Get(srv, usr, id)
+		if err != nil {
+			t.Errorf("Get error: %v", err)
+			return
+		}
+		if m != nil {
+			t.Errorf("%vth message should be deleted", i)
+		}
+	}
+
+}
+

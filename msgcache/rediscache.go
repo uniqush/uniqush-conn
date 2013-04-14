@@ -120,6 +120,9 @@ func (self *redisMessageCache) Get(service, username, id string) (msg *proto.Mes
 	if err != nil {
 		return
 	}
+	if reply == nil {
+		return
+	}
 	data, err := redis.Bytes(reply, err)
 	if err != nil {
 		return
@@ -157,6 +160,9 @@ func (self *redisMessageCache) Del(service, username, id string) (msg *proto.Mes
 		return
 	}
 	if len(bulkReply) != 2 {
+		return
+	}
+	if bulkReply[0] == nil {
 		return
 	}
 	data, err := redis.Bytes(bulkReply[0], err)
