@@ -22,8 +22,11 @@ import (
 	"github.com/uniqush/uniqush-conn/proto/server"
 )
 
-type LoginLogoutHandler interface {
+type LoginHandler interface {
 	OnLogin(service, username string)
+}
+
+type LogoutHandler interface {
 	OnLogout(service, username string, reason error)
 }
 
@@ -33,5 +36,9 @@ type MessageHandler interface {
 
 type ForwardRequestHandler interface {
 	ShouldForward(fwd *server.ForwardRequest) bool
+}
+
+type ErrorHandler interface {
+	OnError(service, username string, err error)
 }
 
