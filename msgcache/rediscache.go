@@ -73,7 +73,7 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 }
 
 func randomId() string {
-	return fmt.Sprintf("m%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
+	return fmt.Sprintf("%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
 }
 
 func isMailKey(id string) bool {
@@ -86,6 +86,16 @@ func isMailKey(id string) bool {
 
 func (self *redisMessageCache) SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
 	id = randomId()
+	err = self.set(service, username, "m" + id, msg, ttl)
+	if err != nil {
+		id = ""
+		return
+	}
+	return
+}
+
+func (self *redisMessageCache) SetPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string, err error) {
+	id = "p" + key
 	err = self.set(service, username, id, msg, ttl)
 	if err != nil {
 		id = ""
@@ -94,17 +104,15 @@ func (self *redisMessageCache) SetMail(service, username string, msg *proto.Mess
 	return
 }
 
-func (self *redisMessageCache) SetPoster(service, username, id string, msg *proto.Message, ttl time.Duration) error {
-	err := self.set(service, username, "p" + id, msg, ttl)
-	return err
-}
-
 func (self *redisMessageCache) GetOrDel(service, username, id string) (msg *proto.Message, err error) {
 	if isMailKey(id) {
-		msg, err = self.del(service, username, id)
-	} else {
-		msg, err = self.get(service, username, id)
 	}
+	msg, err = self.del(service, username, id)
+	return
+}
+
+func (self *redisMessageCache) GetPoster(service, username, id string) (msg *proto.Message, err error) {
+	msg, err = self.get(service, username, id)
 	return
 }
 

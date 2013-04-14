@@ -24,6 +24,9 @@ import (
 
 type Cache interface {
 	SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error)
-	SetPoster(service, username, id string, msg *proto.Message, ttl time.Duration) error
+	SetPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string, err error)
+
+	// Mail can only be read once before expire
+	// Poster can be read many times before expire
 	GetOrDel(service, username, id string) (msg *proto.Message, err error)
 }
