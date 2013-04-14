@@ -59,36 +59,31 @@ type ServiceConfig struct {
 	MaxNrUsers        int
 	MaxNrConnsPerUser int
 
-	LoginHandler evthandler.LoginHandler
-	LogoutHanlder evthandler.LogoutHandler
-	MessageHandler evthandler.MessageHandler
-	ForwardHanlder evthandler.ForwardHanlder
-	ErrorHandler evthandler.ErrorHandler
-
+	LoginHandler          evthandler.LoginHandler
+	LogoutHandler         evthandler.LogoutHandler
+	MessageHandler        evthandler.MessageHandler
+	ForwardRequestHandler evthandler.ForwardRequestHandler
+	ErrorHandler          evthandler.ErrorHandler
 }
 
 type writeMessageResponse struct {
-	err error
+	err []error
 	n   int
 }
 
 type writeMessageRequest struct {
-	user    string
-	msg     *proto.Message
-	mailbox bool
-	timeout time.Duration
-	extra   map[string]string
-	resChan chan<- *writeMessageResponse
+	user      string
+	msg       *proto.Message
+	posterKey string
+	ttl       time.Duration
+	extra     map[string]string
+	resChan   chan<- *writeMessageResponse
 }
 
 type serviceCenter struct {
 	serviceName string
-
 	config *ServiceConfig
-
-	msgChan     chan<- *proto.Message
 	fwdChan     chan<- *server.ForwardRequest
-	connErrChan chan<- *EventConnError
 
 	writeReqChan chan *writeMessageRequest
 	connIn       chan *eventConnIn
@@ -98,34 +93,34 @@ type serviceCenter struct {
 var ErrTooManyConns = errors.New("too many connections")
 var ErrInvalidConnType = errors.New("invalid connection type")
 
-func (self *serviceCenter) reportError(service, username string, err error) {
+func (self *serviceCenter) reportError(service, username, connId string, err error) {
 	if self.config != nil {
 		if self.config.ErrorHandler != nil {
-			self.config.ErrorHandler.OnError(service, username, err)
+			self.config.ErrorHandler.OnError(service, username, connId, err)
 		}
 	}
 }
 
-func (self *serviceCenter) reportLogin(service, username string) {
+func (self *serviceCenter) reportLogin(service, username, connId string) {
 	if self.config != nil {
 		if self.config.LoginHandler != nil {
-			self.config.LoginHandler.OnLogin(service, username)
+			self.config.LoginHandler.OnLogin(service, username, connId)
 		}
 	}
 }
 
-func (self *serviceCenter) reportMessage(msg *proto.Message) {
+func (self *serviceCenter) reportMessage(connId string, msg *proto.Message) {
 	if self.config != nil {
 		if self.config.MessageHandler != nil {
-			self.config.MessageHandler.OnMessage(msg)
+			self.config.MessageHandler.OnMessage(connId, msg)
 		}
 	}
 }
 
-func (self *serviceCenter) reportLogout(service, username string, err error) {
+func (self *serviceCenter) reportLogout(service, username, connId string, err error) {
 	if self.config != nil {
 		if self.config.LogoutHandler != nil {
-			self.config.LogoutHandler.OnLogout(service, username, err)
+			self.config.LogoutHandler.OnLogout(service, username, connId, err)
 		}
 	}
 }
@@ -157,13 +152,13 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			connMap.DelConn(leaveEvt.conn)
 			leaveEvt.conn.Close()
 			nrConns--
-			if self.connErrChan != nil {
-				self.connErrChan <- &EventConnError{C: leaveEvt.conn, Err: leaveEvt.err}
-			}
+			conn := leaveEvt.conn
+			self.reportLogout(conn.Service(), conn.Username(), conn.UniqId(), leaveEvt.err)
 		case wreq := <-self.writeReqChan:
 			wres := new(writeMessageResponse)
 			wres.n = 0
 			conns := connMap.GetConn(wreq.user)
+			setposter := true
 			for _, conn := range conns {
 				if conn == nil {
 					continue
@@ -171,18 +166,20 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				var err error
 				sconn, ok := conn.(server.Conn)
 				if !ok {
-					wres.err = ErrInvalidConnType
+					wres.err = append(wres.err, ErrInvalidConnType)
 					break
 				}
-				if wreq.mailbox {
-					err = sconn.SendOrBox(wreq.msg, wreq.extra, wreq.timeout)
+				if len(wreq.posterKey) == 0 {
+					_, err = sconn.SendMail(wreq.msg, wreq.extra, wreq.ttl)
 				} else {
-					_, err = sconn.SendOrQueue(wreq.msg, wreq.extra)
+					_, err = sconn.SendPoster(wreq.msg, wreq.extra, wreq.posterKey, wreq.ttl, setposter)
 				}
 				if err != nil {
-					wres.err = err
-					break
+					wres.err = append(wres.err, err)
+					self.reportError(sconn.Service(), sconn.Username(), sconn.UniqId(), err)
+					continue
 				}
+				setposter = false
 				if sconn.Visible() {
 					wres.n++
 				}
@@ -194,13 +191,13 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 	}
 }
 
-func (self *serviceCenter) SendOrBox(username string, msg *proto.Message, extra map[string]string, timeout time.Duration) (n int, err error) {
+func (self *serviceCenter) SendMail(username string, msg *proto.Message, extra map[string]string, ttl time.Duration) (n int, err []error) {
 	req := new(writeMessageRequest)
 	ch := make(chan *writeMessageResponse)
 	req.msg = msg
-	req.mailbox = true
+	req.posterKey = ""
 	req.user = username
-	req.timeout = timeout
+	req.ttl = ttl
 	req.resChan = ch
 	req.extra = extra
 	self.writeReqChan <- req
@@ -210,11 +207,12 @@ func (self *serviceCenter) SendOrBox(username string, msg *proto.Message, extra 
 	return
 }
 
-func (self *serviceCenter) SendOrQueue(username string, msg *proto.Message, extra map[string]string) (n int, err error) {
+func (self *serviceCenter) SendPoster(username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) (n int, err []error) {
 	req := new(writeMessageRequest)
 	ch := make(chan *writeMessageResponse)
 	req.msg = msg
-	req.mailbox = false
+	req.posterKey = key
+	req.ttl = ttl
 	req.extra = extra
 	req.user = username
 	req.resChan = ch
@@ -237,9 +235,7 @@ func (self *serviceCenter) serveConn(conn server.Conn) {
 		if err != nil {
 			return
 		}
-		if self.msgChan != nil {
-			self.msgChan <- msg
-		}
+		self.reportMessage(conn.UniqId(), msg)
 	}
 }
 
@@ -256,19 +252,20 @@ func (self *serviceCenter) NewConn(conn server.Conn) error {
 	err := <-ch
 	if err == nil {
 		go self.serveConn(conn)
+		self.reportLogin(conn.Service(), usr, conn.UniqId())
+	} else {
+		self.reportError(conn.Service(), usr, conn.UniqId(), err)
 	}
 	return err
 }
 
-func newServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *serviceCenter {
+func newServiceCenter(serviceName string, conf *ServiceConfig, fwdChan chan<- *server.ForwardRequest) *serviceCenter {
 	ret := new(serviceCenter)
 	ret.config = conf
 	if ret.config == nil {
 		ret.config = new(ServiceConfig)
 	}
 	ret.serviceName = serviceName
-	ret.msgChan = msgChan
-	ret.connErrChan = connErrChan
 	ret.fwdChan = fwdChan
 
 	ret.connIn = make(chan *eventConnIn)

@@ -23,15 +23,15 @@ import (
 )
 
 type LoginHandler interface {
-	OnLogin(service, username string)
+	OnLogin(service, username, connId string)
 }
 
 type LogoutHandler interface {
-	OnLogout(service, username string, reason error)
+	OnLogout(service, username, connId string, reason error)
 }
 
 type MessageHandler interface {
-	OnMessage(msg *proto.Message)
+	OnMessage(connId string, msg *proto.Message)
 }
 
 type ForwardRequestHandler interface {
@@ -39,6 +39,6 @@ type ForwardRequestHandler interface {
 }
 
 type ErrorHandler interface {
-	OnError(service, username string, err error)
+	OnError(service, username, connId string, err error)
 }
 
