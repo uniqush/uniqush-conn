@@ -23,6 +23,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
 	"time"
+	"math/rand"
 )
 
 type redisMessageCache struct {
@@ -71,6 +72,43 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 	return ret
 }
 
+func randomId() string {
+	return fmt.Sprintf("m%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
+}
+
+func isMailKey(id string) bool {
+	if len(id) == 0 {
+		return false
+	}
+	return id[0] == 'm'
+}
+
+
+func (self *redisMessageCache) SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
+	id = randomId()
+	err = self.set(service, username, id, msg, ttl)
+	if err != nil {
+		id = ""
+		return
+	}
+	return
+}
+
+func (self *redisMessageCache) SetPoster(service, username, id string, msg *proto.Message, ttl time.Duration) error {
+	err := self.set(service, username, "p" + id, msg, ttl)
+	return err
+}
+
+func (self *redisMessageCache) GetOrDel(service, username, id string) (msg *proto.Message, err error) {
+	if isMailKey(id) {
+		msg, err = self.del(service, username, id)
+	} else {
+		msg, err = self.get(service, username, id)
+	}
+	return
+}
+
+
 func msgKey(service, username, id string) string {
 	return fmt.Sprintf("mcache:%v:%v:%v", service, username, id)
 }
@@ -90,7 +128,7 @@ func msgUnmarshal(data []byte) (msg *proto.Message, err error) {
 	return
 }
 
-func (self *redisMessageCache) Set(service, username, id string, msg *proto.Message, ttl time.Duration) error {
+func (self *redisMessageCache) set(service, username, id string, msg *proto.Message, ttl time.Duration) error {
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -111,7 +149,7 @@ func (self *redisMessageCache) Set(service, username, id string, msg *proto.Mess
 	return nil
 }
 
-func (self *redisMessageCache) Get(service, username, id string) (msg *proto.Message, err error) {
+func (self *redisMessageCache) get(service, username, id string) (msg *proto.Message, err error) {
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -131,7 +169,7 @@ func (self *redisMessageCache) Get(service, username, id string) (msg *proto.Mes
 	return
 }
 
-func (self *redisMessageCache) Del(service, username, id string) (msg *proto.Message, err error) {
+func (self *redisMessageCache) del(service, username, id string) (msg *proto.Message, err error) {
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()

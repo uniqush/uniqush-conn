@@ -23,7 +23,7 @@ import (
 )
 
 type Cache interface {
-	Set(service, username, id string, msg *proto.Message, ttl time.Duration) error
-	Get(service, username, id string) (msg *proto.Message, err error)
-	Del(service, username, id string) (msg *proto.Message, err error)
+	SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error)
+	SetPoster(service, username, id string, msg *proto.Message, ttl time.Duration) error
+	GetOrDel(service, username, id string) (msg *proto.Message, err error)
 }
