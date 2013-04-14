@@ -54,27 +54,39 @@ func getCache() Cache {
 	return NewRedisMessageCache("", "", db)
 }
 
-func TestGetSet(t *testing.T) {
+func TestSetGetPoster(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
 	srv := "srv"
 	usr := "usr"
 
+	keys := make([]string, N)
 	ids := make([]string, N)
 
 	for i := 0; i < N; i++ {
-		ids[i] = fmt.Sprintf("%v", i)
+		keys[i] = fmt.Sprintf("%v", i)
 	}
 	for i, msg := range msgs {
-		err := cache.Set(srv, usr, ids[i], msg, 0 * time.Second)
+		id, err := cache.SetPoster(srv, usr, keys[i], msg, 0 * time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
 		}
+		ids[i] = id
 	}
 	for i, msg := range msgs {
-		m, err := cache.Get(srv, usr, ids[i])
+		m, err := cache.GetOrDel(srv, usr, ids[i])
+		if err != nil {
+			t.Errorf("Get error: %v", err)
+			return
+		}
+		if !m.Eq(msg) {
+			t.Errorf("%vth message does not same", i)
+		}
+	}
+	for i, msg := range msgs {
+		m, err := cache.GetOrDel(srv, usr, ids[i])
 		if err != nil {
 			t.Errorf("Get error: %v", err)
 			return
@@ -85,7 +97,7 @@ func TestGetSet(t *testing.T) {
 	}
 }
 
-func TestGetDel(t *testing.T) {
+func TestGetSetMail(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
@@ -94,18 +106,16 @@ func TestGetDel(t *testing.T) {
 
 	ids := make([]string, N)
 
-	for i := 0; i < N; i++ {
-		ids[i] = fmt.Sprintf("%v", i)
-	}
 	for i, msg := range msgs {
-		err := cache.Set(srv, usr, ids[i], msg, 0 * time.Second)
+		id, err := cache.SetMail(srv, usr, msg, 0 * time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
 		}
+		ids[i] = id
 	}
 	for i, msg := range msgs {
-		m, err := cache.Del(srv, usr, ids[i])
+		m, err := cache.GetOrDel(srv, usr, ids[i])
 		if err != nil {
 			t.Errorf("Del error: %v", err)
 			return
@@ -115,7 +125,7 @@ func TestGetDel(t *testing.T) {
 		}
 	}
 	for i, id := range ids {
-		m, err := cache.Get(srv, usr, id)
+		m, err := cache.GetOrDel(srv, usr, id)
 		if err != nil {
 			t.Errorf("Get error: %v", err)
 			return
@@ -127,7 +137,7 @@ func TestGetDel(t *testing.T) {
 
 }
 
-func TestSetTTL(t *testing.T) {
+func TestGetSetMailTTL(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
@@ -136,21 +146,17 @@ func TestSetTTL(t *testing.T) {
 
 	ids := make([]string, N)
 
-	for i := 0; i < N; i++ {
-		ids[i] = fmt.Sprintf("%v", i)
-	}
 	for i, msg := range msgs {
-		err := cache.Set(srv, usr, ids[i], msg, 1 * time.Second)
+		id, err := cache.SetMail(srv, usr, msg, 1 * time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
 		}
+		ids[i] = id
 	}
-
 	time.Sleep(2 * time.Second)
-
 	for i, id := range ids {
-		m, err := cache.Get(srv, usr, id)
+		m, err := cache.GetOrDel(srv, usr, id)
 		if err != nil {
 			t.Errorf("Get error: %v", err)
 			return
@@ -159,6 +165,5 @@ func TestSetTTL(t *testing.T) {
 			t.Errorf("%vth message should be deleted", i)
 		}
 	}
-
 }
 

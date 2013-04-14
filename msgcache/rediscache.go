@@ -85,8 +85,8 @@ func isMailKey(id string) bool {
 
 
 func (self *redisMessageCache) SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
-	id = randomId()
-	err = self.set(service, username, "m" + id, msg, ttl)
+	id = "m" + randomId()
+	err = self.set(service, username, id, msg, ttl)
 	if err != nil {
 		id = ""
 		return
@@ -106,16 +106,12 @@ func (self *redisMessageCache) SetPoster(service, username, key string, msg *pro
 
 func (self *redisMessageCache) GetOrDel(service, username, id string) (msg *proto.Message, err error) {
 	if isMailKey(id) {
+		msg, err = self.del(service, username, id)
+	} else {
+		msg, err = self.get(service, username, id)
 	}
-	msg, err = self.del(service, username, id)
 	return
 }
-
-func (self *redisMessageCache) GetPoster(service, username, id string) (msg *proto.Message, err error) {
-	msg, err = self.get(service, username, id)
-	return
-}
-
 
 func msgKey(service, username, id string) string {
 	return fmt.Sprintf("mcache:%v:%v:%v", service, username, id)
