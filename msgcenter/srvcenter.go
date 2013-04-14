@@ -20,6 +20,7 @@ package msgcenter
 import (
 	"errors"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"strings"
@@ -57,6 +58,13 @@ type ServiceConfig struct {
 	MaxNrConns        int
 	MaxNrUsers        int
 	MaxNrConnsPerUser int
+
+	LoginHandler evthandler.LoginHandler
+	LogoutHanlder evthandler.LogoutHandler
+	MessageHandler evthandler.MessageHandler
+	ForwardHanlder evthandler.ForwardHanlder
+	ErrorHandler evthandler.ErrorHandler
+
 }
 
 type writeMessageResponse struct {
@@ -75,6 +83,9 @@ type writeMessageRequest struct {
 
 type serviceCenter struct {
 	serviceName string
+
+	config *ServiceConfig
+
 	msgChan     chan<- *proto.Message
 	fwdChan     chan<- *server.ForwardRequest
 	connErrChan chan<- *EventConnError
@@ -86,6 +97,38 @@ type serviceCenter struct {
 
 var ErrTooManyConns = errors.New("too many connections")
 var ErrInvalidConnType = errors.New("invalid connection type")
+
+func (self *serviceCenter) reportError(service, username string, err error) {
+	if self.config != nil {
+		if self.config.ErrorHandler != nil {
+			self.config.ErrorHandler.OnError(service, username, err)
+		}
+	}
+}
+
+func (self *serviceCenter) reportLogin(service, username string) {
+	if self.config != nil {
+		if self.config.LoginHandler != nil {
+			self.config.LoginHandler.OnLogin(service, username)
+		}
+	}
+}
+
+func (self *serviceCenter) reportMessage(msg *proto.Message) {
+	if self.config != nil {
+		if self.config.MessageHandler != nil {
+			self.config.MessageHandler.OnMessage(msg)
+		}
+	}
+}
+
+func (self *serviceCenter) reportLogout(service, username string, err error) {
+	if self.config != nil {
+		if self.config.LogoutHandler != nil {
+			self.config.LogoutHandler.OnLogout(service, username, err)
+		}
+	}
+}
 
 func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
@@ -219,6 +262,10 @@ func (self *serviceCenter) NewConn(conn server.Conn) error {
 
 func newServiceCenter(serviceName string, conf *ServiceConfig, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError) *serviceCenter {
 	ret := new(serviceCenter)
+	ret.config = conf
+	if ret.config == nil {
+		ret.config = new(ServiceConfig)
+	}
 	ret.serviceName = serviceName
 	ret.msgChan = msgChan
 	ret.connErrChan = connErrChan

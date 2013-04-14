@@ -72,6 +72,102 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 	return ret
 }
 
+func msgKey(service, username, id string) string {
+	return fmt.Sprintf("mcache:%v:%v:%v", service, username, id)
+}
+
+func msgMarshal(msg *proto.Message) (data []byte, err error) {
+	data, err = json.Marshal(msg)
+	return
+}
+
+func msgUnmarshal(data []byte) (msg *proto.Message, err error) {
+	msg = new(proto.Message)
+	err = json.Unmarshal(data, msg)
+	if err != nil {
+		msg = nil
+		return
+	}
+	return
+}
+
+func (self *redisMessageCache) Set(service, username, id string, msg *proto.Message, ttl time.Duration) error {
+	key := msgKey(service, username, id)
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	data, err := msgMarshal(msg)
+	if err != nil {
+		return err
+	}
+
+	if ttl.Seconds() <= 0.0 {
+		_, err = conn.Do("SET", key, data)
+	} else {
+		_, err = conn.Do("SETEX", key, int64(ttl.Seconds()), data)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *redisMessageCache) Get(service, username, id string) (msg *proto.Message, err error) {
+	key := msgKey(service, username, id)
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	reply, err := conn.Do("GET", key)
+	if err != nil {
+		return
+	}
+	data, err := redis.Bytes(reply, err)
+	if err != nil {
+		return
+	}
+	msg, err = msgUnmarshal(data)
+	return
+}
+
+func (self *redisMessageCache) Del(service, username, id string) (msg *proto.Message, err error) {
+	key := msgKey(service, username, id)
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	err = conn.Send("MULTI")
+	if err != nil {
+		return
+	}
+	err = conn.Send("GET", key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	err = conn.Send("DEL", key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	reply,  err := conn.Do("EXEC")
+	if err != nil {
+		return
+	}
+
+	bulkReply, err := redis.Values(reply, err)
+	if err != nil {
+		return
+	}
+	if len(bulkReply) != 2 {
+		return
+	}
+	data, err := redis.Bytes(bulkReply[0], err)
+	if err != nil {
+		return
+	}
+	msg, err = msgUnmarshal(data)
+	return
+}
+
 func mqKey(service, username string) string {
 	return fmt.Sprintf("mq:%v:%v", service, username)
 }
