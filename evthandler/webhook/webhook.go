@@ -44,9 +44,9 @@ func (self *webHook) post(data interface{}) int {
 }
 
 type loginEvent struct {
-	Service string `json:service`
-	Username string `json:username`
-	ConnID string `json:connId`
+	Service string `json:"service"`
+	Username string `json:"username"`
+	ConnID string `json:"connId"`
 }
 
 type LoginHandler struct {
@@ -55,6 +55,21 @@ type LoginHandler struct {
 
 func (self *LoginHandler) OnLogin(service, username, connId string) {
 	self.post(&loginEvent{service, username, connId})
+}
+
+type logoutEvent struct {
+	Service string `json:"service"`
+	Username string `json:"username"`
+	ConnID string `json:"connId"`
+	Reason string `json:"reason"`
+}
+
+type LogoutHandler struct {
+	webHook
+}
+
+func (self *LogoutHandler) OnLogout(service, username, connId string, reason error) {
+	self.post(&logoutEvent{service, username, connId, reason.Error()})
 }
 
 

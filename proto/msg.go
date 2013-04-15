@@ -22,11 +22,11 @@ import (
 )
 
 type Message struct {
-	Id            string            "i,omitempty"
-	Sender        string            "s,omitempty"
-	SenderService string            "v,omitempty"
-	Header        map[string]string "h,omitempty"
-	Body          []byte            "b,omitempty"
+	Id            string            `json:"id,omitempty"`
+	Sender        string            `json:"sender,omitempty"`
+	SenderService string            `json:"service,omitempty"`
+	Header        map[string]string `json:"header,omitempty"`
+	Body          []byte            `json:"body,omitempty"`
 }
 
 func (self *Message) IsEmpty() bool {
@@ -179,9 +179,9 @@ const (
 )
 
 type Command struct {
-	Type    uint8    "t,omitempty"
-	Params  []string "p,omitempty"
-	Message *Message "m,omitempty"
+	Type    uint8
+	Params  []string
+	Message *Message
 }
 
 const (
