@@ -37,14 +37,37 @@ func (self *alwaysAllowAuth) Authenticate(service, user, token string) (bool, er
 	return true, nil
 }
 
+type chanReporter struct {
+	msgChan chan<- *proto.Message
+	errChan chan<- error
+}
+
+func (self *chanReporter) OnMessage(connId string, msg *proto.Message) {
+	if self.msgChan != nil {
+		self.msgChan <- msg
+	}
+}
+
+func (self *chanReporter) OnError(service, username, connId string, err error) {
+	if self.errChan != nil {
+		self.errChan <- fmt.Errorf("[Service=%v][Username=%v] %v", service, username, err)
+	}
+}
+
 type nolimitServiceConfigReader struct {
+	msgChan chan<- *proto.Message
+	errChan chan<- error
 }
 
 func (self *nolimitServiceConfigReader) ReadConfig(service string) *ServiceConfig {
-	return new(ServiceConfig)
+	config := new(ServiceConfig)
+	chr := &chanReporter{self.msgChan, self.errChan}
+	config.ErrorHandler = chr
+	config.MessageHandler = chr
+	return config
 }
 
-func getMessageCenter(addr string, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, connErrChan chan<- *EventConnError, errChan chan<- error) (center *MessageCenter, pubkey *rsa.PublicKey, err error) {
+func getMessageCenter(addr string, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, errChan chan<- error) (center *MessageCenter, pubkey *rsa.PublicKey, err error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
@@ -56,7 +79,10 @@ func getMessageCenter(addr string, msgChan chan<- *proto.Message, fwdChan chan<-
 	pubkey = &privkey.PublicKey
 	authtimeout := 3 * time.Second
 
-	center = NewMessageCenter(ln, privkey, msgChan, fwdChan, connErrChan, errChan, authtimeout, &alwaysAllowAuth{}, &nolimitServiceConfigReader{})
+	creader := &nolimitServiceConfigReader{msgChan, errChan}
+	chr := &chanReporter{nil, errChan}
+
+	center = NewMessageCenter(ln, privkey, chr, fwdChan, authtimeout, &alwaysAllowAuth{}, creader)
 	return
 }
 
@@ -75,10 +101,7 @@ func server2client(center *MessageCenter, clients []client.Conn, errChan chan<- 
 			continue
 		}
 		for _, msg := range msgs {
-			_, err := center.SendOrQueue(client.Service(), client.Username(), msg, nil)
-			if err != nil {
-				errChan <- err
-			}
+			center.SendMail(client.Service(), client.Username(), msg, nil, 0 * time.Second)
 		}
 	}
 }
@@ -104,14 +127,6 @@ func reportError(errChan <-chan error, t *testing.T) {
 	}
 }
 
-func reportConnError(errChan <-chan *EventConnError, t *testing.T) {
-	for err := range errChan {
-		if err != nil {
-			t.Errorf("Error: %v", err)
-		}
-	}
-}
-
 func randomMessage() *proto.Message {
 	msg := new(proto.Message)
 	msg.Body = make([]byte, 10)
@@ -125,14 +140,11 @@ func randomMessage() *proto.Message {
 func TestServerSendToClients(t *testing.T) {
 	addr := "127.0.0.1:8964"
 	N := 10
-	connErrChan := make(chan *EventConnError)
 	errChan := make(chan error)
-	go reportConnError(connErrChan, t)
-	defer close(connErrChan)
 	go reportError(errChan, t)
 	defer close(errChan)
 
-	center, pubkey, err := getMessageCenter(addr, nil, nil, connErrChan, errChan)
+	center, pubkey, err := getMessageCenter(addr, nil, nil, errChan)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 		return
@@ -177,15 +189,12 @@ func receiveAndCompareMessages(msgChan <-chan *proto.Message, msgs map[string]*p
 func TestClientsSendToServer(t *testing.T) {
 	addr := "127.0.0.1:8965"
 	N := 10
-	connErrChan := make(chan *EventConnError)
 	errChan := make(chan error)
-	go reportConnError(connErrChan, t)
-	defer close(connErrChan)
 	go reportError(errChan, t)
 	defer close(errChan)
 
 	msgChan := make(chan *proto.Message)
-	center, pubkey, err := getMessageCenter(addr, msgChan, nil, connErrChan, errChan)
+	center, pubkey, err := getMessageCenter(addr, msgChan, nil, errChan)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 		return
