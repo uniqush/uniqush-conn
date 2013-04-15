@@ -24,6 +24,7 @@ import (
 
 func writeConfigFile(filename string) {
 	config := `
+uniqush_push: http://localhost:9898
 default:
   timeout: 3s
   msg: http://localhost:8080/msg

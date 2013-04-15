@@ -29,9 +29,14 @@ import (
 )
 
 type Config struct {
+	uniqushPushAddr string
 	filename      string
 	srvConfig     map[string]*msgcenter.ServiceConfig
 	defaultConfig *msgcenter.ServiceConfig
+}
+
+func (self *Config) UniqushPushAddr() string {
+	return self.uniqushPushAddr
 }
 
 func (self *Config) ReadConfig(srv string) *msgcenter.ServiceConfig {
@@ -234,6 +239,17 @@ func Parse(filename string) (config *Config, err error) {
 			return
 		}
 		for srv, node := range t {
+			switch srv {
+			case "uniqush-push":
+				fallthrough
+			case "uniqush_push":
+				config.uniqushPushAddr, err = parseString(node)
+				if err != nil {
+					err = fmt.Errorf("invalid uniqush-push address: %v", err)
+					return
+				}
+				continue
+			}
 			var sconf *msgcenter.ServiceConfig
 			sconf, err = parseService(srv, node, config.defaultConfig)
 			if err != nil {
