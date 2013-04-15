@@ -21,6 +21,7 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"net"
@@ -42,27 +43,28 @@ type MessageCenter struct {
 	ln            net.Listener
 	auth          server.Authenticator
 	authtimeout   time.Duration
-	msgChan       chan<- *proto.Message
 	fwdChan       chan<- *server.ForwardRequest
-	connErrChan   chan<- *EventConnError
-	errChan       chan<- error
 	privkey       *rsa.PrivateKey
+	errHandler evthandler.ErrorHandler
 	srvConfReader ServiceConfigReader
+}
+
+func (self *MessageCenter) reportError(service, username, connId string, err error) {
+	if self.errHandler != nil {
+		self.errHandler.OnError(service, username, connId, err)
+	}
 }
 
 func (self *MessageCenter) serveConn(c net.Conn) {
 	conn, err := server.AuthConn(c, self.privkey, self.auth, self.authtimeout)
 	if err != nil {
-		if self.errChan != nil {
-			self.errChan <- fmt.Errorf("[Addr=%v] %v", c.RemoteAddr(), err)
-		}
+		self.reportError("", "", c.RemoteAddr().String(), err)
 		c.Close()
+		return
 	}
 	srv := conn.Service()
 	if len(srv) == 0 || strings.Contains(srv, ":") || strings.Contains(srv, "\n") {
-		if self.errChan != nil {
-			self.errChan <- fmt.Errorf("[Service=%v] bad service name", srv)
-		}
+		self.reportError(srv, "", c.RemoteAddr().String(), fmt.Errorf("bad service name"))
 		return
 	}
 
@@ -71,26 +73,24 @@ func (self *MessageCenter) serveConn(c net.Conn) {
 	if !ok {
 		config := self.srvConfReader.ReadConfig(srv)
 		if config == nil {
-			if self.errChan != nil {
-				self.errChan <- fmt.Errorf("[Service=%v] Cannot find its config info", srv)
-			}
+			self.reportError(srv, "", c.RemoteAddr().String(), fmt.Errorf("cannot find service's config"))
 			self.srvCentersLock.Unlock()
 			return
 		}
-		center = newServiceCenter(srv, config, self.msgChan, self.fwdChan, self.connErrChan)
+		center = newServiceCenter(srv, config, self.fwdChan)
 		self.serviceCenterMap[srv] = center
 	}
 	self.srvCentersLock.Unlock()
 
 	err = center.NewConn(conn)
 	if err != nil {
-		self.errChan <- fmt.Errorf("[Service=%v] %v", srv, err)
+		self.reportError(srv, conn.Username(), c.RemoteAddr().String(), err)
 	}
 }
 
-func (self *MessageCenter) SendOrBox(service, username string, msg *proto.Message, extra map[string]string, timeout time.Duration) (n int, err error) {
+func (self *MessageCenter) SendMail(service, username string, msg *proto.Message, extra map[string]string, ttl time.Duration) (n int, err []error) {
 	if len(username) == 0 || strings.Contains(username, ":") || strings.Contains(username, "\n") {
-		err = fmt.Errorf("[Service=%v] bad username", username)
+		err = append(err, fmt.Errorf("[Service=%v] bad username", username))
 		return
 	}
 	self.srvCentersLock.Lock()
@@ -101,13 +101,13 @@ func (self *MessageCenter) SendOrBox(service, username string, msg *proto.Messag
 		n = 0
 		return
 	}
-	n, err = center.SendOrBox(username, msg, extra, timeout)
+	n, err = center.SendMail(username, msg, extra, ttl)
 	return
 }
 
-func (self *MessageCenter) SendOrQueue(service, username string, msg *proto.Message, extra map[string]string) (n int, err error) {
+func (self *MessageCenter) SendPoster(service, username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) (n int, err []error) {
 	if len(username) == 0 || strings.Contains(username, ":") || strings.Contains(username, "\n") {
-		err = fmt.Errorf("[Service=%v] bad username", username)
+		err = append(err, fmt.Errorf("[Service=%v] bad username", username))
 		return
 	}
 	self.srvCentersLock.Lock()
@@ -118,7 +118,7 @@ func (self *MessageCenter) SendOrQueue(service, username string, msg *proto.Mess
 		n = 0
 		return
 	}
-	n, err = center.SendOrQueue(username, msg, extra)
+	n, err = center.SendPoster(username, msg, extra, key, ttl)
 	return
 }
 
@@ -126,9 +126,7 @@ func (self *MessageCenter) Start() {
 	for {
 		conn, err := self.ln.Accept()
 		if err != nil {
-			if self.errChan != nil {
-				self.errChan <- err
-			}
+			self.reportError("", "", "", err)
 			continue
 		}
 		go self.serveConn(conn)
@@ -137,10 +135,8 @@ func (self *MessageCenter) Start() {
 
 func NewMessageCenter(ln net.Listener,
 	privkey *rsa.PrivateKey,
-	msgChan chan<- *proto.Message,
+	errHandler evthandler.ErrorHandler,
 	fwdChan chan<- *server.ForwardRequest,
-	connErrChan chan<- *EventConnError,
-	errChan chan<- error,
 	authtimeout time.Duration,
 	auth server.Authenticator,
 	srvConfReader ServiceConfigReader) *MessageCenter {
@@ -149,11 +145,9 @@ func NewMessageCenter(ln net.Listener,
 	self.ln = ln
 	self.auth = auth
 	self.authtimeout = authtimeout
-	self.msgChan = msgChan
 	self.fwdChan = fwdChan
-	self.connErrChan = connErrChan
-	self.errChan = errChan
 	self.privkey = privkey
+	self.errHandler = errHandler
 	self.srvConfReader = srvConfReader
 	self.serviceCenterMap = make(map[string] *serviceCenter, 128)
 	return self

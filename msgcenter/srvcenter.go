@@ -268,8 +268,6 @@ func (self *serviceCenter) NewConn(conn server.Conn) error {
 	if err == nil {
 		go self.serveConn(conn)
 		self.reportLogin(conn.Service(), usr, conn.UniqId())
-	} else {
-		self.reportError(conn.Service(), usr, conn.UniqId(), err)
 	}
 	return err
 }
