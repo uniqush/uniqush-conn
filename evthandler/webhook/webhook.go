@@ -133,3 +133,4 @@ type ForwardRequestHandler struct {
 func (self *ErrorHandler) ShouldForward(fwd *server.ForwardRequest) bool {
 	return self.post(fwd) == 200
 }
+
