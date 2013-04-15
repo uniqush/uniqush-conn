@@ -110,14 +110,16 @@ func (self *serverConn) SendMail(msg *proto.Message, extra map[string]string, tt
 func (self *serverConn) SendPoster(msg *proto.Message, extra map[string]string, key string, ttl time.Duration, setposter bool) (id string, err error) {
 	sz, sendDigest := self.shouldDigest(msg)
 	if sendDigest {
+		if len(key) == 0 {
+			key = "defaultPoster"
+		}
 		if setposter {
-			if len(key) == 0 {
-				key = "defaultPoster"
-			}
 			id, err = self.mcache.SetPoster(self.Service(), self.Username(), key, msg, ttl)
 			if err != nil {
 				return
 			}
+		} else {
+			id = self.mcache.PosterId(key)
 		}
 		err = self.writeDigest(msg, extra, sz, id)
 		if err != nil {
@@ -126,6 +128,7 @@ func (self *serverConn) SendPoster(msg *proto.Message, extra map[string]string, 
 		return
 	}
 
+	id = ""
 	// Otherwise, send the message directly
 	err = self.writeAutoCompress(msg, sz)
 	return

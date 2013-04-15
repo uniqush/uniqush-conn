@@ -20,6 +20,7 @@ package msgcenter
 import (
 	"errors"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
@@ -58,6 +59,8 @@ type ServiceConfig struct {
 	MaxNrConns        int
 	MaxNrUsers        int
 	MaxNrConnsPerUser int
+
+	MsgCache msgcache.Cache
 
 	LoginHandler          evthandler.LoginHandler
 	LogoutHandler         evthandler.LogoutHandler
@@ -125,6 +128,15 @@ func (self *serviceCenter) reportLogout(service, username, connId string, err er
 	}
 }
 
+func (self *serviceCenter) setPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string ,err error) {
+	if self.config != nil {
+		if self.config.MsgCache != nil {
+			id, err = self.config.MsgCache.SetPoster(service, username, key, msg, ttl)
+		}
+	}
+	return
+}
+
 func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
 	nrConns := 0
@@ -158,7 +170,9 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			wres := new(writeMessageResponse)
 			wres.n = 0
 			conns := connMap.GetConn(wreq.user)
-			setposter := true
+			if len(wreq.posterKey) != 0 && len(conns) > 0 {
+				self.setPoster(self.serviceName, wreq.user, wreq.posterKey, wreq.msg, wreq.ttl)
+			}
 			for _, conn := range conns {
 				if conn == nil {
 					continue
@@ -172,14 +186,13 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				if len(wreq.posterKey) == 0 {
 					_, err = sconn.SendMail(wreq.msg, wreq.extra, wreq.ttl)
 				} else {
-					_, err = sconn.SendPoster(wreq.msg, wreq.extra, wreq.posterKey, wreq.ttl, setposter)
+					_, err = sconn.SendPoster(wreq.msg, wreq.extra, wreq.posterKey, wreq.ttl, false)
 				}
 				if err != nil {
 					wres.err = append(wres.err, err)
 					self.reportError(sconn.Service(), sconn.Username(), sconn.UniqId(), err)
 					continue
 				}
-				setposter = false
 				if sconn.Visible() {
 					wres.n++
 				}
@@ -246,6 +259,8 @@ func (self *serviceCenter) NewConn(conn server.Conn) error {
 	}
 	evt := new(eventConnIn)
 	ch := make(chan error)
+
+	conn.SetMessageCache(self.config.MsgCache)
 	evt.conn = conn
 	evt.errChan = ch
 	self.connIn <- evt
