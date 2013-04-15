@@ -18,13 +18,14 @@
 package configparser
 
 import (
-	"testing"
 	"os"
+	"testing"
 )
 
 func writeConfigFile(filename string) {
 	config := `
 uniqush_push: http://localhost:9898
+auth: http://localhost:8080/auth
 default:
   timeout: 3s
   msg: http://localhost:8080/msg
@@ -58,4 +59,3 @@ func TestParse(t *testing.T) {
 		t.Errorf("Error: %v\n", err)
 	}
 }
-

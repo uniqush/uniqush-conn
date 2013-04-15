@@ -24,15 +24,17 @@ import (
 	"github.com/uniqush/uniqush-conn/evthandler/webhook"
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/msgcenter"
+	"github.com/uniqush/uniqush-conn/proto/server"
 	"strconv"
 	"time"
 )
 
 type Config struct {
+	Auth            server.Authenticator
 	uniqushPushAddr string
-	filename      string
-	srvConfig     map[string]*msgcenter.ServiceConfig
-	defaultConfig *msgcenter.ServiceConfig
+	filename        string
+	srvConfig       map[string]*msgcenter.ServiceConfig
+	defaultConfig   *msgcenter.ServiceConfig
 }
 
 func (self *Config) UniqushPushAddr() string {
@@ -70,6 +72,17 @@ func parseDuration(node yaml.Node) (t time.Duration, err error) {
 		t, err = time.ParseDuration(string(scalar))
 	} else {
 		err = fmt.Errorf("timeout should be a scalar")
+	}
+	return
+}
+
+func parseAuthHandler(node yaml.Node, timeout time.Duration) (h server.Authenticator, err error) {
+	if scalar, ok := node.(yaml.Scalar); ok {
+		h := new(webhook.AuthHandler)
+		h.URL = string(scalar)
+		h.Timeout = timeout
+	} else {
+		err = fmt.Errorf("webhook should be a scalar")
 	}
 	return
 }
@@ -246,6 +259,13 @@ func Parse(filename string) (config *Config, err error) {
 				config.uniqushPushAddr, err = parseString(node)
 				if err != nil {
 					err = fmt.Errorf("invalid uniqush-push address: %v", err)
+					return
+				}
+				continue
+			case "auth":
+				config.Auth, err = parseAuthHandler(node, 3*time.Second)
+				if err != nil {
+					err = fmt.Errorf("auth: %v", err)
 					return
 				}
 				continue
