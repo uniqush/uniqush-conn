@@ -21,6 +21,8 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"github.com/garyburd/redigo/redis"
+	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
 	"github.com/uniqush/uniqush-conn/proto/server"
@@ -30,6 +32,15 @@ import (
 	"testing"
 	"time"
 )
+
+func getCache() msgcache.Cache {
+	db := 1
+	c, _ := redis.Dial("tcp", "localhost:6379")
+	c.Do("SELECT", db)
+	c.Do("FLUSHDB")
+	c.Close()
+	return msgcache.NewRedisMessageCache("", "", db)
+}
 
 type alwaysAllowAuth struct{}
 
@@ -64,6 +75,7 @@ func (self *nolimitServiceConfigReader) ReadConfig(service string) *ServiceConfi
 	chr := &chanReporter{self.msgChan, self.errChan}
 	config.ErrorHandler = chr
 	config.MessageHandler = chr
+	config.MsgCache = getCache()
 	return config
 }
 
@@ -101,7 +113,7 @@ func server2client(center *MessageCenter, clients []client.Conn, errChan chan<- 
 			continue
 		}
 		for _, msg := range msgs {
-			center.SendMail(client.Service(), client.Username(), msg, nil, 0 * time.Second)
+			center.SendMail(client.Service(), client.Username(), msg, nil, 0*time.Second)
 		}
 	}
 }
@@ -230,4 +242,3 @@ func TestClientsSendToServer(t *testing.T) {
 	}
 	wg.Wait()
 }
-

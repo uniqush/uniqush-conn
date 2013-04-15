@@ -343,6 +343,96 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	wg.Wait()
 }
 
+func TestDigestSettingWithMultiMail(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	// We always want to receive digest
+	err = cliConn.Config(0, 512, true, nil)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	// Wait it to be effect
+	time.Sleep(1 * time.Second)
+	mcache := getCache()
+	servConn.SetMessageCache(mcache)
+	diChan := make(chan *client.Digest)
+	cliConn.SetDigestChannel(diChan)
+
+	N := 10
+	msgs := make([]*proto.Message, N)
+	for i, _ := range msgs {
+		msgs[i] = randomMessage()
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
+
+	msgIdMapLock := new(sync.Mutex)
+	msgIdMap := make(map[string]*proto.Message, N)
+
+	// Server:
+	go func() {
+		for _, msg := range msgs {
+			msgId, err := servConn.SendMail(msg, nil, 0*time.Second)
+			if err != nil {
+				t.Errorf("Error: %v", err)
+			}
+			msgIdMapLock.Lock()
+			msgIdMap[msgId] = msg
+			msgIdMapLock.Unlock()
+		}
+		wg.Done()
+	}()
+
+	// Client:
+	go func() {
+		msgChan := make(chan *proto.Message)
+		go func() {
+			for {
+				m, err := cliConn.ReadMessage()
+				if err != nil {
+					t.Errorf("Error: %v", err)
+				}
+				select {
+				case msgChan <- m:
+				case <-time.After(3 * time.Second):
+					return
+				}
+			}
+
+		}()
+		i := 0
+		for i < N {
+			select {
+			case digest := <-diChan:
+				if nil == digest {
+					t.Errorf("Error: Empty digest")
+				}
+				cliConn.RequestMessage(digest.MsgId)
+			case m := <-msgChan:
+				msgIdMapLock.Lock()
+				msg := msgIdMap[m.Id]
+				msgIdMapLock.Unlock()
+
+				msg.Sender = servConn.Username()
+				msg.SenderService = servConn.Service()
+				m.Id = ""
+				if !msg.Eq(m) {
+					t.Errorf("Error: should same: %v != %v", msg, m)
+				}
+				i++
+			}
+		}
+		wg.Done()
+
+	}()
+	wg.Wait()
+}
+
 func TestForwardFromServerSameService(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
