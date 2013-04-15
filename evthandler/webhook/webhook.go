@@ -134,3 +134,22 @@ func (self *ErrorHandler) ShouldForward(fwd *server.ForwardRequest) bool {
 	return self.post(fwd) == 200
 }
 
+type authEvent struct {
+	Service  string `json:"service"`
+	Username string `json:"username"`
+	Token    string `json:"token"`
+}
+
+type AuthHandler struct {
+	webHook
+}
+
+func (self *AuthHandler) Authenticate(srv, usr, token string) (pass bool, err error) {
+	evt := new(authEvent)
+	evt.Service = srv
+	evt.Username = usr
+	evt.Token = token
+	pass = self.post(evt) == 200
+	return
+}
+
