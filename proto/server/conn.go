@@ -29,9 +29,9 @@ import (
 )
 
 type ForwardRequest struct {
-	Receiver        string
-	ReceiverService string
-	Message         *proto.Message
+	Receiver        string         `json:"receiver"`
+	ReceiverService string         `json:"service"`
+	Message         *proto.Message `json:"msg"`
 }
 
 type Conn interface {

@@ -18,24 +18,47 @@
 package webhook
 
 import (
-	"net/http"
-	"encoding/json"
 	"bytes"
+	"encoding/json"
+	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/proto/server"
+	"net"
+	"net/http"
+	"time"
 )
 
 type webHook struct {
-	url string
+	URL     string
+	Timeout time.Duration
+}
+
+func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err error) {
+	return func(netw, addr string) (net.Conn, error) {
+		c, err := net.Dial(netw, addr)
+		if err != nil {
+			return nil, err
+		}
+		if ns.Seconds() > 0.0 {
+			c.SetDeadline(time.Now().Add(ns))
+		}
+		return c, nil
+	}
 }
 
 func (self *webHook) post(data interface{}) int {
-	if len(self.url) == 0 || self.url == "none" {
+	if len(self.URL) == 0 || self.URL == "none" {
 		return 404
 	}
 	jdata, err := json.Marshal(data)
 	if err != nil {
 		return 404
 	}
-	resp, err := http.Post(self.url, "application/json", bytes.NewReader(jdata))
+	c := http.Client{
+		Transport: &http.Transport{
+			Dial: timeoutDialler(self.Timeout),
+		},
+	}
+	resp, err := c.Post(self.URL, "application/json", bytes.NewReader(jdata))
 	if err != nil {
 		return 404
 	}
@@ -44,9 +67,9 @@ func (self *webHook) post(data interface{}) int {
 }
 
 type loginEvent struct {
-	Service string `json:"service"`
+	Service  string `json:"service"`
 	Username string `json:"username"`
-	ConnID string `json:"connId"`
+	ConnID   string `json:"connId"`
 }
 
 type LoginHandler struct {
@@ -58,10 +81,10 @@ func (self *LoginHandler) OnLogin(service, username, connId string) {
 }
 
 type logoutEvent struct {
-	Service string `json:"service"`
+	Service  string `json:"service"`
 	Username string `json:"username"`
-	ConnID string `json:"connId"`
-	Reason string `json:"reason"`
+	ConnID   string `json:"connId"`
+	Reason   string `json:"reason"`
 }
 
 type LogoutHandler struct {
@@ -72,4 +95,41 @@ func (self *LogoutHandler) OnLogout(service, username, connId string, reason err
 	self.post(&logoutEvent{service, username, connId, reason.Error()})
 }
 
+type messageEvent struct {
+	ConnID string         `json:"connId"`
+	Msg    *proto.Message `json:"msg"`
+}
 
+type MessageHandler struct {
+	webHook
+}
+
+func (self *MessageHandler) OnMessage(connId string, msg *proto.Message) {
+	evt := new(messageEvent)
+	evt.ConnID = connId
+	evt.Msg = msg
+	self.post(evt)
+}
+
+type errorEvent struct {
+	Service  string `json:"service"`
+	Username string `json:"username"`
+	ConnID   string `json:"connId"`
+	Reason   string `json:"reason"`
+}
+
+type ErrorHandler struct {
+	webHook
+}
+
+func (self *ErrorHandler) OnError(service, username, connId string, reason error) {
+	self.post(&errorEvent{service, username, connId, reason.Error()})
+}
+
+type ForwardRequestHandler struct {
+	webHook
+}
+
+func (self *ErrorHandler) ShouldForward(fwd *server.ForwardRequest) bool {
+	return self.post(fwd) == 200
+}
