@@ -62,7 +62,6 @@ func messagePrinter(msgChan <-chan *proto.Message, digestChan <-chan *client.Dig
 			if msg.Body != nil {
 				fmt.Printf("%v", string(msg.Body))
 			}
-			fmt.Printf("\n")
 		case digest := <-digestChan:
 			if digest == nil {
 				return
