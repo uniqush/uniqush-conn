@@ -19,13 +19,17 @@
 package main
 
 import (
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/configparser"
+	"github.com/uniqush/uniqush-conn/msgcenter"
 	"fmt"
 	"net"
 	"encoding/pem"
 	"crypto/x509"
 	"crypto/rsa"
 	"io/ioutil"
+	"flag"
+	"os"
+	"time"
 )
 
 func readPrivateKey(keyFileName string) (priv *rsa.PrivateKey, err error) {
@@ -35,18 +39,39 @@ func readPrivateKey(keyFileName string) (priv *rsa.PrivateKey, err error) {
 	}
 
 	b, _ := pem.Decode(keyData)
-	priv, err := x509.ParsePKCS1PrivateKey(b.Bytes)
+	priv, err = x509.ParsePKCS1PrivateKey(b.Bytes)
 	if err != nil {
 		return
 	}
 	return
 }
 
+var argvKeyFile = flag.String("key", "key.pem", "private key")
+var argvConfigFile = flag.String("config", "config.yaml", "config file path")
+
+// In memory of the blood on the square.
+var argvPort = flag.Int("port", 0x2304, "port number")
+
 func main() {
-	ln, err := net.Listen("tcp", ":8964")
+	flag.Parse()
+	ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%v", *argvPort))
 	if err != nil {
-		fmt.Printf("Error: %v", err)
+		fmt.Fprintf(os.Stderr, "Network error: %v\n", err)
 		return
 	}
+
+	privkey, err := readPrivateKey(*argvKeyFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Key error: %v\n", err)
+		return
+	}
+	config, err := configparser.Parse(*argvConfigFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
+		return
+	}
+
+	center := msgcenter.NewMessageCenter(ln, privkey, nil, nil, 3 * time.Second, config.Auth, config)
+	center.Start()
 }
 
