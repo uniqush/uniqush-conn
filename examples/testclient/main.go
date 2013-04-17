@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 	"bufio"
+	"strings"
 )
 
 func loadRSAPublicKey(keyFileName string) (rsapub *rsa.PublicKey, err error) {
@@ -94,8 +95,15 @@ func messageSender(conn client.Conn) {
 			return
 		}
 		msg := new(proto.Message)
-		msg.Body = []byte(line)
-		err = conn.SendMessage(msg)
+
+		elems := strings.SplitN(line, ":", 2)
+		if len(elems) == 2 {
+			msg.Body = []byte(elems[1])
+			err = conn.ForwardRequest(elems[0], conn.Service(), msg)
+		} else {
+			msg.Body = []byte(line)
+			err = conn.SendMessage(msg)
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return

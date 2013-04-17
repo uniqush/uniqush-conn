@@ -96,6 +96,20 @@ type serviceCenter struct {
 var ErrTooManyConns = errors.New("too many connections")
 var ErrInvalidConnType = errors.New("invalid connection type")
 
+func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
+	shouldFwd := false
+	if self.config != nil {
+		if self.config.ForwardRequestHandler != nil {
+			shouldFwd = self.config.ForwardRequestHandler.ShouldForward(fwdreq)
+		}
+	}
+	if !shouldFwd {
+		return
+	}
+	receiver := fwdreq.Receiver
+	self.SendMail(receiver, fwdreq.Message, nil, 24 * time.Hour)
+}
+
 func (self *serviceCenter) reportError(service, username, connId string, err error) {
 	if self.config != nil {
 		if self.config.ErrorHandler != nil {

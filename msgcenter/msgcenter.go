@@ -43,7 +43,7 @@ type MessageCenter struct {
 	ln            net.Listener
 	auth          server.Authenticator
 	authtimeout   time.Duration
-	fwdChan       chan<- *server.ForwardRequest
+	fwdChan       chan *server.ForwardRequest
 	privkey       *rsa.PrivateKey
 	errHandler evthandler.ErrorHandler
 	srvConfReader ServiceConfigReader
@@ -52,6 +52,22 @@ type MessageCenter struct {
 func (self *MessageCenter) reportError(service, username, connId string, err error) {
 	if self.errHandler != nil {
 		self.errHandler.OnError(service, username, connId, err)
+	}
+}
+
+func (self *MessageCenter) process() {
+	for {
+		select {
+		case fwdreq := <-self.fwdChan:
+			srv := fwdreq.ReceiverService
+			self.srvCentersLock.Lock()
+			center, ok := self.serviceCenterMap[srv]
+			self.srvCentersLock.Unlock()
+			if !ok {
+				continue
+			}
+			center.ReceiveForward(fwdreq)
+		}
 	}
 }
 
@@ -123,6 +139,7 @@ func (self *MessageCenter) SendPoster(service, username string, msg *proto.Messa
 }
 
 func (self *MessageCenter) Start() {
+	go self.process()
 	for {
 		conn, err := self.ln.Accept()
 		if err != nil {
@@ -136,7 +153,6 @@ func (self *MessageCenter) Start() {
 func NewMessageCenter(ln net.Listener,
 	privkey *rsa.PrivateKey,
 	errHandler evthandler.ErrorHandler,
-	fwdChan chan<- *server.ForwardRequest,
 	authtimeout time.Duration,
 	auth server.Authenticator,
 	srvConfReader ServiceConfigReader) *MessageCenter {
@@ -145,7 +161,7 @@ func NewMessageCenter(ln net.Listener,
 	self.ln = ln
 	self.auth = auth
 	self.authtimeout = authtimeout
-	self.fwdChan = fwdChan
+	self.fwdChan = make(chan *server.ForwardRequest)
 	self.privkey = privkey
 	self.errHandler = errHandler
 	self.srvConfReader = srvConfReader

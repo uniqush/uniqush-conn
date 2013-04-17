@@ -25,7 +25,6 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
-	"github.com/uniqush/uniqush-conn/proto/server"
 	"io"
 	"net"
 	"sync"
@@ -79,7 +78,7 @@ func (self *nolimitServiceConfigReader) ReadConfig(service string) *ServiceConfi
 	return config
 }
 
-func getMessageCenter(addr string, msgChan chan<- *proto.Message, fwdChan chan<- *server.ForwardRequest, errChan chan<- error) (center *MessageCenter, pubkey *rsa.PublicKey, err error) {
+func getMessageCenter(addr string, msgChan chan<- *proto.Message, errChan chan<- error) (center *MessageCenter, pubkey *rsa.PublicKey, err error) {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
@@ -94,7 +93,7 @@ func getMessageCenter(addr string, msgChan chan<- *proto.Message, fwdChan chan<-
 	creader := &nolimitServiceConfigReader{msgChan, errChan}
 	chr := &chanReporter{nil, errChan}
 
-	center = NewMessageCenter(ln, privkey, chr, fwdChan, authtimeout, &alwaysAllowAuth{}, creader)
+	center = NewMessageCenter(ln, privkey, chr, authtimeout, &alwaysAllowAuth{}, creader)
 	return
 }
 
@@ -156,7 +155,7 @@ func TestServerSendToClients(t *testing.T) {
 	go reportError(errChan, t)
 	defer close(errChan)
 
-	center, pubkey, err := getMessageCenter(addr, nil, nil, errChan)
+	center, pubkey, err := getMessageCenter(addr, nil, errChan)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 		return
@@ -206,7 +205,7 @@ func TestClientsSendToServer(t *testing.T) {
 	defer close(errChan)
 
 	msgChan := make(chan *proto.Message)
-	center, pubkey, err := getMessageCenter(addr, msgChan, nil, errChan)
+	center, pubkey, err := getMessageCenter(addr, msgChan, errChan)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 		return
