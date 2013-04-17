@@ -70,6 +70,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
 		return
 	}
+	if config.Auth == nil {
+		fmt.Fprintf(os.Stderr, "Config error: You should provide the auth url\n")
+		return
+	}
 
 	center := msgcenter.NewMessageCenter(ln, privkey, nil, nil, 3 * time.Second, config.Auth, config)
 	center.Start()

@@ -130,7 +130,7 @@ type ForwardRequestHandler struct {
 	webHook
 }
 
-func (self *ErrorHandler) ShouldForward(fwd *server.ForwardRequest) bool {
+func (self *ForwardRequestHandler) ShouldForward(fwd *server.ForwardRequest) bool {
 	return self.post(fwd) == 200
 }
 
@@ -152,4 +152,3 @@ func (self *AuthHandler) Authenticate(srv, usr, token string) (pass bool, err er
 	pass = self.post(evt) == 200
 	return
 }
-

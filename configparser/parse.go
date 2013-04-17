@@ -78,9 +78,10 @@ func parseDuration(node yaml.Node) (t time.Duration, err error) {
 
 func parseAuthHandler(node yaml.Node, timeout time.Duration) (h server.Authenticator, err error) {
 	if scalar, ok := node.(yaml.Scalar); ok {
-		h := new(webhook.AuthHandler)
-		h.URL = string(scalar)
-		h.Timeout = timeout
+		hd := new(webhook.AuthHandler)
+		hd.URL = string(scalar)
+		hd.Timeout = timeout
+		h = hd
 	} else {
 		err = fmt.Errorf("webhook should be a scalar")
 	}
@@ -89,9 +90,10 @@ func parseAuthHandler(node yaml.Node, timeout time.Duration) (h server.Authentic
 
 func parseMessageHandler(node yaml.Node, timeout time.Duration) (h evthandler.MessageHandler, err error) {
 	if scalar, ok := node.(yaml.Scalar); ok {
-		h := new(webhook.MessageHandler)
-		h.URL = string(scalar)
-		h.Timeout = timeout
+		hd := new(webhook.MessageHandler)
+		hd.URL = string(scalar)
+		hd.Timeout = timeout
+		h = hd
 	} else {
 		err = fmt.Errorf("webhook should be a scalar")
 	}
@@ -100,9 +102,10 @@ func parseMessageHandler(node yaml.Node, timeout time.Duration) (h evthandler.Me
 
 func parseErrorHandler(node yaml.Node, timeout time.Duration) (h evthandler.ErrorHandler, err error) {
 	if scalar, ok := node.(yaml.Scalar); ok {
-		h := new(webhook.ErrorHandler)
-		h.URL = string(scalar)
-		h.Timeout = timeout
+		hd := new(webhook.ErrorHandler)
+		hd.URL = string(scalar)
+		hd.Timeout = timeout
+		h = hd
 	} else {
 		err = fmt.Errorf("webhook should be a scalar")
 	}
@@ -111,15 +114,40 @@ func parseErrorHandler(node yaml.Node, timeout time.Duration) (h evthandler.Erro
 
 func parseForwardRequestHandler(node yaml.Node, timeout time.Duration) (h evthandler.ForwardRequestHandler, err error) {
 	if scalar, ok := node.(yaml.Scalar); ok {
-		h := new(webhook.ForwardRequestHandler)
-		h.URL = string(scalar)
-		h.Timeout = timeout
+		hd := new(webhook.ForwardRequestHandler)
+		hd.URL = string(scalar)
+		hd.Timeout = timeout
+		h = hd
 	} else {
 		err = fmt.Errorf("webhook should be a scalar")
 	}
 	return
 }
 
+
+func parseLogoutHandler(node yaml.Node, timeout time.Duration) (h evthandler.LogoutHandler, err error) {
+	if scalar, ok := node.(yaml.Scalar); ok {
+		hd := new(webhook.LogoutHandler)
+		hd.URL = string(scalar)
+		hd.Timeout = timeout
+		h = hd
+	} else {
+		err = fmt.Errorf("webhook should be a scalar")
+	}
+	return
+}
+
+func parseLoginHandler(node yaml.Node, timeout time.Duration) (h evthandler.LoginHandler, err error) {
+	if scalar, ok := node.(yaml.Scalar); ok {
+		hd := new(webhook.LoginHandler)
+		hd.URL = string(scalar)
+		hd.Timeout = timeout
+		h = hd
+	} else {
+		err = fmt.Errorf("webhook should be a scalar")
+	}
+	return
+}
 func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 	if fields, ok := node.(yaml.Map); ok {
 		engine := "redis"
@@ -156,28 +184,6 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 		cache = msgcache.NewRedisMessageCache(addr, password, db)
 	} else {
 		err = fmt.Errorf("database info should be a map")
-	}
-	return
-}
-
-func parseLogoutHandler(node yaml.Node, timeout time.Duration) (h evthandler.LogoutHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		h := new(webhook.LogoutHandler)
-		h.URL = string(scalar)
-		h.Timeout = timeout
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
-	}
-	return
-}
-
-func parseLoginHandler(node yaml.Node, timeout time.Duration) (h evthandler.LoginHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		h := new(webhook.LoginHandler)
-		h.URL = string(scalar)
-		h.Timeout = timeout
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
 	}
 	return
 }
@@ -234,6 +240,13 @@ func parseService(service string, node yaml.Node, defaultConfig *msgcenter.Servi
 	return
 }
 
+func checkConfig(config *Config) error {
+	if config.Auth == nil {
+		return fmt.Errorf("No authentication url")
+	}
+	return nil
+}
+
 func Parse(filename string) (config *Config, err error) {
 	file, err := yaml.ReadFile(filename)
 	if err != nil {
@@ -280,6 +293,9 @@ func Parse(filename string) (config *Config, err error) {
 		}
 	default:
 		err = fmt.Errorf("Top level should be a map")
+	}
+	if err == nil {
+		err = checkConfig(config)
 	}
 	return
 }
