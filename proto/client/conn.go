@@ -62,6 +62,27 @@ func (self *clientConn) SetVisibility(v bool) error {
 	return self.cmdio.WriteCommand(cmd, false, true)
 }
 
+func (self *clientConn) subscribe(params map[string]string, sub bool) error {
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_SUBSCRIPTION
+	if sub {
+		cmd.Params = []string{"1"}
+	} else {
+		cmd.Params = []string{"0"}
+	}
+	cmd.Message = new(proto.Message)
+	cmd.Message.Header = params
+	return self.cmdio.WriteCommand(cmd, false, true)
+}
+
+func (self *clientConn) Subscribe(params map[string]string) error {
+	return self.subscribe(params, true)
+}
+
+func (self *clientConn) Unsubscribe(params map[string]string) error {
+	return self.subscribe(params, false)
+}
+
 func (self *clientConn) RequestMessage(id string) error {
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_MSG_RETRIEVE
