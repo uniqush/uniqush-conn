@@ -176,6 +176,14 @@ const (
 	// we should push a notification. But it counts for other purpose,
 	// say, number of connections under the user.)
 	CMD_SET_VISIBILITY
+
+	// Sent from client
+	//
+	// Params:
+	//   0. "1" (as ASCII character, not integer) means subscribe; "0" means unsubscribe. No change on others.
+	// Message:
+	//   Header: parameters
+	CMD_SUBSCRIPTION
 )
 
 type Command struct {

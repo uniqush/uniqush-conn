@@ -28,6 +28,13 @@ import (
 	"time"
 )
 
+type SubscribeRequest struct {
+	Subscribe bool // false: unsubscribe; true: subscribe
+	Service   string
+	Username  string
+	Params    map[string]string
+}
+
 type ForwardRequest struct {
 	Receiver        string         `json:"receiver"`
 	ReceiverService string         `json:"service"`
@@ -43,6 +50,7 @@ type Conn interface {
 	SendPoster(msg *proto.Message, extra map[string]string, key string, ttl time.Duration, setposter bool) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
+	SetSubscribeRequestChan(subChan chan<- *SubscribeRequest)
 	Visible() bool
 	proto.Conn
 }
@@ -58,6 +66,7 @@ type serverConn struct {
 	digestFields      []string
 	mcache            msgcache.Cache
 	fwdChan           chan<- *ForwardRequest
+	subChan           chan<- *SubscribeRequest
 }
 
 func (self *serverConn) Visible() bool {
@@ -67,6 +76,9 @@ func (self *serverConn) Visible() bool {
 
 func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
 	self.fwdChan = fwdChan
+}
+
+func (self *serverConn) SetSubscribeRequestChan(subChan chan<- *SubscribeRequest) {
 }
 
 func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
@@ -183,6 +195,37 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		return
 	}
 	switch cmd.Type {
+	case proto.CMD_SUBSCRIPTION:
+		if self.subChan == nil {
+			return
+		}
+		if len(cmd.Params) < 1 {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		if cmd.Message == nil {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		if len(cmd.Message.Header) == 0 {
+			err = proto.ErrBadPeerImpl
+			return
+		}
+		sub := true
+		if cmd.Params[0] == "0" {
+			sub = false
+		} else if cmd.Params[0] == "1" {
+			sub = true
+		} else {
+			return
+		}
+		req := new(SubscribeRequest)
+		req.Params = cmd.Message.Header
+		req.Service = self.Service()
+		req.Username = self.Username()
+		req.Subscribe = sub
+		self.subChan <- req
+
 	case proto.CMD_SET_VISIBILITY:
 		if len(cmd.Params) < 1 {
 			err = proto.ErrBadPeerImpl
