@@ -63,9 +63,9 @@ default:
   uniqush-push:
     addr: localhost:9898
     timeout: 3s
-  max_conns: 2048
-  max_online_users: 2048
-  max_conns_per_user: 10
+  max-conns: 2048
+  max-online-users: 2048
+  max-conns-per-user: 10
   db:
     engine: redis
     addr: 127.0.0.1:6379

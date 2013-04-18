@@ -20,10 +20,11 @@ package msgcenter
 import (
 	"errors"
 	"fmt"
-	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/evthandler"
+	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
+	"github.com/uniqush/uniqush-conn/push"
 	"strings"
 	"time"
 )
@@ -67,6 +68,13 @@ type ServiceConfig struct {
 	MessageHandler        evthandler.MessageHandler
 	ForwardRequestHandler evthandler.ForwardRequestHandler
 	ErrorHandler          evthandler.ErrorHandler
+
+	// Push related web hooks
+	SubscribeHandler   evthandler.SubscribeHandler
+	UnsubscribeHandler evthandler.UnsubscribeHandler
+	PushHandler        evthandler.PushHandler
+
+	PushService push.Push
 }
 
 type writeMessageResponse struct {
@@ -85,7 +93,7 @@ type writeMessageRequest struct {
 
 type serviceCenter struct {
 	serviceName string
-	config *ServiceConfig
+	config      *ServiceConfig
 	fwdChan     chan<- *server.ForwardRequest
 
 	writeReqChan chan *writeMessageRequest
@@ -107,7 +115,7 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 		return
 	}
 	receiver := fwdreq.Receiver
-	self.SendMail(receiver, fwdreq.Message, nil, 24 * time.Hour)
+	self.SendMail(receiver, fwdreq.Message, nil, 24*time.Hour)
 }
 
 func (self *serviceCenter) reportError(service, username, connId string, err error) {
@@ -142,7 +150,7 @@ func (self *serviceCenter) reportLogout(service, username, connId string, err er
 	}
 }
 
-func (self *serviceCenter) setPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string ,err error) {
+func (self *serviceCenter) setPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string, err error) {
 	if self.config != nil {
 		if self.config.MsgCache != nil {
 			id, err = self.config.MsgCache.SetPoster(service, username, key, msg, ttl)

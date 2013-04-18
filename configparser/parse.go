@@ -25,21 +25,18 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/msgcenter"
 	"github.com/uniqush/uniqush-conn/proto/server"
+	"github.com/uniqush/uniqush-conn/push"
+	"net"
 	"strconv"
 	"time"
 )
 
 type Config struct {
-	Auth            server.Authenticator
-	ErrorHandler    evthandler.ErrorHandler
-	uniqushPushAddr string
-	filename        string
-	srvConfig       map[string]*msgcenter.ServiceConfig
-	defaultConfig   *msgcenter.ServiceConfig
-}
-
-func (self *Config) UniqushPushAddr() string {
-	return self.uniqushPushAddr
+	Auth          server.Authenticator
+	ErrorHandler  evthandler.ErrorHandler
+	filename      string
+	srvConfig     map[string]*msgcenter.ServiceConfig
+	defaultConfig *msgcenter.ServiceConfig
 }
 
 func (self *Config) ReadConfig(srv string) *msgcenter.ServiceConfig {
@@ -193,6 +190,69 @@ func parseLoginHandler(node yaml.Node, timeout time.Duration) (h evthandler.Logi
 	h = hd
 	return
 }
+
+func parseSubscribeHandler(node yaml.Node, timeout time.Duration) (h evthandler.SubscribeHandler, err error) {
+	hd := new(webhook.SubscribeHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
+	}
+	h = hd
+	return
+}
+
+func parseUnsubscribeHandler(node yaml.Node, timeout time.Duration) (h evthandler.UnsubscribeHandler, err error) {
+	hd := new(webhook.UnsubscribeHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
+	}
+	h = hd
+	return
+}
+
+func parsePushHandler(node yaml.Node, timeout time.Duration) (h evthandler.PushHandler, err error) {
+	hd := new(webhook.PushHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
+	}
+	h = hd
+	return
+}
+
+func parseUniqushPush(node yaml.Node, timeout time.Duration) (p push.Push, err error) {
+	kv, ok := node.(yaml.Map)
+	if !ok {
+		err = fmt.Errorf("uniqush-push information should be a map")
+		return
+	}
+	addrN, ok := kv["addr"]
+	if !ok {
+		err = fmt.Errorf("cannot find addr field")
+		return
+	}
+	addr, err := parseString(addrN)
+	if !ok {
+		err = fmt.Errorf("address error: %v", err)
+		return
+	}
+	_, err = net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		err = fmt.Errorf("bad addres: %v", err)
+		return
+	}
+	if to, ok := kv["timeout"]; ok {
+		timeout, err = parseDuration(to)
+		if err != nil {
+			err = fmt.Errorf("bad timeout: %v", err)
+			return
+		}
+	}
+	p = push.NewUniqushPushClient(addr, timeout)
+	return
+}
+
 func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 	if fields, ok := node.(yaml.Map); ok {
 		engine := "redis"
@@ -265,10 +325,16 @@ func parseService(service string, node yaml.Node, defaultConfig *msgcenter.Servi
 			config.LoginHandler, err = parseLoginHandler(value, timeout)
 		case "fwd":
 			config.ForwardRequestHandler, err = parseForwardRequestHandler(value, timeout)
+		case "max-conns":
+			fallthrough
 		case "max_conns":
 			config.MaxNrConns, err = parseInt(value)
+		case "max-online-users":
+			fallthrough
 		case "max_online_users":
 			config.MaxNrUsers, err = parseInt(value)
+		case "max-conns-per-user":
+			fallthrough
 		case "max_conns_per_user":
 			config.MaxNrConnsPerUser, err = parseInt(value)
 		case "db":
@@ -299,6 +365,7 @@ func Parse(filename string) (config *Config, err error) {
 	}
 	root := file.Root
 	config = new(Config)
+	config.filename = filename
 	switch t := root.(type) {
 	case yaml.Map:
 		config.srvConfig = make(map[string]*msgcenter.ServiceConfig, len(t))
