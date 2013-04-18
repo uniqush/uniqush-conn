@@ -115,7 +115,51 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 		return
 	}
 	receiver := fwdreq.Receiver
-	self.SendMail(receiver, fwdreq.Message, nil, 24*time.Hour)
+	extra := getPushInfo(fwdreq.Message, nil, true)
+	self.SendMail(receiver, fwdreq.Message, extra, 24*time.Hour)
+}
+
+func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[string]string {
+	if extra == nil {
+		extra = make(map[string]string, len(msg.Header)+3)
+	}
+	if fwd {
+		extra["sender"] = msg.Sender
+		extra["sender-service"] = msg.SenderService
+		for k, v := range msg.Header {
+			if len(k) > 7 {
+				extra[k] = v
+			}
+		}
+	}
+	if msg.Header != nil {
+		if title, ok := msg.Header["title"]; ok {
+			extra["notif.msg"] = title
+		}
+	}
+	return extra
+}
+
+func (self *serviceCenter) shouldPush(service, username string, msg *proto.Message, extra map[string]string, fwd bool) bool {
+	if self.config != nil {
+		if self.config.PushHandler != nil {
+			info := getPushInfo(msg, extra, fwd)
+			return self.config.PushHandler.ShouldPush(service, username, info)
+		}
+	}
+	return false
+}
+
+func (self *serviceCenter) pushNotif(service, username string, msg *proto.Message, extra map[string]string, fwd bool) {
+	if self.config != nil {
+		if self.config.PushService != nil {
+			info := getPushInfo(msg, extra, fwd)
+			err := self.config.PushService.Push(service, username, info)
+			if err != nil {
+				self.reportError(service, username, "", err)
+			}
+		}
+	}
 }
 
 func (self *serviceCenter) reportError(service, username, connId string, err error) {
@@ -218,6 +262,24 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				if sconn.Visible() {
 					wres.n++
 				}
+			}
+
+			if wres.n == 0 {
+				msg := wreq.msg
+				extra := wreq.extra
+				username := wreq.user
+				service := self.serviceName
+				fwd := false
+				if len(msg.Sender) > 0 && len(msg.SenderService) > 0 {
+					if msg.Sender != username || msg.SenderService != service {
+						fwd = true
+					}
+				}
+				go func() {
+					if self.shouldPush(service, username, msg, extra, fwd) {
+						self.pushNotif(service, username, msg, extra, fwd)
+					}
+				}()
 			}
 			if wreq.resChan != nil {
 				wreq.resChan <- wres
