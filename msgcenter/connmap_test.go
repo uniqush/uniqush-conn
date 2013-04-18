@@ -24,7 +24,7 @@ import (
 
 type fakeConn struct {
 	username string
-	n int
+	n        int
 }
 
 func (self *fakeConn) Username() string {
@@ -42,7 +42,7 @@ type connGenerator struct {
 func (self *connGenerator) nextConn() minimalConn {
 	usr := fmt.Sprintf("user-%v", self.nextId)
 	self.nextId++
-	return &fakeConn{username:usr}
+	return &fakeConn{username: usr}
 }
 
 func TestInsertConnMap(t *testing.T) {
@@ -81,7 +81,7 @@ func TestInsertDupConnMap(t *testing.T) {
 
 		for i := 0; i < M; i++ {
 			u := c.Username()
-			fc := &fakeConn{username:u, n:i}
+			fc := &fakeConn{username: u, n: i}
 			err := cmap.AddConn(fc, 0, 0)
 			if err != nil {
 				t.Errorf("%v", err)
@@ -102,4 +102,3 @@ func TestInsertDupConnMap(t *testing.T) {
 		}
 	}
 }
-

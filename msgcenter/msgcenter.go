@@ -45,7 +45,7 @@ type MessageCenter struct {
 	authtimeout   time.Duration
 	fwdChan       chan *server.ForwardRequest
 	privkey       *rsa.PrivateKey
-	errHandler evthandler.ErrorHandler
+	errHandler    evthandler.ErrorHandler
 	srvConfReader ServiceConfigReader
 }
 
@@ -165,6 +165,6 @@ func NewMessageCenter(ln net.Listener,
 	self.privkey = privkey
 	self.errHandler = errHandler
 	self.srvConfReader = srvConfReader
-	self.serviceCenterMap = make(map[string] *serviceCenter, 128)
+	self.serviceCenterMap = make(map[string]*serviceCenter, 128)
 	return self
 }
