@@ -41,3 +41,15 @@ type ForwardRequestHandler interface {
 type ErrorHandler interface {
 	OnError(service, username, connId string, err error)
 }
+
+type SubscribeHandler interface {
+	ShouldSubscribe(service, username string, info map[string]string) bool
+}
+
+type UnsubscribeHandler interface {
+	OnUnsubscribe(service, username string, info map[string]string)
+}
+
+type PushHandler interface {
+	ShouldPush(service, username string, info map[string]string) bool
+}

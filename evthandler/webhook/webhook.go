@@ -171,3 +171,46 @@ func (self *AuthHandler) Authenticate(srv, usr, token string) (pass bool, err er
 	pass = self.post(evt) == 200
 	return
 }
+
+type pushRelatedEvent struct {
+	Service  string            `json:"service"`
+	Username string            `json:"username"`
+	Info     map[string]string `json:"info"`
+}
+
+type SubscribeHandler struct {
+	webHook
+}
+
+func (self *SubscribeHandler) ShouldSubscribe(service, username string, info map[string]string) bool {
+	evt := new(pushRelatedEvent)
+	evt.Service = service
+	evt.Username = username
+	evt.Info = info
+	return self.post(evt) == 200
+}
+
+type PushHandler struct {
+	webHook
+}
+
+func (self *PushHandler) ShouldPush(service, username string, info map[string]string) bool {
+	evt := new(pushRelatedEvent)
+	evt.Service = service
+	evt.Username = username
+	evt.Info = info
+	return self.post(evt) == 200
+}
+
+type UnsubscribeHandler struct {
+	webHook
+}
+
+func (self *UnsubscribeHandler) OnUnsubscribe(service, username string, info map[string]string) {
+	evt := new(pushRelatedEvent)
+	evt.Service = service
+	evt.Username = username
+	evt.Info = info
+	self.post(evt)
+	return
+}
