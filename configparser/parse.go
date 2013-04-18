@@ -31,6 +31,7 @@ import (
 
 type Config struct {
 	Auth            server.Authenticator
+	ErrorHandler    evthandler.ErrorHandler
 	uniqushPushAddr string
 	filename        string
 	srvConfig       map[string]*msgcenter.ServiceConfig
@@ -76,76 +77,120 @@ func parseDuration(node yaml.Node) (t time.Duration, err error) {
 	return
 }
 
-func parseAuthHandler(node yaml.Node, timeout time.Duration) (h server.Authenticator, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		hd := new(webhook.AuthHandler)
-		hd.URL = string(scalar)
-		hd.Timeout = timeout
-		h = hd
+type webhookInfo struct {
+	url          string
+	timeout      time.Duration
+	defaultValue string
+}
+
+func parseWebHook(node yaml.Node) (hook *webhookInfo, err error) {
+	if kv, ok := node.(yaml.Map); ok {
+		hook = new(webhookInfo)
+		if url, ok := kv["url"]; ok {
+			hook.url, err = parseString(url)
+			if err != nil {
+				err = fmt.Errorf("webhook's url should be a string")
+				return
+			}
+		} else {
+			err = fmt.Errorf("webhook should have url")
+			return
+		}
+		if timeout, ok := kv["timeout"]; ok {
+			hook.timeout, err = parseDuration(timeout)
+			if err != nil {
+				err = fmt.Errorf("timeout error: %v", err)
+				return
+			}
+		}
+		if defaultValue, ok := kv["defaultValue"]; ok {
+			hook.defaultValue, err = parseString(defaultValue)
+			if err != nil {
+				err = fmt.Errorf("webhook's default value should be a string")
+				return
+			}
+		}
 	} else {
-		err = fmt.Errorf("webhook should be a scalar")
+		err = fmt.Errorf("webhook should be a map")
 	}
+	return
+}
+
+func setWebHook(hd webhook.WebHook, node yaml.Node, timeout time.Duration) error {
+	hook, err := parseWebHook(node)
+	if err != nil {
+		return err
+	}
+	if hook.timeout < 0*time.Second {
+		hook.timeout = timeout
+	}
+	hd.SetTimeout(hook.timeout)
+	hd.SetURL(hook.url)
+	if hook.defaultValue == "allow" {
+		hd.SetDefault(200)
+	} else {
+		hd.SetDefault(404)
+	}
+	return nil
+}
+
+func parseAuthHandler(node yaml.Node, timeout time.Duration) (h server.Authenticator, err error) {
+	hd := new(webhook.AuthHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
+	}
+	h = hd
 	return
 }
 
 func parseMessageHandler(node yaml.Node, timeout time.Duration) (h evthandler.MessageHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		hd := new(webhook.MessageHandler)
-		hd.URL = string(scalar)
-		hd.Timeout = timeout
-		h = hd
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
+	hd := new(webhook.MessageHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
 	}
+	h = hd
 	return
 }
 
 func parseErrorHandler(node yaml.Node, timeout time.Duration) (h evthandler.ErrorHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		hd := new(webhook.ErrorHandler)
-		hd.URL = string(scalar)
-		hd.Timeout = timeout
-		h = hd
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
+	hd := new(webhook.ErrorHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
 	}
+	h = hd
 	return
 }
 
 func parseForwardRequestHandler(node yaml.Node, timeout time.Duration) (h evthandler.ForwardRequestHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		hd := new(webhook.ForwardRequestHandler)
-		hd.URL = string(scalar)
-		hd.Timeout = timeout
-		h = hd
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
+	hd := new(webhook.ForwardRequestHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
 	}
+	h = hd
 	return
 }
 
-
 func parseLogoutHandler(node yaml.Node, timeout time.Duration) (h evthandler.LogoutHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		hd := new(webhook.LogoutHandler)
-		hd.URL = string(scalar)
-		hd.Timeout = timeout
-		h = hd
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
+	hd := new(webhook.LogoutHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
 	}
+	h = hd
 	return
 }
 
 func parseLoginHandler(node yaml.Node, timeout time.Duration) (h evthandler.LoginHandler, err error) {
-	if scalar, ok := node.(yaml.Scalar); ok {
-		hd := new(webhook.LoginHandler)
-		hd.URL = string(scalar)
-		hd.Timeout = timeout
-		h = hd
-	} else {
-		err = fmt.Errorf("webhook should be a scalar")
+	hd := new(webhook.LoginHandler)
+	err = setWebHook(hd, node, timeout)
+	if err != nil {
+		return
 	}
+	h = hd
 	return
 }
 func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
@@ -266,19 +311,17 @@ func Parse(filename string) (config *Config, err error) {
 		}
 		for srv, node := range t {
 			switch srv {
-			case "uniqush-push":
-				fallthrough
-			case "uniqush_push":
-				config.uniqushPushAddr, err = parseString(node)
-				if err != nil {
-					err = fmt.Errorf("invalid uniqush-push address: %v", err)
-					return
-				}
-				continue
 			case "auth":
 				config.Auth, err = parseAuthHandler(node, 3*time.Second)
 				if err != nil {
 					err = fmt.Errorf("auth: %v", err)
+					return
+				}
+				continue
+			case "err":
+				config.ErrorHandler, err = parseErrorHandler(node, 3*time.Second)
+				if err != nil {
+					err = fmt.Errorf("global error handler: %v", err)
 					return
 				}
 				continue

@@ -27,9 +27,28 @@ import (
 	"time"
 )
 
+type WebHook interface {
+	SetURL(url string)
+	SetTimeout(timeout time.Duration)
+	SetDefault(d int)
+}
+
 type webHook struct {
 	URL     string
 	Timeout time.Duration
+	Default int
+}
+
+func (self *webHook) SetURL(url string) {
+	self.URL = url
+}
+
+func (self *webHook) SetTimeout(timeout time.Duration) {
+	self.Timeout = timeout
+}
+
+func (self *webHook) SetDefault(d int) {
+	self.Default = d
 }
 
 func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err error) {
@@ -47,11 +66,11 @@ func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err er
 
 func (self *webHook) post(data interface{}) int {
 	if len(self.URL) == 0 || self.URL == "none" {
-		return 404
+		return self.Default
 	}
 	jdata, err := json.Marshal(data)
 	if err != nil {
-		return 404
+		return self.Default
 	}
 	c := http.Client{
 		Transport: &http.Transport{
@@ -60,7 +79,7 @@ func (self *webHook) post(data interface{}) int {
 	}
 	resp, err := c.Post(self.URL, "application/json", bytes.NewReader(jdata))
 	if err != nil {
-		return 404
+		return self.Default
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode

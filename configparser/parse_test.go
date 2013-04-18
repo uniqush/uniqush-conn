@@ -24,15 +24,45 @@ import (
 
 func writeConfigFile(filename string) {
 	config := `
-uniqush_push: http://localhost:9898
-auth: http://localhost:8080/auth
-default:
+auth:
+  default: disallow
+  url: http://localhost:8080/auth
   timeout: 3s
-  msg: http://localhost:8080/msg
-  fwd: http://localhost:8080/fwd
-  err: http://localhost:8080/err
-  login: http://localhost:8080/login
-  logout: http://localhost:8080/logout
+err: 
+  url: http://localhost:8080/err
+  timeout: 3s
+default:
+  msg:
+    url: http://localhost:8080/msg
+    timeout: 3s
+  err: 
+    url: http://localhost:8080/err
+    timeout: 3s
+  login: 
+    url: http://localhost:8080/login
+    timeout: 3s
+  logout: 
+    url: http://localhost:8080/logout
+    timeout: 3s
+  fwd: 
+    default: allow
+    url: http://localhost:8080/fwd
+    timeout: 3s
+  subscribe:
+    default: allow
+    url: http://localhost:8080/subscribe
+    timeout: 3s
+  unsubscribe:
+    default: allow
+    url: http://localhost:8080/unsubscribe
+    timeout: 3s
+  push:
+    default: disallow
+    url: http://localhost:8080/push
+    timeout: 3s
+  uniqush-push:
+    addr: localhost:9898
+    timeout: 3s
   max_conns: 2048
   max_online_users: 2048
   max_conns_per_user: 10
@@ -40,7 +70,7 @@ default:
     engine: redis
     addr: 127.0.0.1:6379
     name: 1
-`
+    `
 	file, _ := os.Create(filename)
 	file.WriteString(config)
 	file.Close()
