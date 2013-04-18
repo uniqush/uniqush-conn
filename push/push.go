@@ -1,0 +1,131 @@
+/*
+ * Copyright 2013 Nan Deng
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+package push
+
+import (
+	"net"
+	"net/http"
+	"time"
+	"fmt"
+	"net/url"
+)
+
+type Push interface {
+	Subscribe(service, username string, info map[string]string) error
+	Unsubscribe(service, username string, info map[string]string) error
+	Push(service, username string, info map[string]string) error
+}
+
+type uniqushPush struct {
+	addr string
+	timeout time.Duration
+}
+
+func NewUniqushPushClient(addr string, timeout time.Duration) Push {
+	ret := new(uniqushPush)
+	ret.addr = addr
+	ret.timeout = timeout
+	return ret
+}
+
+func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err error) {
+	return func(netw, addr string) (net.Conn, error) {
+		c, err := net.Dial(netw, addr)
+		if err != nil {
+			return nil, err
+		}
+		if ns.Seconds() > 0.0 {
+			c.SetDeadline(time.Now().Add(ns))
+		}
+		return c, nil
+	}
+}
+
+func (self *uniqushPush) post(path string, data url.Values) error {
+	if len(path) == 0 {
+		return nil
+	}
+
+	url := fmt.Sprintf("http://%v/%v", self.addr, path)
+
+	c := http.Client{
+		Transport: &http.Transport{
+			Dial: timeoutDialler(self.timeout),
+		},
+	}
+	resp, err := c.PostForm(url, data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+func (self *uniqushPush) subscribe(service, username string, info map[string]string, sub bool) error {
+	data := url.Values{}
+	data.Add("service", service)
+	data.Add("subscriber", username)
+
+	for k, v := range info {
+		switch k {
+		case "pushservicetype":
+			fallthrough
+		case "regid":
+			fallthrough
+		case "devtoken":
+			fallthrough
+		case "account":
+			data.Add(k, v)
+		}
+	}
+	path := "unsubscribe"
+	if sub {
+		path = "subscribe"
+	}
+	err := self.post(path, data)
+	return err
+}
+
+func (self *uniqushPush) Subscribe(service, username string, info map[string]string) error {
+	return self.subscribe(service, username, info, true)
+}
+
+func (self *uniqushPush) Unsubscribe(service, username string, info map[string]string) error {
+	return self.subscribe(service, username, info, false)
+}
+
+func (self *uniqushPush) Push(service, username string, info map[string]string) error {
+	data := url.Values{}
+	data.Add("service", service)
+	data.Add("subscriber", username)
+	for k, v := range info {
+		if len(k) < 7 {
+			continue
+		}
+		if k[:6] == "notif." {
+			key := k[6:]
+			if key == "service" || key == "subscriber" {
+				continue
+			}
+			data.Add(key, v)
+		}
+	}
+	err := self.post("push", data)
+	return err
+}
+
