@@ -75,7 +75,7 @@ func main() {
 		return
 	}
 
-	center := msgcenter.NewMessageCenter(ln, privkey, nil, 3 * time.Second, config.Auth, config)
+	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, 3 * time.Second, config.Auth, config)
 	center.Start()
 }
 
