@@ -41,4 +41,3 @@ type ForwardRequestHandler interface {
 type ErrorHandler interface {
 	OnError(service, username, connId string, err error)
 }
-

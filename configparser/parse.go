@@ -103,7 +103,7 @@ func parseWebHook(node yaml.Node) (hook *webhookInfo, err error) {
 				return
 			}
 		}
-		if defaultValue, ok := kv["defaultValue"]; ok {
+		if defaultValue, ok := kv["default"]; ok {
 			hook.defaultValue, err = parseString(defaultValue)
 			if err != nil {
 				err = fmt.Errorf("webhook's default value should be a string")
