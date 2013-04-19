@@ -154,11 +154,21 @@ func (self *serviceCenter) shouldPush(service, username string, msg *proto.Messa
 	return false
 }
 
-func (self *serviceCenter) pushNotif(service, username string, msg *proto.Message, extra map[string]string, fwd bool) {
+func (self *serviceCenter) nrDeliveryPoints(service, username string) int {
+	n := 0
+	if self.config != nil {
+		if self.config.PushService != nil {
+			n = self.config.PushService.NrDeliveryPoints(service, username)
+		}
+	}
+	return n
+}
+
+func (self *serviceCenter) pushNotif(service, username string, msg *proto.Message, extra map[string]string, msgIds[]string, fwd bool) {
 	if self.config != nil {
 		if self.config.PushService != nil {
 			info := getPushInfo(msg, extra, fwd)
-			err := self.config.PushService.Push(service, username, info)
+			err := self.config.PushService.Push(service, username, info, msgIds)
 			if err != nil {
 				self.reportError(service, username, "", err)
 			}
@@ -206,6 +216,16 @@ func (self *serviceCenter) setPoster(service, username, key string, msg *proto.M
 	}
 	return
 }
+
+func (self *serviceCenter) setMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
+	if self.config != nil {
+		if self.config.MsgCache != nil {
+			id, err = self.config.MsgCache.SetMail(service, username, msg, ttl)
+		}
+	}
+	return
+}
+
 
 func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
@@ -280,8 +300,31 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					}
 				}
 				go func() {
+					n := self.nrDeliveryPoints(service, username)
+					if n <= 0 {
+						return
+					}
+					var msgIds []string
+					if len(wreq.posterKey) == 0 {
+						msgIds = make([]string, n)
+						var e error
+						for i := 0; i < n; i++ {
+							msgIds[i], e = self.setMail(service, username, msg, wreq.ttl)
+							if e != nil {
+								// FIXME: Dark side of the force
+								return
+							}
+						}
+					} else {
+						id, e := self.setPoster(service, wreq.user, wreq.posterKey, wreq.msg, wreq.ttl)
+						if e != nil {
+							// FIXME: Dark side of the force
+							return
+						}
+						msgIds = []string{id}
+					}
 					if self.shouldPush(service, username, msg, extra, fwd) {
-						self.pushNotif(service, username, msg, extra, fwd)
+						self.pushNotif(service, username, msg, extra, msgIds, fwd)
 					}
 				}()
 			}
