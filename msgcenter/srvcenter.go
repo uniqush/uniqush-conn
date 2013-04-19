@@ -26,6 +26,7 @@ import (
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"github.com/uniqush/uniqush-conn/push"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -99,6 +100,9 @@ type serviceCenter struct {
 	writeReqChan chan *writeMessageRequest
 	connIn       chan *eventConnIn
 	connLeave    chan *eventConnLeave
+	subReqChan   chan *server.SubscribeRequest
+
+	pushServiceLock sync.RWMutex
 }
 
 var ErrTooManyConns = errors.New("too many connections")
@@ -152,6 +156,21 @@ func (self *serviceCenter) shouldPush(service, username string, msg *proto.Messa
 		}
 	}
 	return false
+}
+
+func (self *serviceCenter) subscribe(req *server.SubscribeRequest) {
+	if req == nil {
+		return
+	}
+	if self.config != nil {
+		if self.config.PushService != nil {
+			if req.Subscribe {
+				self.config.PushService.Subscribe(req.Service, req.Username, req.Params)
+			} else {
+				self.config.PushService.Unsubscribe(req.Service, req.Username, req.Params)
+			}
+		}
+	}
 }
 
 func (self *serviceCenter) nrDeliveryPoints(service, username string) int {
@@ -255,6 +274,10 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			nrConns--
 			conn := leaveEvt.conn
 			self.reportLogout(conn.Service(), conn.Username(), conn.UniqId(), leaveEvt.err)
+		case subreq := <-self.subReqChan:
+			self.pushServiceLock.Lock()
+			self.subscribe(subreq)
+			self.pushServiceLock.Unlock()
 		case wreq := <-self.writeReqChan:
 			wres := new(writeMessageResponse)
 			wres.n = 0
@@ -302,6 +325,8 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					if !self.shouldPush(service, username, msg, extra, fwd) {
 						return
 					}
+					self.pushServiceLock.RLock()
+					defer self.pushServiceLock.RUnlock()
 					n := self.nrDeliveryPoints(service, username)
 					if n <= 0 {
 						return
@@ -415,6 +440,7 @@ func newServiceCenter(serviceName string, conf *ServiceConfig, fwdChan chan<- *s
 	ret.connIn = make(chan *eventConnIn)
 	ret.connLeave = make(chan *eventConnLeave)
 	ret.writeReqChan = make(chan *writeMessageRequest)
+	ret.subReqChan = make(chan *server.SubscribeRequest)
 	go ret.process(conf.MaxNrConns, conf.MaxNrConnsPerUser, conf.MaxNrUsers)
 	return ret
 }
