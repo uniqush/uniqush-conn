@@ -38,6 +38,7 @@ type SubscribeRequest struct {
 type ForwardRequest struct {
 	Receiver        string         `json:"receiver"`
 	ReceiverService string         `json:"service"`
+	TTL             time.Duration  `json:"ttl"`
 	Message         *proto.Message `json:"msg"`
 }
 
@@ -263,6 +264,11 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		}
 		cmd.Message.Id = ""
 		fwdreq.Message = cmd.Message
+		if cmd.Message != nil && len(cmd.Message.Header) > 0 {
+			if ttls, ok := cmd.Message.Header["uniqush.ttl"]; ok {
+				fwdreq.TTL, _ = time.ParseDuration(ttls)
+			}
+		}
 		self.fwdChan <- fwdreq
 	case proto.CMD_SETTING:
 		if len(cmd.Params) < 3 {
