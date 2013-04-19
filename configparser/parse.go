@@ -337,6 +337,16 @@ func parseService(service string, node yaml.Node, defaultConfig *msgcenter.Servi
 			config.LoginHandler, err = parseLoginHandler(value, timeout)
 		case "fwd":
 			config.ForwardRequestHandler, err = parseForwardRequestHandler(value, timeout)
+		case "push":
+			config.PushHandler, err = parsePushHandler(value, timeout)
+		case "subscribe":
+			config.SubscribeHandler, err = parseSubscribeHandler(value, timeout)
+		case "unsubscribe":
+			config.UnsubscribeHandler, err = parseUnsubscribeHandler(value, timeout)
+		case "uniqush-push":
+			fallthrough
+		case "uniqush_push":
+			config.PushService, err = parseUniqushPush(value, timeout)
 		case "max-conns":
 			fallthrough
 		case "max_conns":

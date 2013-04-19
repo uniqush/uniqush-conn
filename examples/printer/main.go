@@ -48,6 +48,9 @@ func main() {
 	r.HandleFunc("/err", PrintData)
 	r.HandleFunc("/login", PrintData)
 	r.HandleFunc("/logout", PrintData)
+	r.HandleFunc("/subscribe", PrintData)
+	r.HandleFunc("/unsubscribe", PrintData)
+	r.HandleFunc("/push", PrintData)
 	http.Handle("/", r)
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {

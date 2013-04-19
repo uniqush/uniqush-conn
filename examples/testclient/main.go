@@ -98,6 +98,8 @@ func messageSender(conn client.Conn) {
 		elems := strings.SplitN(line, ":", 2)
 		if len(elems) == 2 {
 			msg.Body = []byte(elems[1])
+			msg.Header = make(map[string]string, 1)
+			msg.Header["title"] = elems[1]
 			err = conn.ForwardRequest(elems[0], conn.Service(), msg)
 		} else {
 			msg.Body = []byte(line)

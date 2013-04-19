@@ -149,6 +149,8 @@ func (self *serviceCenter) shouldPush(service, username string, msg *proto.Messa
 		if self.config.PushHandler != nil {
 			info := getPushInfo(msg, extra, fwd)
 			return self.config.PushHandler.ShouldPush(service, username, info)
+		} else {
+			fmt.Printf("Should not push it, no push handler\n")
 		}
 	}
 	return false
@@ -289,6 +291,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			}
 
 			if wres.n == 0 {
+				fmt.Printf("Should push this message\n")
 				msg := wreq.msg
 				extra := wreq.extra
 				username := wreq.user
@@ -300,6 +303,10 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					}
 				}
 				go func() {
+					if !self.shouldPush(service, username, msg, extra, fwd) {
+						return
+					}
+					fmt.Printf("OK! Let's push it\n")
 					n := self.nrDeliveryPoints(service, username)
 					if n <= 0 {
 						return
@@ -323,9 +330,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 						}
 						msgIds = []string{id}
 					}
-					if self.shouldPush(service, username, msg, extra, fwd) {
 						self.pushNotif(service, username, msg, extra, msgIds, fwd)
-					}
 				}()
 			}
 			if wreq.resChan != nil {
