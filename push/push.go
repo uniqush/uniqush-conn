@@ -23,9 +23,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"time"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Push interface {
@@ -79,7 +79,7 @@ func (self *uniqushPush) postReadLines(path string, data url.Values, nrLines int
 	defer resp.Body.Close()
 	if nrLines > 0 {
 		respBuf := bufio.NewReader(resp.Body)
-		line := make([]byte, 0, nrLines * 512)
+		line := make([]byte, 0, nrLines*512)
 		for i := 0; i < nrLines; i++ {
 			l, _, e := respBuf.ReadLine()
 			if e != nil {
@@ -123,7 +123,7 @@ func (self *uniqushPush) subscribe(service, username string, info map[string]str
 	return err
 }
 
-func (self *uniqushPush) NrDeliveryPoints(service, username string) int{
+func (self *uniqushPush) NrDeliveryPoints(service, username string) int {
 	data := url.Values{}
 	data.Add("service", service)
 	data.Add("subscriber", username)

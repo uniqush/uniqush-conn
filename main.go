@@ -15,19 +15,18 @@
  *
  */
 
-
 package main
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"flag"
+	"fmt"
 	"github.com/uniqush/uniqush-conn/configparser"
 	"github.com/uniqush/uniqush-conn/msgcenter"
-	"fmt"
-	"net"
-	"encoding/pem"
-	"crypto/x509"
-	"crypto/rsa"
 	"io/ioutil"
-	"flag"
+	"net"
 	"os"
 	"time"
 )
@@ -75,7 +74,6 @@ func main() {
 		return
 	}
 
-	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, 3 * time.Second, config.Auth, config)
+	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, 3*time.Second, config.Auth, config)
 	center.Start()
 }
-
