@@ -110,7 +110,7 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 		if self.config.ForwardRequestHandler != nil {
 			shouldFwd = self.config.ForwardRequestHandler.ShouldForward(fwdreq)
 			maxttl := self.config.ForwardRequestHandler.MaxTTL()
-			if fwdreq.TTL < 1 * time.Second || fwdreq.TTL > maxttl {
+			if fwdreq.TTL < 1*time.Second || fwdreq.TTL > maxttl {
 				fwdreq.TTL = maxttl
 			}
 		}
@@ -149,8 +149,6 @@ func (self *serviceCenter) shouldPush(service, username string, msg *proto.Messa
 		if self.config.PushHandler != nil {
 			info := getPushInfo(msg, extra, fwd)
 			return self.config.PushHandler.ShouldPush(service, username, info)
-		} else {
-			fmt.Printf("Should not push it, no push handler\n")
 		}
 	}
 	return false
@@ -166,7 +164,7 @@ func (self *serviceCenter) nrDeliveryPoints(service, username string) int {
 	return n
 }
 
-func (self *serviceCenter) pushNotif(service, username string, msg *proto.Message, extra map[string]string, msgIds[]string, fwd bool) {
+func (self *serviceCenter) pushNotif(service, username string, msg *proto.Message, extra map[string]string, msgIds []string, fwd bool) {
 	if self.config != nil {
 		if self.config.PushService != nil {
 			info := getPushInfo(msg, extra, fwd)
@@ -227,7 +225,6 @@ func (self *serviceCenter) setMail(service, username string, msg *proto.Message,
 	}
 	return
 }
-
 
 func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
 	connMap := newTreeBasedConnMap()
@@ -291,7 +288,6 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			}
 
 			if wres.n == 0 {
-				fmt.Printf("Should push this message\n")
 				msg := wreq.msg
 				extra := wreq.extra
 				username := wreq.user
@@ -306,7 +302,6 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					if !self.shouldPush(service, username, msg, extra, fwd) {
 						return
 					}
-					fmt.Printf("OK! Let's push it\n")
 					n := self.nrDeliveryPoints(service, username)
 					if n <= 0 {
 						return
@@ -330,7 +325,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 						}
 						msgIds = []string{id}
 					}
-						self.pushNotif(service, username, msg, extra, msgIds, fwd)
+					self.pushNotif(service, username, msg, extra, msgIds, fwd)
 				}()
 			}
 			if wreq.resChan != nil {
