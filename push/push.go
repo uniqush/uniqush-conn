@@ -18,21 +18,25 @@
 package push
 
 import (
+	"bufio"
+	"fmt"
 	"net"
 	"net/http"
-	"time"
-	"fmt"
 	"net/url"
+	"time"
+	"strconv"
+	"strings"
 )
 
 type Push interface {
 	Subscribe(service, username string, info map[string]string) error
 	Unsubscribe(service, username string, info map[string]string) error
-	Push(service, username string, info map[string]string) error
+	Push(service, username string, info map[string]string, msgIds []string) error
+	NrDeliveryPoints(service, username string) int
 }
 
 type uniqushPush struct {
-	addr string
+	addr    string
 	timeout time.Duration
 }
 
@@ -56,9 +60,9 @@ func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err er
 	}
 }
 
-func (self *uniqushPush) post(path string, data url.Values) error {
+func (self *uniqushPush) postReadLines(path string, data url.Values, nrLines int) (value string, err error) {
 	if len(path) == 0 {
-		return nil
+		return
 	}
 
 	url := fmt.Sprintf("http://%v/%v", self.addr, path)
@@ -70,10 +74,28 @@ func (self *uniqushPush) post(path string, data url.Values) error {
 	}
 	resp, err := c.PostForm(url, data)
 	if err != nil {
-		return err
+		return
 	}
 	defer resp.Body.Close()
-	return nil
+	if nrLines > 0 {
+		respBuf := bufio.NewReader(resp.Body)
+		line := make([]byte, 0, nrLines * 512)
+		for i := 0; i < nrLines; i++ {
+			l, _, e := respBuf.ReadLine()
+			if e != nil {
+				err = e
+				return
+			}
+			line = append(line, l...)
+		}
+		value = string(line)
+	}
+	return
+}
+
+func (self *uniqushPush) post(path string, data url.Values) error {
+	_, err := self.postReadLines(path, data, 0)
+	return err
 }
 
 func (self *uniqushPush) subscribe(service, username string, info map[string]string, sub bool) error {
@@ -101,6 +123,21 @@ func (self *uniqushPush) subscribe(service, username string, info map[string]str
 	return err
 }
 
+func (self *uniqushPush) NrDeliveryPoints(service, username string) int{
+	data := url.Values{}
+	data.Add("service", service)
+	data.Add("subscriber", username)
+	v, err := self.postReadLines("nrdp", data, 1)
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
 func (self *uniqushPush) Subscribe(service, username string, info map[string]string) error {
 	return self.subscribe(service, username, info, true)
 }
@@ -109,7 +146,7 @@ func (self *uniqushPush) Unsubscribe(service, username string, info map[string]s
 	return self.subscribe(service, username, info, false)
 }
 
-func (self *uniqushPush) Push(service, username string, info map[string]string) error {
+func (self *uniqushPush) Push(service, username string, info map[string]string, msgIds []string) error {
 	data := url.Values{}
 	data.Add("service", service)
 	data.Add("subscriber", username)
@@ -125,7 +162,9 @@ func (self *uniqushPush) Push(service, username string, info map[string]string) 
 			data.Add(key, v)
 		}
 	}
+	for _, id := range msgIds {
+		data.Add("uniqush.perdp.uniqush.msgid", id)
+	}
 	err := self.post("push", data)
 	return err
 }
-
