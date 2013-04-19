@@ -147,10 +147,19 @@ func (self *ErrorHandler) OnError(service, username, connId string, reason error
 
 type ForwardRequestHandler struct {
 	webHook
+	maxTTL time.Duration
 }
 
 func (self *ForwardRequestHandler) ShouldForward(fwd *server.ForwardRequest) bool {
 	return self.post(fwd) == 200
+}
+
+func (self *ForwardRequestHandler) SetMaxTTL(ttl time.Duration) {
+	self.maxTTL = ttl
+}
+
+func (self *ForwardRequestHandler) MaxTTL() time.Duration {
+	return self.maxTTL
 }
 
 type authEvent struct {

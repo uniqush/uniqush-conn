@@ -20,6 +20,7 @@ package evthandler
 import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
+	"time"
 )
 
 type LoginHandler interface {
@@ -36,6 +37,7 @@ type MessageHandler interface {
 
 type ForwardRequestHandler interface {
 	ShouldForward(fwd *server.ForwardRequest) bool
+	MaxTTL() time.Duration
 }
 
 type ErrorHandler interface {

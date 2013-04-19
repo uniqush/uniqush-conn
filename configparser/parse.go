@@ -167,6 +167,18 @@ func parseForwardRequestHandler(node yaml.Node, timeout time.Duration) (h evthan
 	if err != nil {
 		return
 	}
+	if kv, ok := node.(yaml.Map); ok {
+		if ttlnode, ok := kv["max-ttl"]; ok {
+			ttl, e := parseDuration(ttlnode)
+			if e != nil {
+				err = fmt.Errorf("max-ttl: %v", e)
+				return
+			}
+			hd.SetMaxTTL(ttl)
+		} else {
+			hd.SetMaxTTL(24 * time.Hour)
+		}
+	}
 	h = hd
 	return
 }

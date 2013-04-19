@@ -48,6 +48,7 @@ default:
     default: allow
     url: http://localhost:8080/fwd
     timeout: 3s
+    max-ttl: 36h
   subscribe:
     default: allow
     url: http://localhost:8080/subscribe
