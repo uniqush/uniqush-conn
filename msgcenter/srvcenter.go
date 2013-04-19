@@ -109,6 +109,10 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 	if self.config != nil {
 		if self.config.ForwardRequestHandler != nil {
 			shouldFwd = self.config.ForwardRequestHandler.ShouldForward(fwdreq)
+			maxttl := self.config.ForwardRequestHandler.MaxTTL()
+			if fwdreq.TTL < 1 * time.Second || fwdreq.TTL > maxttl {
+				fwdreq.TTL = maxttl
+			}
 		}
 	}
 	if !shouldFwd {
@@ -116,7 +120,7 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 	}
 	receiver := fwdreq.Receiver
 	extra := getPushInfo(fwdreq.Message, nil, true)
-	self.SendMail(receiver, fwdreq.Message, extra, 24*time.Hour)
+	self.SendMail(receiver, fwdreq.Message, extra, fwdreq.TTL)
 }
 
 func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[string]string {
