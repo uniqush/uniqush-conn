@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
-	"time"
 	"math/rand"
+	"time"
 )
 
 type redisMessageCache struct {
@@ -82,7 +82,6 @@ func isMailKey(id string) bool {
 	}
 	return id[0] == 'm'
 }
-
 
 func (self *redisMessageCache) SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
 	id = "m" + randomId()
@@ -196,7 +195,7 @@ func (self *redisMessageCache) del(service, username, id string) (msg *proto.Mes
 		conn.Do("DISCARD")
 		return
 	}
-	reply,  err := conn.Do("EXEC")
+	reply, err := conn.Do("EXEC")
 	if err != nil {
 		return
 	}
@@ -221,4 +220,3 @@ func (self *redisMessageCache) del(service, username, id string) (msg *proto.Mes
 	msg, err = msgUnmarshal(data)
 	return
 }
-

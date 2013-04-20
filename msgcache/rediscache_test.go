@@ -19,11 +19,11 @@ package msgcache
 
 import (
 	"crypto/rand"
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
 	"io"
 	"testing"
-	"fmt"
 	"time"
 )
 
@@ -68,7 +68,7 @@ func TestSetGetPoster(t *testing.T) {
 		keys[i] = fmt.Sprintf("%v", i)
 	}
 	for i, msg := range msgs {
-		id, err := cache.SetPoster(srv, usr, keys[i], msg, 0 * time.Second)
+		id, err := cache.SetPoster(srv, usr, keys[i], msg, 0*time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
@@ -107,7 +107,7 @@ func TestGetSetMail(t *testing.T) {
 	ids := make([]string, N)
 
 	for i, msg := range msgs {
-		id, err := cache.SetMail(srv, usr, msg, 0 * time.Second)
+		id, err := cache.SetMail(srv, usr, msg, 0*time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
@@ -147,7 +147,7 @@ func TestGetSetMailTTL(t *testing.T) {
 	ids := make([]string, N)
 
 	for i, msg := range msgs {
-		id, err := cache.SetMail(srv, usr, msg, 1 * time.Second)
+		id, err := cache.SetMail(srv, usr, msg, 1*time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
@@ -166,4 +166,3 @@ func TestGetSetMailTTL(t *testing.T) {
 		}
 	}
 }
-
