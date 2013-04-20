@@ -135,8 +135,9 @@ const (
 	// message to another user.
 	//
 	// Params:
-	// 0. Reciever's name
-	// 1. [optional] Reciever's service name.
+	// 0. TTL
+	// 1. Reciever's name
+	// 2. [optional] Reciever's service name.
 	//    If empty, then same service as the client
 	CMD_FWD_REQ
 

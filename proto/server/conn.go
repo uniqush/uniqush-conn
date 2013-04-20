@@ -243,7 +243,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			atomic.StoreInt32(&self.visible, v)
 		}
 	case proto.CMD_FWD_REQ:
-		if len(cmd.Params) < 1 {
+		if len(cmd.Params) < 2 {
 			err = proto.ErrBadPeerImpl
 			return
 		}
@@ -256,19 +256,15 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		}
 		cmd.Message.Sender = self.Username()
 		cmd.Message.SenderService = self.Service()
-		fwdreq.Receiver = cmd.Params[0]
-		if len(cmd.Params) > 1 {
-			fwdreq.ReceiverService = cmd.Params[1]
+		fwdreq.TTL, _ = time.ParseDuration(cmd.Params[0])
+		fwdreq.Receiver = cmd.Params[1]
+		if len(cmd.Params) > 2 {
+			fwdreq.ReceiverService = cmd.Params[2]
 		} else {
 			fwdreq.ReceiverService = self.Service()
 		}
 		cmd.Message.Id = ""
 		fwdreq.Message = cmd.Message
-		if cmd.Message != nil && len(cmd.Message.Header) > 0 {
-			if ttls, ok := cmd.Message.Header["uniqush.ttl"]; ok {
-				fwdreq.TTL, _ = time.ParseDuration(ttls)
-			}
-		}
 		self.fwdChan <- fwdreq
 	case proto.CMD_SETTING:
 		if len(cmd.Params) < 3 {

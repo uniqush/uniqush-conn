@@ -703,7 +703,7 @@ func TestForwardRequestDifferentService(t *testing.T) {
 
 	// Client:
 	go func() {
-		err := cliConn.ForwardRequest(fwd, fwdSrv, msg)
+		err := cliConn.ForwardRequest(fwd, fwdSrv, msg, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -762,7 +762,7 @@ func TestForwardRequestSameService(t *testing.T) {
 
 	// Client:
 	go func() {
-		err := cliConn.ForwardRequest(fwd, fwdSrv, msg)
+		err := cliConn.ForwardRequest(fwd, fwdSrv, msg, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}

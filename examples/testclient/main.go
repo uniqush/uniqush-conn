@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -8,13 +9,12 @@ import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
-	"io/ioutil"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
-	"time"
-	"bufio"
 	"strings"
+	"time"
 )
 
 func loadRSAPublicKey(keyFileName string) (rsapub *rsa.PublicKey, err error) {
@@ -41,7 +41,6 @@ func loadRSAPublicKey(keyFileName string) (rsapub *rsa.PublicKey, err error) {
 	}
 	return
 }
-
 
 var argvPubKey = flag.String("key", "pub.pem", "public key file")
 var argvService = flag.String("s", "service", "service")
@@ -100,7 +99,7 @@ func messageSender(conn client.Conn) {
 			msg.Body = []byte(elems[1])
 			msg.Header = make(map[string]string, 1)
 			msg.Header["title"] = elems[1]
-			err = conn.ForwardRequest(elems[0], conn.Service(), msg)
+			err = conn.ForwardRequest(elems[0], conn.Service(), msg, 1*time.Hour)
 		} else {
 			msg.Body = []byte(line)
 			err = conn.SendMessage(msg)

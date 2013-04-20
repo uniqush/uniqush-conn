@@ -22,6 +22,7 @@ import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
 	"strconv"
+	"time"
 )
 
 type Conn interface {
@@ -29,7 +30,7 @@ type Conn interface {
 	Config(digestThreshold, compressThreshold int, encrypt bool, digestFields []string) error
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
-	ForwardRequest(receiver, service string, msg *proto.Message) error
+	ForwardRequest(receiver, service string, msg *proto.Message, ttl time.Duration) error
 	SetVisibility(v bool) error
 	SendMessage(msg *proto.Message) error
 }
@@ -124,11 +125,12 @@ func (self *clientConn) SendMessage(msg *proto.Message) error {
 	return self.WriteMessage(msg, compress, self.encrypt)
 }
 
-func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Message) error {
+func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Message, ttl time.Duration) error {
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_FWD_REQ
-	cmd.Params = make([]string, 1, 2)
-	cmd.Params[0] = receiver
+	cmd.Params = make([]string, 2, 3)
+	cmd.Params[0] = fmt.Sprintf("%v", ttl)
+	cmd.Params[1] = receiver
 	if len(service) > 0 && service != self.Service() {
 		cmd.Params = append(cmd.Params, service)
 	}
