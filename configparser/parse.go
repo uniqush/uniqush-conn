@@ -32,7 +32,7 @@ import (
 )
 
 type Config struct {
-	HttpAddr string
+	HttpAddr      string
 	Auth          server.Authenticator
 	ErrorHandler  evthandler.ErrorHandler
 	filename      string
@@ -66,6 +66,10 @@ func parseInt(node yaml.Node) (n int, err error) {
 }
 
 func parseString(node yaml.Node) (str string, err error) {
+	if node == nil {
+		str = ""
+		return
+	}
 	if scalar, ok := node.(yaml.Scalar); ok {
 		str = string(scalar)
 	} else {
@@ -315,6 +319,10 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 }
 
 func parseService(service string, node yaml.Node, defaultConfig *msgcenter.ServiceConfig) (config *msgcenter.ServiceConfig, err error) {
+	if node == nil {
+		config = defaultConfig
+		return
+	}
 	fields, ok := node.(yaml.Map)
 	if !ok {
 		err = fmt.Errorf("[service=%v] Service information should be a map", service)
