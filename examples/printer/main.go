@@ -18,7 +18,6 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
 	"net/http"
 	"fmt"
 	"bufio"
@@ -41,17 +40,7 @@ func PrintData(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	r := mux.NewRouter()
-	r.HandleFunc("/auth", PrintData)
-	r.HandleFunc("/msg", PrintData)
-	r.HandleFunc("/fwd", PrintData)
-	r.HandleFunc("/err", PrintData)
-	r.HandleFunc("/login", PrintData)
-	r.HandleFunc("/logout", PrintData)
-	r.HandleFunc("/subscribe", PrintData)
-	r.HandleFunc("/unsubscribe", PrintData)
-	r.HandleFunc("/push", PrintData)
-	http.Handle("/", r)
+	http.HandleFunc("/", PrintData)
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
