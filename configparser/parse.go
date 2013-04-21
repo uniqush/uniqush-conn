@@ -440,6 +440,9 @@ func Parse(filename string) (config *Config, err error) {
 					return
 				}
 				continue
+			case "default":
+				// Don't need to parse the default service again.
+				continue
 			}
 			var sconf *msgcenter.ServiceConfig
 			sconf, err = parseService(srv, node, config.defaultConfig)
