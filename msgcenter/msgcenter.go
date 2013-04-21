@@ -71,6 +71,19 @@ func (self *MessageCenter) process() {
 	}
 }
 
+func (self *MessageCenter) AddService(srv string) *serviceCenter {
+	self.srvCentersLock.Lock()
+	defer self.srvCentersLock.Unlock()
+	config := self.srvConfReader.ReadConfig(srv)
+	if config == nil {
+		self.reportError(srv, "", "", fmt.Errorf("cannot find service's config"))
+		return nil
+	}
+	center := newServiceCenter(srv, config, self.fwdChan)
+	self.serviceCenterMap[srv] = center
+	return center
+}
+
 func (self *MessageCenter) serveConn(c net.Conn) {
 	conn, err := server.AuthConn(c, self.privkey, self.auth, self.authtimeout)
 	if err != nil {

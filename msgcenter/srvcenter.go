@@ -337,7 +337,8 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					}
 				}
 				go func() {
-					if !self.shouldPush(service, username, msg, extra, fwd) {
+					should := self.shouldPush(service, username, msg, extra, fwd)
+					if !should {
 						return
 					}
 					self.pushServiceLock.RLock()

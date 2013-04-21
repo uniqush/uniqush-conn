@@ -75,6 +75,11 @@ func main() {
 	}
 
 	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, 3*time.Second, config.Auth, config)
+
+	srvs := config.AllServices()
+	for _, srv := range srvs {
+		center.AddService(srv)
+	}
 	proc := NewHttpRequestProcessor(config.HttpAddr, center)
 	go center.Start()
 	err = proc.Start()

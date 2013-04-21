@@ -18,22 +18,22 @@
 package main
 
 import (
-	"net/http"
 	"encoding/json"
-	"github.com/uniqush/uniqush-conn/proto"
-	"github.com/uniqush/uniqush-conn/msgcenter"
-	"time"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/msgcenter"
+	"github.com/uniqush/uniqush-conn/proto"
 	"io"
+	"net/http"
+	"time"
 )
 
 type sendMessageRequest struct {
-	Service string `json:"service"`
-	Username string `json:"username"`
-	Header map[string]string `json:"header,omitempty"`
-	Body []byte `json:"body,omitempty"`
-	TTL time.Duration `json:"ttl,omitempty"`
-	PosterKey string `json:"key,omitempty"`
+	Service   string            `json:"service"`
+	Username  string            `json:"username"`
+	Header    map[string]string `json:"header,omitempty"`
+	Body      []byte            `json:"body,omitempty"`
+	TTL       string            `json:"ttl,omitempty"`
+	PosterKey string            `json:"key,omitempty"`
 }
 
 func parseJson(input io.Reader) (req *sendMessageRequest, err error) {
@@ -60,8 +60,15 @@ func isPrefix(prefix, str string) bool {
 }
 
 func (self *RequestProcessor) sendMessage(req *sendMessageRequest) []error {
-	if req.TTL < 1 * time.Second {
-		req.TTL = 24 * time.Hour
+	var errs []error
+	ttl := 24 * time.Hour
+	if len(req.TTL) > 0 {
+		var e error
+		ttl, e = time.ParseDuration(req.TTL)
+		if e != nil {
+			errs = append(errs, e)
+			return errs
+		}
 	}
 
 	msg := new(proto.Message)
@@ -70,8 +77,6 @@ func (self *RequestProcessor) sendMessage(req *sendMessageRequest) []error {
 	if len(req.Body) > 0 {
 		msg.Body = []byte(req.Body)
 	}
-
-	var errs []error
 
 	for k, v := range req.Header {
 		if isPrefix("notif.", k) {
@@ -90,9 +95,9 @@ func (self *RequestProcessor) sendMessage(req *sendMessageRequest) []error {
 	}
 
 	if len(req.PosterKey) == 0 {
-		_, errs = self.center.SendMail(req.Service, req.Username, msg, extra, req.TTL)
+		_, errs = self.center.SendMail(req.Service, req.Username, msg, extra, ttl)
 	} else {
-		_, errs = self.center.SendPoster(req.Service, req.Username, msg, extra, req.PosterKey, req.TTL)
+		_, errs = self.center.SendPoster(req.Service, req.Username, msg, extra, req.PosterKey, ttl)
 	}
 	return errs
 }
@@ -128,7 +133,7 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 }
 
 func (self *HttpRequestProcessor) Start() error {
-	err := http.ListenAndServe(self.addr, self)
+	http.Handle("/send.json", self)
+	err := http.ListenAndServe(self.addr, nil)
 	return err
 }
-

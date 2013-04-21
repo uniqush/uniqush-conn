@@ -40,6 +40,14 @@ type Config struct {
 	defaultConfig *msgcenter.ServiceConfig
 }
 
+func (self *Config) AllServices() []string {
+	ret := make([]string, 0, len(self.srvConfig))
+	for srv, _ := range self.srvConfig {
+		ret = append(ret, srv)
+	}
+	return ret
+}
+
 func (self *Config) ReadConfig(srv string) *msgcenter.ServiceConfig {
 	if ret, ok := self.srvConfig[srv]; ok {
 		return ret
