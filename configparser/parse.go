@@ -32,6 +32,7 @@ import (
 )
 
 type Config struct {
+	HttpAddr string
 	Auth          server.Authenticator
 	ErrorHandler  evthandler.ErrorHandler
 	filename      string
@@ -411,6 +412,15 @@ func Parse(filename string) (config *Config, err error) {
 				config.ErrorHandler, err = parseErrorHandler(node, 3*time.Second)
 				if err != nil {
 					err = fmt.Errorf("global error handler: %v", err)
+					return
+				}
+				continue
+			case "http-addr":
+				fallthrough
+			case "http_addr":
+				config.HttpAddr, err = parseString(node)
+				if err != nil {
+					err = fmt.Errorf("Bad HTTP bind address: %v", err)
 					return
 				}
 				continue

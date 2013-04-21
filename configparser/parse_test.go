@@ -24,6 +24,7 @@ import (
 
 func writeConfigFile(filename string) {
 	config := `
+http-addr: 127.0.0.1:8088
 auth:
   default: disallow
   url: http://localhost:8080/auth
