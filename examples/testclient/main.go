@@ -105,7 +105,9 @@ func messageSender(conn client.Conn) {
 			err = conn.SendMessage(msg)
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
+			if err != io.EOF {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
 			return
 		}
 	}
