@@ -93,7 +93,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	// - Client's version (1 byte)
 	// - Client's DH public key: g ^ y
 	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
-	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen+1]
+	keyExPkt = keyExPkt[:1+dhPubkeyLen+authKeyLen]
 
 	// Receive the data from client
 	n, err = io.ReadFull(conn, keyExPkt)
@@ -184,10 +184,10 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 		return
 	}
 
-	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen+1]
+	keyExPkt = keyExPkt[:1+dhPubkeyLen+authKeyLen]
 	keyExPkt[0] = currentProtocolVersion
 	copy(keyExPkt[1:], mypub)
-	err = ks.clientHMAC(keyExPkt[1:dhPubkeyLen], keyExPkt[dhPubkeyLen + 1:])
+	err = ks.clientHMAC(keyExPkt[1:dhPubkeyLen+1], keyExPkt[dhPubkeyLen+1:])
 	if err != nil {
 		return
 	}

@@ -127,12 +127,14 @@ func exchangeKeysOrReport(t *testing.T, succ bool) (serverKeySet, clientKeySet *
 	if es == nil && !succ {
 		if t != nil {
 			t.Errorf("Should be failed. Run again")
+			return
 		}
 		return
 	}
 	if ec == nil && !succ {
 		if t != nil {
 			t.Errorf("Should be failed. Run again")
+			return
 		}
 		return
 	}
@@ -144,6 +146,7 @@ func exchangeKeysOrReport(t *testing.T, succ bool) (serverKeySet, clientKeySet *
 		clientKeySet = nil
 		if t != nil {
 			t.Errorf("Error from server: %v", es)
+			return
 		}
 	}
 	if ec != nil && succ {
@@ -151,6 +154,7 @@ func exchangeKeysOrReport(t *testing.T, succ bool) (serverKeySet, clientKeySet *
 		clientKeySet = nil
 		if t != nil {
 			t.Errorf("Error from client: %v", ec)
+			return
 		}
 	}
 	if !serverKeySet.eq(clientKeySet) {
@@ -159,6 +163,7 @@ func exchangeKeysOrReport(t *testing.T, succ bool) (serverKeySet, clientKeySet *
 
 		if t != nil {
 			t.Errorf("Key set Not equal")
+			return
 		}
 	}
 	return
