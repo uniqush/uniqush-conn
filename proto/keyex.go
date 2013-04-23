@@ -70,10 +70,11 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	}
 
 	siglen := (privKey.N.BitLen() + 7) / 8
-	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen)
-	copy(keyExPkt, mypub)
-	copy(keyExPkt[dhPubkeyLen:], sig)
-	nonce := keyExPkt[dhPubkeyLen+siglen:]
+	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen+1)
+	keyExPkt[0] = currentProtocolVersion
+	copy(keyExPkt[1:], mypub)
+	copy(keyExPkt[dhPubkeyLen+1:], sig)
+	nonce := keyExPkt[dhPubkeyLen+siglen+1:]
 	n, err = io.ReadFull(rand.Reader, nonce)
 	if err != nil || n != len(nonce) {
 		err = ErrZeroEntropy
@@ -81,6 +82,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	}
 
 	// Send to client:
+	// - Server's version (1 byte)
 	// - DH public key: g ^ x
 	// - Signature of DH public key RSASSA-PSS(g ^ x)
 	// - nonce
@@ -137,11 +139,12 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 
 func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err error) {
 	// Receive the data from server, which contains:
+	// - version
 	// - Server's DH public key: g ^ x
 	// - Signature of server's DH public key RSASSA-PSS(g ^ x)
 	// - nonce
 	siglen := (pubKey.N.BitLen() + 7) / 8
-	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen)
+	keyExPkt := make([]byte, dhPubkeyLen+siglen+nonceLen+1)
 	n, err := io.ReadFull(conn, keyExPkt)
 	if err != nil {
 		return
@@ -151,9 +154,15 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 		return
 	}
 
-	serverPubData := keyExPkt[:dhPubkeyLen]
-	signature := keyExPkt[dhPubkeyLen : dhPubkeyLen+siglen]
-	nonce := keyExPkt[dhPubkeyLen+siglen:]
+	version := keyExPkt[0]
+	if version != currentProtocolVersion {
+		err = ErrImcompatibleProtocol
+		return
+	}
+
+	serverPubData := keyExPkt[1 : dhPubkeyLen+1]
+	signature := keyExPkt[dhPubkeyLen+1 : dhPubkeyLen+siglen+1]
+	nonce := keyExPkt[dhPubkeyLen+siglen+1:]
 
 	sha := sha256.New()
 	hashed := make([]byte, sha.Size())
