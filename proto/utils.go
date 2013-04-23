@@ -24,6 +24,7 @@ import (
 )
 
 var ErrZeroEntropy = errors.New("Need more random number")
+var ErrImcompatibleProtocol = errors.New("incompatible protocol")
 var ErrBadServer = errors.New("Unkown Server")
 var ErrCorruptedData = errors.New("corrupted data")
 var ErrBadKeyExchangePacket = errors.New("Bad Key-exchange Packet")

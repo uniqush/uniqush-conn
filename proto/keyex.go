@@ -28,6 +28,8 @@ import (
 	"net"
 )
 
+const currentProtocolVersion byte = 1
+
 // The authentication here is quite similar with, if not same as, tarsnap's auth algorithm.
 //
 // First, server generate a Diffie-Hellman public key, dhpub1, sign it with
@@ -88,9 +90,10 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	}
 
 	// Receive from client:
+	// - Client's version (1 byte)
 	// - Client's DH public key: g ^ y
 	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
-	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen]
+	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen+1]
 
 	// Receive the data from client
 	n, err = io.ReadFull(conn, keyExPkt)
@@ -101,6 +104,13 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 		err = ErrBadKeyExchangePacket
 		return
 	}
+
+	version := keyExPkt[0]
+	if version > currentProtocolVersion {
+		err = ErrImcompatibleProtocol
+		return
+	}
+	keyExPkt = keyExPkt[1:]
 
 	// First, recover client's DH public key
 	clientpub := dhkx.NewPublicKey(keyExPkt[:dhPubkeyLen])
@@ -174,14 +184,16 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 		return
 	}
 
-	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen]
-	copy(keyExPkt, mypub)
-	err = ks.clientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	keyExPkt = keyExPkt[:dhPubkeyLen+authKeyLen+1]
+	keyExPkt[0] = currentProtocolVersion
+	copy(keyExPkt[1:], mypub)
+	err = ks.clientHMAC(keyExPkt[1:dhPubkeyLen], keyExPkt[dhPubkeyLen + 1:])
 	if err != nil {
 		return
 	}
 
 	// Send the client message to server, which contains:
+	// - Protocol version (1 byte)
 	// - Client's DH public key: g ^ y
 	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
 	err = writen(conn, keyExPkt)
