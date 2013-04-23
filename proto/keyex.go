@@ -136,11 +136,6 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 }
 
 func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err error) {
-	// Generate a DH key
-	group, _ := dhkx.GetGroup(dhGroupID)
-	priv, _ := group.GeneratePrivateKey(nil)
-	mypub := leftPaddingZero(priv.Bytes(), dhPubkeyLen)
-
 	// Receive the data from server, which contains:
 	// - Server's DH public key: g ^ x
 	// - Signature of server's DH public key RSASSA-PSS(g ^ x)
@@ -171,6 +166,11 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 	if err != nil {
 		return
 	}
+
+	// Generate a DH key
+	group, _ := dhkx.GetGroup(dhGroupID)
+	priv, _ := group.GeneratePrivateKey(nil)
+	mypub := leftPaddingZero(priv.Bytes(), dhPubkeyLen)
 
 	// Generate the shared key from server's DH public key and client DH private key
 	serverpub := dhkx.NewPublicKey(serverPubData)
