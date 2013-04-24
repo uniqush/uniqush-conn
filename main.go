@@ -28,7 +28,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"time"
 )
 
 func readPrivateKey(keyFileName string) (priv *rsa.PrivateKey, err error) {
@@ -74,7 +73,7 @@ func main() {
 		return
 	}
 
-	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, 3*time.Second, config.Auth, config)
+	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, config.HandshakeTimeout, config.Auth, config)
 
 	srvs := config.AllServices()
 	for _, srv := range srvs {

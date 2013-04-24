@@ -25,6 +25,7 @@ import (
 func writeConfigFile(filename string) {
 	config := `
 http-addr: 127.0.0.1:8088
+handshake-timeout: 10s
 auth:
   default: disallow
   url: http://localhost:8080/auth

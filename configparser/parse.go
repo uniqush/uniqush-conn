@@ -32,12 +32,13 @@ import (
 )
 
 type Config struct {
-	HttpAddr      string
-	Auth          server.Authenticator
-	ErrorHandler  evthandler.ErrorHandler
-	filename      string
-	srvConfig     map[string]*msgcenter.ServiceConfig
-	defaultConfig *msgcenter.ServiceConfig
+	HandshakeTimeout time.Duration
+	HttpAddr         string
+	Auth             server.Authenticator
+	ErrorHandler     evthandler.ErrorHandler
+	filename         string
+	srvConfig        map[string]*msgcenter.ServiceConfig
+	defaultConfig    *msgcenter.ServiceConfig
 }
 
 func (self *Config) AllServices() []string {
@@ -437,6 +438,15 @@ func Parse(filename string) (config *Config, err error) {
 				config.HttpAddr, err = parseString(node)
 				if err != nil {
 					err = fmt.Errorf("Bad HTTP bind address: %v", err)
+					return
+				}
+				continue
+			case "handshake-timeout":
+				fallthrough
+			case "handshake_timeout":
+				config.HandshakeTimeout, err = parseDuration(node)
+				if err != nil {
+					err = fmt.Errorf("bad handshake timeout: %v", err)
 					return
 				}
 				continue
