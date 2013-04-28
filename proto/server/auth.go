@@ -36,9 +36,11 @@ var ErrAuthFail = errors.New("authentication failed")
 func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeout time.Duration) (c Conn, err error) {
 	conn.SetDeadline(time.Now().Add(timeout))
 	defer func() {
-		conn.SetDeadline(time.Time{})
-		if err != nil {
-			conn.Close()
+		if err == nil {
+			err = conn.SetDeadline(time.Time{})
+			if err != nil {
+				conn.Close()
+			}
 		}
 	}()
 
@@ -53,9 +55,11 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 		return
 	}
 	if cmd.Type != proto.CMD_AUTH {
+		err = ErrAuthFail
 		return
 	}
 	if len(cmd.Params) != 3 {
+		err = ErrAuthFail
 		return
 	}
 	service := cmd.Params[0]
