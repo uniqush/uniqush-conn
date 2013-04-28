@@ -107,7 +107,7 @@ func (self *CommandIO) readAndCmpHmac(mac []byte) error {
 
 func (self *CommandIO) decodeCommand(data []byte, compress bool) (cmd *Command, err error) {
 	decoded := data
-	if !compress {
+	if compress {
 		decoded, err = snappy.Decode(nil, data)
 		if err != nil {
 			return
@@ -127,7 +127,7 @@ func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, 
 	}
 
 	data = bsonEncoded
-	if !compress {
+	if compress {
 		data, err = snappy.Encode(nil, bsonEncoded)
 		if err != nil {
 			return
