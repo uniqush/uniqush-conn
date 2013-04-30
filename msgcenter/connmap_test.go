@@ -178,7 +178,7 @@ func TestDeleteDupConnMap(t *testing.T) {
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if len(cs) != M - 1 {
+		if len(cs) != M-1 {
 			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), len(cs))
 		}
 	}

@@ -18,6 +18,7 @@
 package msgcenter
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/evthandler"
@@ -40,21 +41,15 @@ type eventConnLeave struct {
 	err  error
 }
 
-type EventConnError struct {
-	Err error
-	C   server.Conn
+type Result struct {
+	Err     error  `json:"err,omitempty"`
+	ConnId  string `json:"connId,omitempty"`
+	Visible bool   `json:"visible"`
 }
 
-func (self *EventConnError) Service() string {
-	return self.C.Service()
-}
-
-func (self *EventConnError) Username() string {
-	return self.C.Username()
-}
-
-func (self *EventConnError) Error() string {
-	return fmt.Sprintf("[Service=%v][User=%v] %v", self.C.Service(), self.C.Username(), self.Err)
+func (self *Result) Error() string {
+	b, _ := json.Marshal(self)
+	return string(b)
 }
 
 type ServiceConfig struct {
@@ -78,18 +73,13 @@ type ServiceConfig struct {
 	PushService push.Push
 }
 
-type writeMessageResponse struct {
-	err []error
-	n   int
-}
-
 type writeMessageRequest struct {
 	user      string
 	msg       *proto.Message
 	posterKey string
 	ttl       time.Duration
 	extra     map[string]string
-	resChan   chan<- *writeMessageResponse
+	resChan   chan<- []*Result
 }
 
 type serviceCenter struct {
@@ -302,13 +292,13 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			self.subscribe(subreq)
 			self.pushServiceLock.Unlock()
 		case wreq := <-self.writeReqChan:
-			wres := new(writeMessageResponse)
-			wres.n = 0
 			conns := connMap.GetConn(wreq.user)
+			res := make([]*Result, 0, len(conns))
 			if len(wreq.posterKey) != 0 && len(conns) > 0 {
 				self.setPoster(self.serviceName, wreq.user, wreq.posterKey, wreq.msg, wreq.ttl)
 			}
 			errConns := make([]*connWriteErr, 0, len(conns))
+			n := 0
 			for _, conn := range conns {
 				if conn == nil {
 					continue
@@ -316,8 +306,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				var err error
 				sconn, ok := conn.(server.Conn)
 				if !ok {
-					wres.err = append(wres.err, ErrInvalidConnType)
-					break
+					continue
 				}
 				if len(wreq.posterKey) == 0 {
 					_, err = sconn.SendMail(wreq.msg, wreq.extra, wreq.ttl)
@@ -326,17 +315,18 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				}
 				if err != nil {
 					errConns = append(errConns, &connWriteErr{sconn, err})
-					wres.err = append(wres.err, err)
+					res = append(res, &Result{err, sconn.UniqId(), sconn.Visible()})
 					self.reportError(sconn.Service(), sconn.Username(), sconn.UniqId(), sconn.RemoteAddr().String(), err)
 					continue
+				} else {
+					res = append(res, &Result{nil, sconn.UniqId(), sconn.Visible()})
 				}
 				if sconn.Visible() {
-					wres.n++
+					n++
 				}
 			}
 
-			if wres.n == 0 {
-				wres.err = append(wres.err, fmt.Errorf("no connection for this user. Sending push notification instead"))
+			if n == 0 {
 				msg := wreq.msg
 				extra := wreq.extra
 				username := wreq.user
@@ -381,7 +371,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				}()
 			}
 			if wreq.resChan != nil {
-				wreq.resChan <- wres
+				wreq.resChan <- res
 			}
 
 			// close all connections with error:
@@ -395,9 +385,9 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 	}
 }
 
-func (self *serviceCenter) SendMail(username string, msg *proto.Message, extra map[string]string, ttl time.Duration) (n int, err []error) {
+func (self *serviceCenter) SendMail(username string, msg *proto.Message, extra map[string]string, ttl time.Duration) []*Result {
 	req := new(writeMessageRequest)
-	ch := make(chan *writeMessageResponse)
+	ch := make(chan []*Result)
 	req.msg = msg
 	req.posterKey = ""
 	req.user = username
@@ -406,14 +396,12 @@ func (self *serviceCenter) SendMail(username string, msg *proto.Message, extra m
 	req.extra = extra
 	self.writeReqChan <- req
 	res := <-ch
-	n = res.n
-	err = res.err
-	return
+	return res
 }
 
-func (self *serviceCenter) SendPoster(username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) (n int, err []error) {
+func (self *serviceCenter) SendPoster(username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) []*Result {
 	req := new(writeMessageRequest)
-	ch := make(chan *writeMessageResponse)
+	ch := make(chan []*Result)
 	req.msg = msg
 	req.posterKey = key
 	req.ttl = ttl
@@ -422,9 +410,7 @@ func (self *serviceCenter) SendPoster(username string, msg *proto.Message, extra
 	req.resChan = ch
 	self.writeReqChan <- req
 	res := <-ch
-	n = res.n
-	err = res.err
-	return
+	return res
 }
 
 func (self *serviceCenter) serveConn(conn server.Conn) {

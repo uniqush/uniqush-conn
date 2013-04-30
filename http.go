@@ -59,15 +59,14 @@ func isPrefix(prefix, str string) bool {
 	return false
 }
 
-func (self *RequestProcessor) sendMessage(req *sendMessageRequest) []error {
-	var errs []error
+func (self *RequestProcessor) sendMessage(req *sendMessageRequest) (errs []error, res []*msgcenter.Result) {
 	ttl := 24 * time.Hour
 	if len(req.TTL) > 0 {
 		var e error
 		ttl, e = time.ParseDuration(req.TTL)
 		if e != nil {
 			errs = append(errs, e)
-			return errs
+			return
 		}
 	}
 
@@ -82,7 +81,7 @@ func (self *RequestProcessor) sendMessage(req *sendMessageRequest) []error {
 		if isPrefix("notif.", k) {
 			if isPrefix("notif.uniqush.", k) {
 				errs = append(errs, fmt.Errorf("invalid key %v: notif.uniqush.* are reserved keys", k))
-				return errs
+				return
 			}
 			extra[k] = v
 		} else {
@@ -91,15 +90,15 @@ func (self *RequestProcessor) sendMessage(req *sendMessageRequest) []error {
 	}
 	if msg.IsEmpty() {
 		errs = append(errs, fmt.Errorf("empty message"))
-		return errs
+		return
 	}
 
 	if len(req.PosterKey) == 0 {
-		_, errs = self.center.SendMail(req.Service, req.Username, msg, extra, ttl)
+		res = self.center.SendMail(req.Service, req.Username, msg, extra, ttl)
 	} else {
-		_, errs = self.center.SendPoster(req.Service, req.Username, msg, extra, req.PosterKey, ttl)
+		res = self.center.SendPoster(req.Service, req.Username, msg, extra, req.PosterKey, ttl)
 	}
-	return errs
+	return
 }
 
 type HttpRequestProcessor struct {
@@ -121,14 +120,13 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		fmt.Fprintf(w, "Invalid input: %v\r\n", err)
 		return
 	}
-	errs := self.sendMessage(req)
-	if len(errs) > 0 {
-		for _, err := range errs {
-			fmt.Fprintf(w, "%v\r\n", err)
-		}
-		return
+	errs, res := self.sendMessage(req)
+	for _, e := range errs {
+		fmt.Fprintf(w, "%v\r\n", e)
 	}
-	fmt.Fprintf(w, "Success\r\n")
+	for _, r := range res {
+		fmt.Fprintf(w, "%v\r\n", r)
+	}
 	return
 }
 
@@ -137,3 +135,4 @@ func (self *HttpRequestProcessor) Start() error {
 	err := http.ListenAndServe(self.addr, nil)
 	return err
 }
+

@@ -117,38 +117,34 @@ func (self *MessageCenter) serveConn(c net.Conn) {
 	}
 }
 
-func (self *MessageCenter) SendMail(service, username string, msg *proto.Message, extra map[string]string, ttl time.Duration) (n int, err []error) {
+func (self *MessageCenter) SendMail(service, username string, msg *proto.Message, extra map[string]string, ttl time.Duration) []*Result {
 	if len(username) == 0 || strings.Contains(username, ":") || strings.Contains(username, "\n") {
-		err = append(err, fmt.Errorf("[Service=%v] bad username", username))
-		return
+		res := []*Result{&Result{fmt.Errorf("[Service=%v] bad username", username), "", false}}
+		return res
 	}
 	self.srvCentersLock.Lock()
 	center, ok := self.serviceCenterMap[service]
 	self.srvCentersLock.Unlock()
 
 	if !ok {
-		n = 0
-		return
+		return nil
 	}
-	n, err = center.SendMail(username, msg, extra, ttl)
-	return
+	return center.SendMail(username, msg, extra, ttl)
 }
 
-func (self *MessageCenter) SendPoster(service, username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) (n int, err []error) {
+func (self *MessageCenter) SendPoster(service, username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) []*Result {
 	if len(username) == 0 || strings.Contains(username, ":") || strings.Contains(username, "\n") {
-		err = append(err, fmt.Errorf("[Service=%v] bad username", username))
-		return
+		res := []*Result{&Result{fmt.Errorf("[Service=%v] bad username", username), "", false}}
+		return res
 	}
 	self.srvCentersLock.Lock()
 	center, ok := self.serviceCenterMap[service]
 	self.srvCentersLock.Unlock()
 
 	if !ok {
-		n = 0
-		return
+		return nil
 	}
-	n, err = center.SendPoster(username, msg, extra, key, ttl)
-	return
+	return center.SendPoster(username, msg, extra, key, ttl)
 }
 
 func (self *MessageCenter) Start() {
