@@ -127,6 +127,11 @@ func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
 	}
 	cl[i] = cl[len(cl)-1]
 	cl = cl[:len(cl)-1]
+	if len(cl) == 0 {
+		self.tree.Delete(connKey(conn))
+	} else {
+		self.tree.ReplaceOrInsert(cl)
+	}
 	return true
 }
 

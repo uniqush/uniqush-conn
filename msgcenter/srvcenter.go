@@ -262,7 +262,7 @@ func (self *serviceCenter) setMail(service, username string, msg *proto.Message,
 
 type connWriteErr struct {
 	conn server.Conn
-	err error
+	err  error
 }
 
 func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
@@ -290,6 +290,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			}
 		case leaveEvt := <-self.connLeave:
 			deleted := connMap.DelConn(leaveEvt.conn)
+			fmt.Printf("delete a connection %v under user %v; deleted: %v\n", leaveEvt.conn.UniqId(), leaveEvt.conn.Username(), deleted)
 			leaveEvt.conn.Close()
 			if deleted {
 				nrConns--
@@ -386,6 +387,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			// close all connections with error:
 			go func() {
 				for _, e := range errConns {
+					fmt.Printf("Need to remove connection %v\n", e.conn.UniqId())
 					self.connLeave <- &eventConnLeave{conn: e.conn, err: e.err}
 				}
 			}()

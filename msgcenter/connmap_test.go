@@ -102,3 +102,84 @@ func TestInsertDupConnMap(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteConnMap(t *testing.T) {
+	N := 10
+	cmap := newTreeBasedConnMap()
+	g := new(connGenerator)
+	conns := make([]minimalConn, N)
+	users := make([]string, N)
+	for i, _ := range conns {
+		c := g.nextConn()
+		err := cmap.AddConn(c, 0, 0)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		conns[i] = c
+		users[i] = c.Username()
+	}
+	for _, c := range conns {
+		cs := cmap.GetConn(c.Username())
+		if len(cs) != 1 {
+			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), len(cs))
+			continue
+		}
+		if cs[0].Username() != c.Username() {
+			t.Errorf("Bad for user %v", c.Username())
+		}
+	}
+	for _, c := range conns {
+		deleted := cmap.DelConn(c)
+		if !deleted {
+			t.Errorf("should delete a connection")
+		}
+	}
+	for _, c := range conns {
+		cs := cmap.GetConn(c.Username())
+		if cs != nil {
+			t.Errorf("deletion failed")
+		}
+	}
+}
+
+func TestDeleteDupConnMap(t *testing.T) {
+	N := 10
+	M := 2
+	cmap := newTreeBasedConnMap()
+	g := new(connGenerator)
+	conns := make([]minimalConn, N)
+	for i, _ := range conns {
+		c := g.nextConn()
+
+		for i := 0; i < M; i++ {
+			u := c.Username()
+			fc := &fakeConn{username: u, n: i}
+			err := cmap.AddConn(fc, 0, 0)
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}
+		conns[i] = c
+	}
+	for _, c := range conns {
+		cs := cmap.GetConn(c.Username())
+		if len(cs) != M {
+			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), len(cs))
+			continue
+		}
+		for i, conn := range cs {
+			if conn.Username() != c.Username() {
+				t.Errorf("Bad for user %v", c.Username())
+			}
+			if i == 0 {
+				cmap.DelConn(conn)
+			}
+		}
+	}
+	for _, c := range conns {
+		cs := cmap.GetConn(c.Username())
+		if len(cs) != M - 1 {
+			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), len(cs))
+		}
+	}
+}
