@@ -204,16 +204,16 @@ func (self *serviceCenter) pushNotif(service, username string, msg *proto.Messag
 			info := getPushInfo(msg, extra, fwd)
 			err := self.config.PushService.Push(service, username, info, msgIds)
 			if err != nil {
-				self.reportError(service, username, "", err)
+				self.reportError(service, username, "", "", err)
 			}
 		}
 	}
 }
 
-func (self *serviceCenter) reportError(service, username, connId string, err error) {
+func (self *serviceCenter) reportError(service, username, connId, addr string, err error) {
 	if self.config != nil {
 		if self.config.ErrorHandler != nil {
-			self.config.ErrorHandler.OnError(service, username, connId, err)
+			self.config.ErrorHandler.OnError(service, username, connId, addr, err)
 		}
 	}
 }
@@ -317,7 +317,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				}
 				if err != nil {
 					wres.err = append(wres.err, err)
-					self.reportError(sconn.Service(), sconn.Username(), sconn.UniqId(), err)
+					self.reportError(sconn.Service(), sconn.Username(), sconn.UniqId(), sconn.RemoteAddr().String(), err)
 					continue
 				}
 				if sconn.Visible() {

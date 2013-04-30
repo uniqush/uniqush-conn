@@ -134,6 +134,7 @@ type errorEvent struct {
 	Service  string `json:"service"`
 	Username string `json:"username"`
 	ConnID   string `json:"connId"`
+	Addr     string `json:"addr"`
 	Reason   string `json:"reason"`
 }
 
@@ -141,8 +142,8 @@ type ErrorHandler struct {
 	webHook
 }
 
-func (self *ErrorHandler) OnError(service, username, connId string, reason error) {
-	self.post(&errorEvent{service, username, connId, reason.Error()})
+func (self *ErrorHandler) OnError(service, username, connId, addr string, reason error) {
+	self.post(&errorEvent{service, username, connId, addr, reason.Error()})
 }
 
 type ForwardRequestHandler struct {

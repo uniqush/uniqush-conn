@@ -49,9 +49,9 @@ type MessageCenter struct {
 	srvConfReader ServiceConfigReader
 }
 
-func (self *MessageCenter) reportError(service, username, connId string, err error) {
+func (self *MessageCenter) reportError(service, username, connId, addr string, err error) {
 	if self.errHandler != nil {
-		self.errHandler.OnError(service, username, connId, err)
+		self.errHandler.OnError(service, username, connId, addr, err)
 	}
 }
 
@@ -76,7 +76,7 @@ func (self *MessageCenter) AddService(srv string) *serviceCenter {
 	defer self.srvCentersLock.Unlock()
 	config := self.srvConfReader.ReadConfig(srv)
 	if config == nil {
-		self.reportError(srv, "", "", fmt.Errorf("cannot find service's config"))
+		self.reportError(srv, "", "", "", fmt.Errorf("cannot find service's config"))
 		return nil
 	}
 	center := newServiceCenter(srv, config, self.fwdChan)
@@ -87,13 +87,13 @@ func (self *MessageCenter) AddService(srv string) *serviceCenter {
 func (self *MessageCenter) serveConn(c net.Conn) {
 	conn, err := server.AuthConn(c, self.privkey, self.auth, self.authtimeout)
 	if err != nil {
-		self.reportError("", "", c.RemoteAddr().String(), err)
+		self.reportError("", "", "", c.RemoteAddr().String(), err)
 		c.Close()
 		return
 	}
 	srv := conn.Service()
 	if len(srv) == 0 || strings.Contains(srv, ":") || strings.Contains(srv, "\n") {
-		self.reportError(srv, "", c.RemoteAddr().String(), fmt.Errorf("bad service name"))
+		self.reportError(srv, "", "", c.RemoteAddr().String(), fmt.Errorf("bad service name"))
 		return
 	}
 
@@ -102,7 +102,7 @@ func (self *MessageCenter) serveConn(c net.Conn) {
 	if !ok {
 		config := self.srvConfReader.ReadConfig(srv)
 		if config == nil {
-			self.reportError(srv, "", c.RemoteAddr().String(), fmt.Errorf("cannot find service's config"))
+			self.reportError(srv, "", "", c.RemoteAddr().String(), fmt.Errorf("cannot find service's config"))
 			self.srvCentersLock.Unlock()
 			return
 		}
@@ -113,7 +113,7 @@ func (self *MessageCenter) serveConn(c net.Conn) {
 
 	err = center.NewConn(conn)
 	if err != nil {
-		self.reportError(srv, conn.Username(), c.RemoteAddr().String(), err)
+		self.reportError(srv, conn.Username(), "", c.RemoteAddr().String(), err)
 	}
 }
 
@@ -156,7 +156,7 @@ func (self *MessageCenter) Start() {
 	for {
 		conn, err := self.ln.Accept()
 		if err != nil {
-			self.reportError("", "", "", err)
+			self.reportError("", "", "", self.ln.Addr().String(), err)
 			continue
 		}
 		go self.serveConn(conn)

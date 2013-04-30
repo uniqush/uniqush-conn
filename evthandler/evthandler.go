@@ -41,7 +41,7 @@ type ForwardRequestHandler interface {
 }
 
 type ErrorHandler interface {
-	OnError(service, username, connId string, err error)
+	OnError(service, username, connId, addr string, err error)
 }
 
 type SubscribeHandler interface {

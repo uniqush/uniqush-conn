@@ -42,6 +42,7 @@ type ControlCommandProcessor interface {
 
 type Conn interface {
 	MessageReadWriter
+	RemoteAddr() net.Addr
 	Close() error
 	Service() string
 	Username() string
@@ -56,6 +57,10 @@ type messageIO struct {
 	id       string
 	msgChan  chan interface{}
 	proc     ControlCommandProcessor
+}
+
+func (self *messageIO) RemoteAddr() net.Addr {
+	return self.conn.RemoteAddr()
 }
 
 func (self *messageIO) Close() error {
