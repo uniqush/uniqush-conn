@@ -89,20 +89,22 @@ type loginEvent struct {
 	Service  string `json:"service"`
 	Username string `json:"username"`
 	ConnID   string `json:"connId"`
+	Addr     string `json:"addr"`
 }
 
 type LoginHandler struct {
 	webHook
 }
 
-func (self *LoginHandler) OnLogin(service, username, connId string) {
-	self.post(&loginEvent{service, username, connId})
+func (self *LoginHandler) OnLogin(service, username, connId, addr string) {
+	self.post(&loginEvent{service, username, connId, addr})
 }
 
 type logoutEvent struct {
 	Service  string `json:"service"`
 	Username string `json:"username"`
 	ConnID   string `json:"connId"`
+	Addr     string `json:"addr"`
 	Reason   string `json:"reason"`
 }
 
@@ -110,8 +112,8 @@ type LogoutHandler struct {
 	webHook
 }
 
-func (self *LogoutHandler) OnLogout(service, username, connId string, reason error) {
-	self.post(&logoutEvent{service, username, connId, reason.Error()})
+func (self *LogoutHandler) OnLogout(service, username, connId, addr string, reason error) {
+	self.post(&logoutEvent{service, username, connId, addr, reason.Error()})
 }
 
 type messageEvent struct {

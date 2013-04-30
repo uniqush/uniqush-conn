@@ -31,7 +31,7 @@ type minimalConn interface {
 type connMap interface {
 	AddConn(conn minimalConn, maxNrConnsPerUser int, maxNrUsers int) error
 	GetConn(username string) []minimalConn
-	DelConn(conn minimalConn)
+	DelConn(conn minimalConn) bool
 }
 
 func connKey(conn minimalConn) string {
@@ -80,7 +80,7 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, m
 		return nil
 	}
 	var cl []minimalConn
-	cl = self.GetConn(conn.Username())
+	cl = self.GetConn(connKey(conn))
 	if cl == nil {
 		if maxNrUsers > 0 && self.tree.Len() >= maxNrUsers {
 			return ErrTooManyUsers
@@ -100,13 +100,13 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, m
 	return nil
 }
 
-func (self *treeBasedConnMap) DelConn(conn minimalConn) {
+func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
 	if conn == nil {
-		return
+		return false
 	}
-	cl := self.GetConn(conn.Username())
+	cl := self.GetConn(connKey(conn))
 	if cl == nil {
-		return
+		return false
 	}
 	i := -1
 	var c minimalConn
@@ -116,15 +116,18 @@ func (self *treeBasedConnMap) DelConn(conn minimalConn) {
 		}
 	}
 	if i < 0 {
-		return
+		return false
 	}
 	if len(cl) == 1 {
-		self.tree.Delete(connKey(conn))
-		return
+		c := self.tree.Delete(connKey(conn))
+		if c == nil {
+			return false
+		}
+		return true
 	}
 	cl[i] = cl[len(cl)-1]
 	cl = cl[:len(cl)-1]
-	return
+	return true
 }
 
 func newTreeBasedConnMap() connMap {

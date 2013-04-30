@@ -58,7 +58,7 @@ func (self *chanReporter) OnMessage(connId string, msg *proto.Message) {
 	}
 }
 
-func (self *chanReporter) OnError(service, username, connId string, err error) {
+func (self *chanReporter) OnError(service, username, connId, addr string, err error) {
 	if self.errChan != nil {
 		self.errChan <- fmt.Errorf("[Service=%v][Username=%v] %v", service, username, err)
 	}

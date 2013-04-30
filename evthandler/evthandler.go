@@ -24,11 +24,11 @@ import (
 )
 
 type LoginHandler interface {
-	OnLogin(service, username, connId string)
+	OnLogin(service, username, connId, addr string)
 }
 
 type LogoutHandler interface {
-	OnLogout(service, username, connId string, reason error)
+	OnLogout(service, username, connId, addr string, reason error)
 }
 
 type MessageHandler interface {

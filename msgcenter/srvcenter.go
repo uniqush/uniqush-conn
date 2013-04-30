@@ -218,10 +218,10 @@ func (self *serviceCenter) reportError(service, username, connId, addr string, e
 	}
 }
 
-func (self *serviceCenter) reportLogin(service, username, connId string) {
+func (self *serviceCenter) reportLogin(service, username, connId, addr string) {
 	if self.config != nil {
 		if self.config.LoginHandler != nil {
-			self.config.LoginHandler.OnLogin(service, username, connId)
+			self.config.LoginHandler.OnLogin(service, username, connId, addr)
 		}
 	}
 }
@@ -234,10 +234,10 @@ func (self *serviceCenter) reportMessage(connId string, msg *proto.Message) {
 	}
 }
 
-func (self *serviceCenter) reportLogout(service, username, connId string, err error) {
+func (self *serviceCenter) reportLogout(service, username, connId, addr string, err error) {
 	if self.config != nil {
 		if self.config.LogoutHandler != nil {
-			self.config.LogoutHandler.OnLogout(service, username, connId, err)
+			self.config.LogoutHandler.OnLogout(service, username, connId, addr, err)
 		}
 	}
 }
@@ -258,6 +258,11 @@ func (self *serviceCenter) setMail(service, username string, msg *proto.Message,
 		}
 	}
 	return
+}
+
+type connWriteErr struct {
+	conn server.Conn
+	err error
 }
 
 func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int) {
@@ -284,11 +289,13 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				connInEvt.errChan <- nil
 			}
 		case leaveEvt := <-self.connLeave:
-			connMap.DelConn(leaveEvt.conn)
+			deleted := connMap.DelConn(leaveEvt.conn)
 			leaveEvt.conn.Close()
-			nrConns--
-			conn := leaveEvt.conn
-			self.reportLogout(conn.Service(), conn.Username(), conn.UniqId(), leaveEvt.err)
+			if deleted {
+				nrConns--
+				conn := leaveEvt.conn
+				self.reportLogout(conn.Service(), conn.Username(), conn.UniqId(), conn.RemoteAddr().String(), leaveEvt.err)
+			}
 		case subreq := <-self.subReqChan:
 			self.pushServiceLock.Lock()
 			self.subscribe(subreq)
@@ -300,6 +307,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			if len(wreq.posterKey) != 0 && len(conns) > 0 {
 				self.setPoster(self.serviceName, wreq.user, wreq.posterKey, wreq.msg, wreq.ttl)
 			}
+			errConns := make([]*connWriteErr, 0, len(conns))
 			for _, conn := range conns {
 				if conn == nil {
 					continue
@@ -316,6 +324,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					_, err = sconn.SendPoster(wreq.msg, wreq.extra, wreq.posterKey, wreq.ttl, false)
 				}
 				if err != nil {
+					errConns = append(errConns, &connWriteErr{sconn, err})
 					wres.err = append(wres.err, err)
 					self.reportError(sconn.Service(), sconn.Username(), sconn.UniqId(), sconn.RemoteAddr().String(), err)
 					continue
@@ -326,6 +335,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			}
 
 			if wres.n == 0 {
+				wres.err = append(wres.err, fmt.Errorf("no connection for this user. Sending push notification instead"))
 				msg := wreq.msg
 				extra := wreq.extra
 				username := wreq.user
@@ -372,6 +382,13 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			if wreq.resChan != nil {
 				wreq.resChan <- wres
 			}
+
+			// close all connections with error:
+			go func() {
+				for _, e := range errConns {
+					self.connLeave <- &eventConnLeave{conn: e.conn, err: e.err}
+				}
+			}()
 		}
 	}
 }
@@ -439,7 +456,7 @@ func (self *serviceCenter) NewConn(conn server.Conn) error {
 	err := <-ch
 	if err == nil {
 		go self.serveConn(conn)
-		self.reportLogin(conn.Service(), usr, conn.UniqId())
+		self.reportLogin(conn.Service(), usr, conn.UniqId(), conn.RemoteAddr().String())
 	}
 	return err
 }
