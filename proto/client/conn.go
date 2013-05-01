@@ -27,7 +27,7 @@ import (
 
 type Conn interface {
 	proto.Conn
-	Config(digestThreshold, compressThreshold int, encrypt bool, digestFields []string) error
+	Config(digestThreshold, compressThreshold int, digestFields []string) error
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
 	ForwardRequest(receiver, service string, msg *proto.Message, ttl time.Duration) error
@@ -49,7 +49,6 @@ type clientConn struct {
 
 	digestThreshold   int
 	compressThreshold int
-	encrypt           bool
 }
 
 func (self *clientConn) SetVisibility(v bool) error {
@@ -60,7 +59,7 @@ func (self *clientConn) SetVisibility(v bool) error {
 	} else {
 		cmd.Params = []string{"0"}
 	}
-	return self.cmdio.WriteCommand(cmd, false, true)
+	return self.cmdio.WriteCommand(cmd, false)
 }
 
 func (self *clientConn) subscribe(params map[string]string, sub bool) error {
@@ -73,7 +72,7 @@ func (self *clientConn) subscribe(params map[string]string, sub bool) error {
 	}
 	cmd.Message = new(proto.Message)
 	cmd.Message.Header = params
-	return self.cmdio.WriteCommand(cmd, false, true)
+	return self.cmdio.WriteCommand(cmd, false)
 }
 
 func (self *clientConn) Subscribe(params map[string]string) error {
@@ -88,31 +87,25 @@ func (self *clientConn) RequestMessage(id string) error {
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_MSG_RETRIEVE
 	cmd.Params = []string{id}
-	return self.cmdio.WriteCommand(cmd, false, true)
+	return self.cmdio.WriteCommand(cmd, false)
 }
 
 func (self *clientConn) SetDigestChannel(digestChan chan<- *Digest) {
 	self.digestChan = digestChan
 }
 
-func (self *clientConn) Config(digestThreshold, compressThreshold int, encrypt bool, digestFields []string) error {
+func (self *clientConn) Config(digestThreshold, compressThreshold int, digestFields []string) error {
 	self.digestThreshold = digestThreshold
 	self.compressThreshold = compressThreshold
-	self.encrypt = encrypt
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_SETTING
-	cmd.Params = make([]string, 3, 3+len(digestFields))
+	cmd.Params = make([]string, 2, 2+len(digestFields))
 	cmd.Params[0] = fmt.Sprintf("%v", digestThreshold)
 	cmd.Params[1] = fmt.Sprintf("%v", compressThreshold)
-	if encrypt {
-		cmd.Params[2] = "1"
-	} else {
-		cmd.Params[2] = "0"
-	}
 	for _, f := range digestFields {
 		cmd.Params = append(cmd.Params, f)
 	}
-	err := self.cmdio.WriteCommand(cmd, false, true)
+	err := self.cmdio.WriteCommand(cmd, false)
 	return err
 }
 
@@ -122,7 +115,7 @@ func (self *clientConn) SendMessage(msg *proto.Message) error {
 	if self.compressThreshold > 0 && self.compressThreshold < sz {
 		compress = true
 	}
-	return self.WriteMessage(msg, compress, self.encrypt)
+	return self.WriteMessage(msg, compress)
 }
 
 func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Message, ttl time.Duration) error {
@@ -140,7 +133,7 @@ func (self *clientConn) ForwardRequest(receiver, service string, msg *proto.Mess
 	if self.compressThreshold > 0 && self.compressThreshold < sz {
 		compress = true
 	}
-	return self.cmdio.WriteCommand(cmd, compress, self.encrypt)
+	return self.cmdio.WriteCommand(cmd, compress)
 }
 
 func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
@@ -193,7 +186,6 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	cc := new(clientConn)
 	cc.cmdio = cmdio
 	cc.Conn = proto.NewConn(cmdio, service, username, conn, cc)
-	cc.encrypt = true
 	cc.compressThreshold = 512
 	return cc
 }

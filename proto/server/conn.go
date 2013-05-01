@@ -61,7 +61,6 @@ type serverConn struct {
 	cmdio             *proto.CommandIO
 	digestThreshold   int32
 	compressThreshold int32
-	encrypt           int32
 	visible           int32
 	digestFielsLock   sync.Mutex
 	digestFields      []string
@@ -97,8 +96,7 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	if c > 0 && c < int32(sz) {
 		compress = true
 	}
-	encrypt := atomic.LoadInt32(&self.encrypt) > 0
-	return self.WriteMessage(msg, compress, encrypt)
+	return self.WriteMessage(msg, compress)
 }
 
 func (self *serverConn) SendMail(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
@@ -182,9 +180,8 @@ func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string,
 	if c > 0 && c < int32(sz) {
 		compress = true
 	}
-	encrypt := atomic.LoadInt32(&self.encrypt) > 0
 
-	err = self.cmdio.WriteCommand(digest, compress, encrypt)
+	err = self.cmdio.WriteCommand(digest, compress)
 	if err != nil {
 		return
 	}
@@ -267,7 +264,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		fwdreq.Message = cmd.Message
 		self.fwdChan <- fwdreq
 	case proto.CMD_SETTING:
-		if len(cmd.Params) < 3 {
+		if len(cmd.Params) < 2 {
 			err = proto.ErrBadPeerImpl
 			return
 		}
@@ -290,23 +287,12 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 			}
 			atomic.StoreInt32(&self.compressThreshold, int32(c))
 		}
-		if len(cmd.Params[2]) > 0 {
-			var e int32
-			e = -1
-			if cmd.Params[2] == "0" {
-				e = 0
-			} else if cmd.Params[2] == "1" {
-				e = 1
-			}
-			if e >= 0 {
-				atomic.StoreInt32(&self.encrypt, e)
-			}
-		}
-		if len(cmd.Params) > 3 {
+		nrPreDigestFields := 2
+		if len(cmd.Params) > nrPreDigestFields {
 			self.digestFielsLock.Lock()
 			defer self.digestFielsLock.Unlock()
-			self.digestFields = make([]string, len(cmd.Params)-3)
-			for i, f := range cmd.Params[3:] {
+			self.digestFields = make([]string, len(cmd.Params)-nrPreDigestFields)
+			for i, f := range cmd.Params[nrPreDigestFields:] {
 				self.digestFields[i] = f
 			}
 		}
@@ -353,7 +339,6 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.digestThreshold = -1
 	sc.compressThreshold = 512
 	sc.digestFields = make([]string, 0, 10)
-	sc.encrypt = 1
 	sc.visible = 1
 	return sc
 }

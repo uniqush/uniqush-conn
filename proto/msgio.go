@@ -24,7 +24,7 @@ import (
 )
 
 type MessageWriter interface {
-	WriteMessage(msg *Message, compress, encrypt bool) error
+	WriteMessage(msg *Message, compress bool) error
 }
 
 type MessageReader interface {
@@ -130,7 +130,7 @@ func (self *messageIO) collectMessage() {
 	}
 }
 
-func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error {
+func (self *messageIO) WriteMessage(msg *Message, compress bool) error {
 	cmd := new(Command)
 
 	if msg != nil {
@@ -160,7 +160,7 @@ func (self *messageIO) WriteMessage(msg *Message, compress, encrypt bool) error 
 	} else {
 		cmd.Type = CMD_EMPTY
 	}
-	return self.cmdio.WriteCommand(cmd, compress, encrypt)
+	return self.cmdio.WriteCommand(cmd, compress)
 }
 
 func (self *messageIO) UniqId() string {

@@ -52,7 +52,7 @@ func testSendingCommands(t *testing.T, op opBetweenWriteAndRead, compress, encry
 	}()
 
 	for _, cmd := range cmds {
-		err := from.WriteCommand(cmd, compress, encrypt)
+		err := from.WriteCommand(cmd, compress)
 		if err != nil {
 			t.Errorf("Error on write: %v", err)
 		}
@@ -217,7 +217,7 @@ func TestConcurrentWrite(t *testing.T) {
 	}()
 
 	for _, cmd := range cmds {
-		go io1.WriteCommand(cmd, true, true)
+		go io1.WriteCommand(cmd, true)
 	}
 	<-done
 }
@@ -240,53 +240,8 @@ func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 
 	b.StartTimer()
 	for _, cmd := range cmds {
-		io1.WriteCommand(cmd, true, true)
+		io1.WriteCommand(cmd, true)
 	}
 	<-done
 }
 
-func BenchmarkExchangingMultiFullCommandNoEncrypt(b *testing.B) {
-	b.StopTimer()
-	cmds := make([]*Command, b.N)
-	for i, _ := range cmds {
-		cmd := randomCommand()
-		cmds[i] = cmd
-	}
-	io1, io2 := getNetworkCommandIOs(nil)
-	done := make(chan bool)
-	go func() {
-		defer close(done)
-		for i := 0; i < b.N; i++ {
-			io2.ReadCommand()
-		}
-	}()
-
-	b.StartTimer()
-	for _, cmd := range cmds {
-		io1.WriteCommand(cmd, true, false)
-	}
-	<-done
-}
-
-func BenchmarkExchangingMultiFullCommandNoEncryptNoCompress(b *testing.B) {
-	b.StopTimer()
-	cmds := make([]*Command, b.N)
-	for i, _ := range cmds {
-		cmd := randomCommand()
-		cmds[i] = cmd
-	}
-	io1, io2 := getNetworkCommandIOs(nil)
-	done := make(chan bool)
-	go func() {
-		defer close(done)
-		for i := 0; i < b.N; i++ {
-			io2.ReadCommand()
-		}
-	}()
-
-	b.StartTimer()
-	for _, cmd := range cmds {
-		io1.WriteCommand(cmd, false, false)
-	}
-	<-done
-}

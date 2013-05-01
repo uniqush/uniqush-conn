@@ -77,7 +77,6 @@ func (a *Message) Eq(b *Message) bool {
 
 const (
 	cmdflag_COMPRESS = 1 << iota
-	cmdflag_ENCRYPT
 	cmdflag_NEEDACK
 )
 

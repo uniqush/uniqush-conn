@@ -57,7 +57,7 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string,
 	cmd.Params[2] = token
 
 	// don't compress, but encrypt it
-	cmdio.WriteCommand(cmd, false, true)
+	cmdio.WriteCommand(cmd, false)
 
 	cmd, err = cmdio.ReadCommand()
 	if err != nil {

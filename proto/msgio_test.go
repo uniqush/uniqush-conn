@@ -88,7 +88,7 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 		cmdio := ks.ServerCommandIO(s2cConn)
 		servConn := NewConn(cmdio, "service", "username", s2cConn, nil)
 		for _, msg := range msgs {
-			err := servConn.WriteMessage(msg, true, true)
+			err := servConn.WriteMessage(msg, true)
 			if err != nil {
 				es = err
 				return

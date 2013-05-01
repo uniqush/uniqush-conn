@@ -39,31 +39,20 @@ type CommandIO struct {
 	writeLock *sync.Mutex
 }
 
-func (self *CommandIO) writeThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
+func (self *CommandIO) writeThenHmac(data []byte) (mac []byte, err error) {
 	writer := self.cryptWriter
-	if !encrypt {
-		writer = self.conn
-	} else {
-		self.writeAuth.Reset()
-	}
+	self.writeAuth.Reset()
 	err = writen(writer, data)
 	if err != nil {
-		return
-	}
-	if !encrypt {
 		return
 	}
 	mac = self.writeAuth.Sum(nil)
 	return
 }
 
-func (self *CommandIO) readThenHmac(data []byte, encrypt bool) (mac []byte, err error) {
+func (self *CommandIO) readThenHmac(data []byte) (mac []byte, err error) {
 	reader := self.cryptReader
-	if !encrypt {
-		reader = self.conn
-	} else {
-		self.readAuth.Reset()
-	}
+	self.readAuth.Reset()
 
 	n, err := io.ReadFull(reader, data)
 	if err != nil {
@@ -71,9 +60,6 @@ func (self *CommandIO) readThenHmac(data []byte, encrypt bool) (mac []byte, err 
 	}
 	if n != len(data) {
 		err = io.EOF
-		return
-	}
-	if !encrypt {
 		return
 	}
 	mac = self.readAuth.Sum(nil)
@@ -137,14 +123,11 @@ func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, 
 }
 
 // WriteCommand() is goroutine-safe. i.e. Multiple goroutine could write concurrently.
-func (self *CommandIO) WriteCommand(cmd *Command, compress, encrypt bool) error {
+func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
 	var flag uint16
 	flag = 0
 	if compress {
 		flag |= cmdflag_COMPRESS
-	}
-	if encrypt {
-		flag |= cmdflag_ENCRYPT
 	}
 	data, err := self.encodeCommand(cmd, compress)
 	if err != nil {
@@ -165,7 +148,7 @@ func (self *CommandIO) WriteCommand(cmd *Command, compress, encrypt bool) error 
 	if err != nil {
 		return err
 	}
-	mac, err := self.writeThenHmac(data, encrypt)
+	mac, err := self.writeThenHmac(data)
 	if err != nil {
 		return err
 	}
@@ -190,10 +173,9 @@ func (self *CommandIO) ReadCommand() (cmd *Command, err error) {
 	}
 
 	compress := ((flag & cmdflag_COMPRESS) != 0)
-	encrypt := ((flag & cmdflag_ENCRYPT) != 0)
 
 	data := make([]byte, int(cmdLen))
-	mac, err := self.readThenHmac(data, encrypt)
+	mac, err := self.readThenHmac(data)
 	if err != nil {
 		return
 	}

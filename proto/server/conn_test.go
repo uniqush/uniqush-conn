@@ -60,7 +60,7 @@ func sendTestMessages(s2c, c2s proto.Conn, serverToClient bool, msgs ...*proto.M
 	go func() {
 		defer wg.Done()
 		for _, msg := range msgs {
-			es = src.WriteMessage(msg, true, true)
+			es = src.WriteMessage(msg, true)
 			if es != nil {
 				return
 			}
@@ -166,7 +166,7 @@ func TestDigestSetting(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(0, 512, true, nil)
+	err = cliConn.Config(0, 512, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -227,7 +227,7 @@ func TestDigestSettingWithFields(t *testing.T) {
 
 	fields := []string{"digest"}
 	// We always want to receive digest
-	err = cliConn.Config(0, 512, true, fields)
+	err = cliConn.Config(0, 512, fields)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(0, 512, true, nil)
+	err = cliConn.Config(0, 512, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -351,7 +351,7 @@ func TestDigestSettingWithMultiMail(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(0, 512, true, nil)
+	err = cliConn.Config(0, 512, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -441,7 +441,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive the message
-	err = cliConn.Config(1024, 1024, true, nil)
+	err = cliConn.Config(1024, 1024, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -489,7 +489,7 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(1024, 1024, true, nil)
+	err = cliConn.Config(1024, 1024, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -538,7 +538,7 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(1024, 1024, true, nil)
+	err = cliConn.Config(1024, 1024, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -613,7 +613,7 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(1024, 1024, true, nil)
+	err = cliConn.Config(1024, 1024, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -661,7 +661,7 @@ func TestForwardRequestDifferentService(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(1024, 1024, true, nil)
+	err = cliConn.Config(1024, 1024, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -720,7 +720,7 @@ func TestForwardRequestSameService(t *testing.T) {
 	defer cliConn.Close()
 
 	// We always want to receive digest
-	err = cliConn.Config(1024, 1024, true, nil)
+	err = cliConn.Config(1024, 1024, nil)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
