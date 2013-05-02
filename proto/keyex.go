@@ -61,6 +61,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 
 	sha := sha256.New()
 	hashed := make([]byte, sha.Size())
+	sha.Write([]byte{currentProtocolVersion})
 	sha.Write(mypub)
 	hashed = sha.Sum(hashed[:0])
 
@@ -84,7 +85,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	// Send to client:
 	// - Server's version (1 byte)
 	// - DH public key: g ^ x
-	// - Signature of DH public key RSASSA-PSS(g ^ x)
+	// - Signature of DH public key RSASSA-PSS(version || g ^ x)
 	// - nonce
 	err = writen(conn, keyExPkt)
 	if err != nil {
@@ -94,7 +95,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	// Receive from client:
 	// - Client's version (1 byte)
 	// - Client's DH public key: g ^ y
-	// - HMAC of client's DH public key: HMAC(g ^ y, clientAuthKey)
+	// - HMAC of client's DH public key: HMAC(version || g ^ y, clientAuthKey)
 	keyExPkt = keyExPkt[:1+dhPubkeyLen+authKeyLen]
 
 	// Receive the data from client
@@ -112,10 +113,8 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 		err = ErrImcompatibleProtocol
 		return
 	}
-	keyExPkt = keyExPkt[1:]
-
 	// First, recover client's DH public key
-	clientpub := dhkx.NewPublicKey(keyExPkt[:dhPubkeyLen])
+	clientpub := dhkx.NewPublicKey(keyExPkt[1:dhPubkeyLen+1])
 
 	// Compute a shared key K.
 	K, err := group.ComputeKey(clientpub, priv)
@@ -130,7 +129,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 	}
 
 	// Check client's hmac
-	err = ks.checkClientHMAC(keyExPkt[:dhPubkeyLen], keyExPkt[dhPubkeyLen:])
+	err = ks.checkClientHMAC(keyExPkt[:dhPubkeyLen+1], keyExPkt[dhPubkeyLen+1:])
 	if err != nil {
 		return
 	}
@@ -166,7 +165,7 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 
 	sha := sha256.New()
 	hashed := make([]byte, sha.Size())
-	sha.Write(serverPubData)
+	sha.Write(keyExPkt[:dhPubkeyLen + 1])
 	hashed = sha.Sum(hashed[:0])
 
 	// Verify the signature
@@ -196,7 +195,7 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 	keyExPkt = keyExPkt[:1+dhPubkeyLen+authKeyLen]
 	keyExPkt[0] = currentProtocolVersion
 	copy(keyExPkt[1:], mypub)
-	err = ks.clientHMAC(keyExPkt[1:dhPubkeyLen+1], keyExPkt[dhPubkeyLen+1:])
+	err = ks.clientHMAC(keyExPkt[:dhPubkeyLen+1], keyExPkt[dhPubkeyLen+1:])
 	if err != nil {
 		return
 	}

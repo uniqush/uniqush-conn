@@ -42,6 +42,12 @@ type CommandIO struct {
 func (self *CommandIO) writeThenHmac(data []byte) (mac []byte, err error) {
 	writer := self.cryptWriter
 	self.writeAuth.Reset()
+	var datalen uint16
+	datalen = uint16(len(data))
+	err = binary.Write(self.writeAuth, binary.LittleEndian, datalen)
+	if err != nil {
+		return
+	}
 	err = writen(writer, data)
 	if err != nil {
 		return
@@ -54,6 +60,12 @@ func (self *CommandIO) readThenHmac(data []byte) (mac []byte, err error) {
 	reader := self.cryptReader
 	self.readAuth.Reset()
 
+	var datalen uint16
+	datalen = uint16(len(data))
+	err = binary.Write(self.readAuth, binary.LittleEndian, datalen)
+	if err != nil {
+		return
+	}
 	n, err := io.ReadFull(reader, data)
 	if err != nil {
 		return
@@ -124,7 +136,7 @@ func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, 
 
 // WriteCommand() is goroutine-safe. i.e. Multiple goroutine could write concurrently.
 func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
-	var flag uint16
+	var flag byte
 	flag = 0
 	if compress {
 		flag |= cmdflag_COMPRESS
@@ -133,6 +145,7 @@ func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
 	if err != nil {
 		return err
 	}
+	data = append(data, flag)
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
 	if cmdLen == 0 {
@@ -141,10 +154,6 @@ func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
 	self.writeLock.Lock()
 	defer self.writeLock.Unlock()
 	err = binary.Write(self.conn, binary.LittleEndian, cmdLen)
-	if err != nil {
-		return err
-	}
-	err = binary.Write(self.conn, binary.LittleEndian, flag)
 	if err != nil {
 		return err
 	}
@@ -162,28 +171,22 @@ func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
 // ReadCommand() is not goroutine-safe.
 func (self *CommandIO) ReadCommand() (cmd *Command, err error) {
 	var cmdLen uint16
-	var flag uint16
 	err = binary.Read(self.conn, binary.LittleEndian, &cmdLen)
 	if err != nil {
 		return
 	}
-	err = binary.Read(self.conn, binary.LittleEndian, &flag)
-	if err != nil {
-		return
-	}
-
-	compress := ((flag & cmdflag_COMPRESS) != 0)
 
 	data := make([]byte, int(cmdLen))
 	mac, err := self.readThenHmac(data)
 	if err != nil {
 		return
 	}
+	compress := ((data[len(data) - 1] & cmdflag_COMPRESS) != 0)
 	err = self.readAndCmpHmac(mac)
 	if err != nil {
 		return
 	}
-	cmd, err = self.decodeCommand(data, compress)
+	cmd, err = self.decodeCommand(data[:len(data) - 1], compress)
 	return
 }
 
