@@ -145,7 +145,9 @@ func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
 	if err != nil {
 		return err
 	}
-	data = append(data, flag)
+	data = append(data, 0)
+	copy(data[1:], data[:len(data)-1])
+	data[0] = flag
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
 	if cmdLen == 0 {
@@ -181,12 +183,12 @@ func (self *CommandIO) ReadCommand() (cmd *Command, err error) {
 	if err != nil {
 		return
 	}
-	compress := ((data[len(data) - 1] & cmdflag_COMPRESS) != 0)
+	compress := ((data[0] & cmdflag_COMPRESS) != 0)
 	err = self.readAndCmpHmac(mac)
 	if err != nil {
 		return
 	}
-	cmd, err = self.decodeCommand(data[:len(data) - 1], compress)
+	cmd, err = self.decodeCommand(data[1:], compress)
 	return
 }
 
