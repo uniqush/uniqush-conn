@@ -203,7 +203,7 @@ func (self *serviceCenter) pushNotif(service, username string, msg *proto.Messag
 func (self *serviceCenter) reportError(service, username, connId, addr string, err error) {
 	if self.config != nil {
 		if self.config.ErrorHandler != nil {
-			self.config.ErrorHandler.OnError(service, username, connId, addr, err)
+			go self.config.ErrorHandler.OnError(service, username, connId, addr, err)
 		}
 	}
 }
@@ -211,7 +211,7 @@ func (self *serviceCenter) reportError(service, username, connId, addr string, e
 func (self *serviceCenter) reportLogin(service, username, connId, addr string) {
 	if self.config != nil {
 		if self.config.LoginHandler != nil {
-			self.config.LoginHandler.OnLogin(service, username, connId, addr)
+			go self.config.LoginHandler.OnLogin(service, username, connId, addr)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func (self *serviceCenter) reportLogin(service, username, connId, addr string) {
 func (self *serviceCenter) reportMessage(connId string, msg *proto.Message) {
 	if self.config != nil {
 		if self.config.MessageHandler != nil {
-			self.config.MessageHandler.OnMessage(connId, msg)
+			go self.config.MessageHandler.OnMessage(connId, msg)
 		}
 	}
 }
@@ -227,7 +227,7 @@ func (self *serviceCenter) reportMessage(connId string, msg *proto.Message) {
 func (self *serviceCenter) reportLogout(service, username, connId, addr string, err error) {
 	if self.config != nil {
 		if self.config.LogoutHandler != nil {
-			self.config.LogoutHandler.OnLogout(service, username, connId, addr, err)
+			go self.config.LogoutHandler.OnLogout(service, username, connId, addr, err)
 		}
 	}
 }

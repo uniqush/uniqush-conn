@@ -51,7 +51,7 @@ type MessageCenter struct {
 
 func (self *MessageCenter) reportError(service, username, connId, addr string, err error) {
 	if self.errHandler != nil {
-		self.errHandler.OnError(service, username, connId, addr, err)
+		go self.errHandler.OnError(service, username, connId, addr, err)
 	}
 }
 
