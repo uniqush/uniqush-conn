@@ -105,6 +105,7 @@ func (self *CommandIO) readAndCmpHmac(mac []byte) error {
 
 func (self *CommandIO) decodeCommand(data []byte) (cmd *Command, err error) {
 	compress := ((data[0] & cmdflag_COMPRESS) != 0)
+	data = data[1:]
 	decoded := data
 	if compress {
 		decoded, err = snappy.Decode(nil, data)
@@ -132,23 +133,22 @@ func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, 
 			return
 		}
 	}
+	data = append(data, 0)
+	copy(data[1:], data[:len(data)-1])
+	data[0] = 0
+	if compress {
+		data[0] = data[0] | cmdflag_COMPRESS
+	}
+	fmt.Printf("data: %v\n", data)
 	return
 }
 
 // WriteCommand() is goroutine-safe. i.e. Multiple goroutine could write concurrently.
 func (self *CommandIO) WriteCommand(cmd *Command, compress bool) error {
-	var flag byte
-	flag = 0
-	if compress {
-		flag |= cmdflag_COMPRESS
-	}
 	data, err := self.encodeCommand(cmd, compress)
 	if err != nil {
 		return err
 	}
-	data = append(data, 0)
-	copy(data[1:], data[:len(data)-1])
-	data[0] = flag
 	var cmdLen uint16
 	cmdLen = uint16(len(data))
 	if cmdLen == 0 {
