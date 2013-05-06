@@ -103,7 +103,8 @@ func (self *CommandIO) readAndCmpHmac(mac []byte) error {
 	return nil
 }
 
-func (self *CommandIO) decodeCommand(data []byte, compress bool) (cmd *Command, err error) {
+func (self *CommandIO) decodeCommand(data []byte) (cmd *Command, err error) {
+	compress := ((data[0] & cmdflag_COMPRESS) != 0)
 	decoded := data
 	if compress {
 		decoded, err = snappy.Decode(nil, data)
@@ -183,12 +184,11 @@ func (self *CommandIO) ReadCommand() (cmd *Command, err error) {
 	if err != nil {
 		return
 	}
-	compress := ((data[0] & cmdflag_COMPRESS) != 0)
 	err = self.readAndCmpHmac(mac)
 	if err != nil {
 		return
 	}
-	cmd, err = self.decodeCommand(data[1:], compress)
+	cmd, err = self.decodeCommand(data)
 	return
 }
 
