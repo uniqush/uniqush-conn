@@ -21,6 +21,7 @@ const (
 	encrKeyLen  int = 32
 	authKeyLen  int = 32
 	ivLen       int = 16
+	blkLen      int = 16
 	hmacLen     int = 32
 	pssSaltLen  int = 32
 	dhGroupID   int = 0

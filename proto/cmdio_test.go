@@ -244,4 +244,3 @@ func BenchmarkExchangingMultiFullCommandOverNetwork(b *testing.B) {
 	}
 	<-done
 }
-

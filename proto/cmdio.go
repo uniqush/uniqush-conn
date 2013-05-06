@@ -104,8 +104,13 @@ func (self *CommandIO) readAndCmpHmac(mac []byte) error {
 }
 
 func (self *CommandIO) decodeCommand(data []byte) (cmd *Command, err error) {
+	// Flag: 8 bit
+	// Most significant 5 bits: number of bytes of padding
+	// Least significant bit: compress bit
 	compress := ((data[0] & cmdflag_COMPRESS) != 0)
-	data = data[1:]
+	var npadding int
+	npadding = int(data[0] >> 3)
+	data = data[1 : len(data)-npadding]
 	decoded := data
 	if compress {
 		decoded, err = snappy.Decode(nil, data)
@@ -133,13 +138,20 @@ func (self *CommandIO) encodeCommand(cmd *Command, compress bool) (data []byte, 
 			return
 		}
 	}
+	var flag byte
+	if compress {
+		flag |= cmdflag_COMPRESS
+	}
+	// one byte flag
+	nrBlk := (len(data) + blkLen) / blkLen
+	npadding := (nrBlk * blkLen) - (len(data) + 1)
+	flag |= byte((npadding & 0xFF) << 3)
+
 	data = append(data, 0)
 	copy(data[1:], data[:len(data)-1])
-	data[0] = 0
-	if compress {
-		data[0] = data[0] | cmdflag_COMPRESS
-	}
-	fmt.Printf("data: %v\n", data)
+	data[0] = flag
+
+	data = append(data, make([]byte, npadding)...)
 	return
 }
 

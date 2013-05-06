@@ -114,7 +114,7 @@ func ServerKeyExchange(privKey *rsa.PrivateKey, conn net.Conn) (ks *keySet, err 
 		return
 	}
 	// First, recover client's DH public key
-	clientpub := dhkx.NewPublicKey(keyExPkt[1:dhPubkeyLen+1])
+	clientpub := dhkx.NewPublicKey(keyExPkt[1 : dhPubkeyLen+1])
 
 	// Compute a shared key K.
 	K, err := group.ComputeKey(clientpub, priv)
@@ -165,7 +165,7 @@ func ClientKeyExchange(pubKey *rsa.PublicKey, conn net.Conn) (ks *keySet, err er
 
 	sha := sha256.New()
 	hashed := make([]byte, sha.Size())
-	sha.Write(keyExPkt[:dhPubkeyLen + 1])
+	sha.Write(keyExPkt[:dhPubkeyLen+1])
 	hashed = sha.Sum(hashed[:0])
 
 	// Verify the signature
