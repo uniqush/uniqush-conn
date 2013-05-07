@@ -27,7 +27,7 @@ import (
 )
 
 type Authenticator interface {
-	Authenticate(srv, usr, token string) (bool, error)
+	Authenticate(srv, usr, token, addr string) (bool, error)
 }
 
 var ErrAuthFail = errors.New("authentication failed")
@@ -73,7 +73,7 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 		return
 	}
 
-	ok, err := auth.Authenticate(service, username, token)
+	ok, err := auth.Authenticate(service, username, token, conn.RemoteAddr().String())
 	if err != nil {
 		return
 	}

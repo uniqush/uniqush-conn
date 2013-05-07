@@ -169,17 +169,19 @@ type authEvent struct {
 	Service  string `json:"service"`
 	Username string `json:"username"`
 	Token    string `json:"token"`
+	Addr     string `json:"addr"`
 }
 
 type AuthHandler struct {
 	webHook
 }
 
-func (self *AuthHandler) Authenticate(srv, usr, token string) (pass bool, err error) {
+func (self *AuthHandler) Authenticate(srv, usr, token, addr string) (pass bool, err error) {
 	evt := new(authEvent)
 	evt.Service = srv
 	evt.Username = usr
 	evt.Token = token
+	evt.Addr = addr
 	pass = self.post(evt) == 200
 	return
 }
