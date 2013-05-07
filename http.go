@@ -135,4 +135,3 @@ func (self *HttpRequestProcessor) Start() error {
 	err := http.ListenAndServe(self.addr, nil)
 	return err
 }
-
