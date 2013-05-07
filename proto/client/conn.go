@@ -36,9 +36,11 @@ type Conn interface {
 }
 
 type Digest struct {
-	MsgId string
-	Size  int
-	Info  map[string]string
+	MsgId         string
+	Sender        string
+	SenderService string
+	Size          int
+	Info          map[string]string
 }
 
 type clientConn struct {
@@ -158,6 +160,14 @@ func (self *clientConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		digest.MsgId = cmd.Params[1]
 		if cmd.Message != nil {
 			digest.Info = cmd.Message.Header
+		}
+		if len(cmd.Params) > 2 {
+			digest.Sender = cmd.Params[2]
+			if len(cmd.Params) > 3 {
+				digest.SenderService = cmd.Params[3]
+			} else {
+				digest.SenderService = self.Service()
+			}
 		}
 		self.digestChan <- digest
 	case proto.CMD_FWD:

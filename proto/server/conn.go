@@ -145,12 +145,32 @@ func (self *serverConn) SendPoster(msg *proto.Message, extra map[string]string, 
 	return
 }
 
+func (self *serverConn) fromServer(msg *proto.Message) bool {
+	if len(msg.Sender) == 0 {
+		return true
+	}
+	if msg.Sender == self.Username() {
+		if len(msg.SenderService) == 0 {
+			return true
+		}
+		if msg.SenderService == self.Service() {
+			return true
+		}
+	}
+	return false
+}
+
 func (self *serverConn) writeDigest(msg *proto.Message, extra map[string]string, sz int, id string) (err error) {
 	digest := new(proto.Command)
 	digest.Type = proto.CMD_DIGEST
-	digest.Params = make([]string, 2)
+	digest.Params = make([]string, 2, 4)
 	digest.Params[0] = fmt.Sprintf("%v", sz)
 	digest.Params[1] = id
+
+	if !self.fromServer(msg) {
+		digest.Params = append(digest.Params, msg.Sender)
+		digest.Params = append(digest.Params, msg.SenderService)
+	}
 
 	dmsg := new(proto.Message)
 

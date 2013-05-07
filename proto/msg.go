@@ -100,12 +100,12 @@ const (
 	CMD_BYE
 
 	// Sent from client.
-	// Telling the server about its perference.
+	// Telling the server about its preference.
 	//
 	// Params:
 	// 0. Digest threshold: -1 always send message directly; Empty: not change
 	// 1. Compression threshold: -1 always compress the data; Empty: not change
-	// 2. Encryption (1 - encrypt; 0 - no ecnrypt; others - not change)
+	// 2. Encryption (1 - encrypt; 0 - no encrypt; others - not change)
 	// >3. [optional] Digest fields
 	CMD_SETTING
 
@@ -116,6 +116,8 @@ const (
 	// Params:
 	// 0. Size of the message
 	// 1. The id of the message
+	// 2. [optional] sender's username
+	// 3. [optional] sender's service
 	//
 	// Message.Header:
 	// Other digest info
@@ -123,7 +125,7 @@ const (
 
 	// Sent from client.
 	// Telling the server which cached
-	// message it wants to retrive.
+	// message it wants to retrieve.
 	//
 	// Params:
 	// 0. The message id
@@ -135,13 +137,13 @@ const (
 	//
 	// Params:
 	// 0. TTL
-	// 1. Reciever's name
-	// 2. [optional] Reciever's service name.
+	// 1. Receiver's name
+	// 2. [optional] Receiver's service name.
 	//    If empty, then same service as the client
 	CMD_FWD_REQ
 
 	// Sent from server.
-	// Telling the client the mssage
+	// Telling the client the message
 	// is originally from another user.
 	//
 	// Params:
