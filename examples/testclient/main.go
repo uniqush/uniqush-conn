@@ -46,8 +46,10 @@ var argvPubKey = flag.String("key", "pub.pem", "public key file")
 var argvService = flag.String("s", "service", "service")
 var argvUsername = flag.String("u", "username", "username")
 var argvPassword = flag.String("p", "", "password")
+var argvDigestThrd = flag.Int("d", 512, "digest threshold")
+var argvCompressThrd = flag.Int("c", 1024, "compress threshold")
 
-func messagePrinter(msgChan <-chan *proto.Message, digestChan <-chan *client.Digest) {
+func messagePrinter(conn client.Conn, msgChan <-chan *proto.Message, digestChan <-chan *client.Digest) {
 	for {
 		select {
 		case msg := <-msgChan:
@@ -65,7 +67,16 @@ func messagePrinter(msgChan <-chan *proto.Message, digestChan <-chan *client.Dig
 			if digest == nil {
 				return
 			}
-			fmt.Printf("- Digest:%v\n", digest)
+			fmt.Printf("- Digest:[size=%v]", digest.Size)
+			if len(digest.Sender) > 0 {
+				fmt.Printf("[sender=%v]", digest.Sender)
+			}
+			fmt.Printf("[id=%v]", digest.MsgId)
+			for k, v := range digest.Info {
+				fmt.Printf("[%v=%v]", k, v)
+			}
+			fmt.Printf("; I will retrieve it now\n")
+			conn.RequestMessage(digest.MsgId)
 		}
 	}
 }
@@ -98,7 +109,7 @@ func messageSender(conn client.Conn) {
 		if len(elems) == 2 {
 			msg.Body = []byte(elems[1])
 			msg.Header = make(map[string]string, 1)
-			msg.Header["title"] = elems[1]
+			msg.Header["title"] = strings.TrimSpace(elems[1])
 			err = conn.ForwardRequest(elems[0], conn.Service(), msg, 1*time.Hour)
 		} else {
 			msg.Body = []byte(line)
@@ -132,12 +143,17 @@ func main() {
 
 	c, err := net.Dial("tcp", addr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid address: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
 	conn, err := client.Dial(c, pk, *argvService, *argvUsername, *argvPassword, 3*time.Second)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid address: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Login Error: %v\n", err)
+		return
+	}
+	err = conn.Config(*argvDigestThrd, *argvCompressThrd, nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Config Error: %v\n", err)
 		return
 	}
 
@@ -145,6 +161,6 @@ func main() {
 	digestChan := make(chan *client.Digest)
 	conn.SetDigestChannel(digestChan)
 	go messageReceiver(conn, msgChan)
-	go messagePrinter(msgChan, digestChan)
+	go messagePrinter(conn, msgChan, digestChan)
 	messageSender(conn)
 }
