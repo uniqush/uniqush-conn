@@ -105,8 +105,7 @@ const (
 	// Params:
 	// 0. Digest threshold: -1 always send message directly; Empty: not change
 	// 1. Compression threshold: -1 always compress the data; Empty: not change
-	// 2. Encryption (1 - encrypt; 0 - no encrypt; others - not change)
-	// >3. [optional] Digest fields
+	// >2. [optional] Digest fields
 	CMD_SETTING
 
 	// Sent from server.
