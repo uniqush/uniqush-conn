@@ -18,7 +18,6 @@
 package msgcenter
 
 import (
-	"bytes"
 	"errors"
 	"github.com/petar/GoLLRB/llrb"
 )
@@ -34,10 +33,29 @@ type connMap interface {
 	DelConn(conn minimalConn) bool
 }
 
+type connListItem struct {
+	name string
+	list []minimalConn
+}
+
+func (self *connListItem) key() string {
+	if len(self.list) == 0 {
+		return self.name
+	}
+	return connKey(self.list[0])
+}
+
+func (self *connListItem) Less(than llrb.Item) bool {
+	selfKey := llrb.String(self.key())
+	thanKey := llrb.String(than.(*connListItem).key())
+	return selfKey.Less(thanKey)
+}
+
 func connKey(conn minimalConn) string {
 	return conn.Username()
 }
 
+/*
 func getKey(a interface{}) string {
 	switch t := a.(type) {
 	case string:
@@ -51,25 +69,25 @@ func getKey(a interface{}) string {
 }
 
 func lessConnList(a, b interface{}) bool {
-
 	akey := getKey(a)
 	bkey := getKey(b)
 	cmp := bytes.Compare([]byte(akey), []byte(bkey))
 	return cmp < 0
 }
+*/
 
 type treeBasedConnMap struct {
-	tree *llrb.Tree
+	tree *llrb.LLRB
 }
 
 func (self *treeBasedConnMap) GetConn(user string) []minimalConn {
-	key := user
+	key := &connListItem{name: user, list: nil}
 	clif := self.tree.Get(key)
-	cl, ok := clif.([]minimalConn)
+	cl, ok := clif.(*connListItem)
 	if !ok || cl == nil {
 		return nil
 	}
-	return cl
+	return cl.list
 }
 
 var ErrTooManyUsers = errors.New("too many users")
@@ -96,7 +114,8 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, m
 		}
 	}
 	cl = append(cl, conn)
-	self.tree.ReplaceOrInsert(cl)
+	key := &connListItem{name: "", list: cl}
+	self.tree.ReplaceOrInsert(key)
 	return nil
 }
 
@@ -119,7 +138,8 @@ func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
 		return false
 	}
 	if len(cl) == 1 {
-		c := self.tree.Delete(connKey(conn))
+		key := &connListItem{name: connKey(conn), list: cl}
+		c := self.tree.Delete(key)
 		if c == nil {
 			return false
 		}
@@ -127,16 +147,17 @@ func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
 	}
 	cl[i] = cl[len(cl)-1]
 	cl = cl[:len(cl)-1]
+	key := &connListItem{name: connKey(conn), list: cl}
 	if len(cl) == 0 {
-		self.tree.Delete(connKey(conn))
+		self.tree.Delete(key)
 	} else {
-		self.tree.ReplaceOrInsert(cl)
+		self.tree.ReplaceOrInsert(key)
 	}
 	return true
 }
 
 func newTreeBasedConnMap() connMap {
 	ret := new(treeBasedConnMap)
-	ret.tree = llrb.New(lessConnList)
+	ret.tree = llrb.New()
 	return ret
 }

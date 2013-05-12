@@ -43,7 +43,7 @@ func getCache() msgcache.Cache {
 
 type alwaysAllowAuth struct{}
 
-func (self *alwaysAllowAuth) Authenticate(service, user, token string) (bool, error) {
+func (self *alwaysAllowAuth) Authenticate(service, user, token, addr string) (bool, error) {
 	return true, nil
 }
 
