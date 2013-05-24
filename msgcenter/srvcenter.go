@@ -167,7 +167,6 @@ func (self *serviceCenter) subscribe(req *server.SubscribeRequest) {
 	if req == nil {
 		return
 	}
-	fmt.Printf("Subscribe request\n")
 	if self.config != nil {
 		if self.config.PushService != nil {
 			if req.Subscribe {
