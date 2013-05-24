@@ -66,7 +66,8 @@ type serverConn struct {
 	digestFields      []string
 	mcache            msgcache.Cache
 	fwdChan           chan<- *ForwardRequest
-	subChan           chan<- *SubscribeRequest
+	subChan           chan *SubscribeRequest
+	subChanChan       chan chan<- *SubscribeRequest
 }
 
 func (self *serverConn) Visible() bool {
@@ -78,7 +79,15 @@ func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	self.fwdChan = fwdChan
 }
 
+func (self *serverConn) subReqForward() {
+	outChan := <-self.subChanChan
+	for req := range self.subChan {
+		outChan <- req
+	}
+}
+
 func (self *serverConn) SetSubscribeRequestChan(subChan chan<- *SubscribeRequest) {
+	self.subChan <- subChan
 }
 
 func (self *serverConn) shouldDigest(msg *proto.Message) (sz int, sendDigest bool) {
@@ -360,5 +369,8 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	sc.compressThreshold = 512
 	sc.digestFields = make([]string, 0, 10)
 	sc.visible = 1
+	sc.subChan = make(chan *SubscribeRequest)
+	sc.subChanChan = make(chan chan<- *SubscribeRequest)
+	go sc.subReqForward()
 	return sc
 }

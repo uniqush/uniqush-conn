@@ -167,6 +167,7 @@ func (self *serviceCenter) subscribe(req *server.SubscribeRequest) {
 	if req == nil {
 		return
 	}
+	fmt.Printf("Subscribe request\n")
 	if self.config != nil {
 		if self.config.PushService != nil {
 			if req.Subscribe {
@@ -415,6 +416,7 @@ func (self *serviceCenter) SendPoster(username string, msg *proto.Message, extra
 
 func (self *serviceCenter) serveConn(conn server.Conn) {
 	conn.SetForwardRequestChannel(self.fwdChan)
+	conn.SetSubscribeRequestChan(self.subReqChan)
 	var err error
 	defer func() {
 		self.connLeave <- &eventConnLeave{conn: conn, err: err}
