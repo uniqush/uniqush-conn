@@ -117,15 +117,6 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 	self.SendMail(receiver, fwdreq.Message, extra, fwdreq.TTL)
 }
 
-func isPrefix(prefix, str string) bool {
-	if len(str) > len(prefix) {
-		if str[:len(prefix)] == prefix {
-			return true
-		}
-	}
-	return false
-}
-
 func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[string]string {
 	if extra == nil {
 		extra = make(map[string]string, len(msg.Header)+3)
@@ -134,8 +125,9 @@ func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[stri
 		extra["sender"] = msg.Sender
 		extra["sender-service"] = msg.SenderService
 		for k, v := range msg.Header {
-			if isPrefix("notif.", k) {
-				if isPrefix("notif.uniqush.", k) {
+			if strings.HasPrefix(k, "notif.") {
+				if strings.HasPrefix(k, "notif.uniqush.") {
+					// forward message should not contain reserved fields
 					continue
 				}
 				extra[k] = v
@@ -150,6 +142,7 @@ func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[stri
 			}
 		}
 	}
+	extra["notif.uniqush.msgsize"] = fmt.Sprintf("%v", msg.Size())
 	return extra
 }
 

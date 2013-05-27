@@ -156,7 +156,7 @@ func (self *uniqushPush) Push(service, username string, info map[string]string, 
 		}
 		if k[:6] == "notif." {
 			key := k[6:]
-			if key == "service" || key == "subscriber" {
+			if key == "service" || key == "subscriber" || key == "subscribers" {
 				continue
 			}
 			data.Add(key, v)
