@@ -122,8 +122,6 @@ func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[stri
 		extra = make(map[string]string, len(msg.Header)+3)
 	}
 	if fwd {
-		extra["sender"] = msg.Sender
-		extra["sender-service"] = msg.SenderService
 		for k, v := range msg.Header {
 			if strings.HasPrefix(k, "notif.") {
 				if strings.HasPrefix(k, "notif.uniqush.") {
@@ -134,6 +132,8 @@ func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[stri
 				delete(msg.Header, k)
 			}
 		}
+		extra["uniqush.sender"] = msg.Sender
+		extra["uniqush.sender-service"] = msg.SenderService
 	}
 	if msg.Header != nil {
 		if title, ok := msg.Header["title"]; ok {
