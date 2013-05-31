@@ -185,6 +185,27 @@ const (
 	// Message:
 	//   Header: parameters
 	CMD_SUBSCRIPTION
+
+	// Sent from client.
+	//
+	// For each message digest pushed through push service (like GCM, APNS),
+	// uniqush-conn will remember the message IDs of them and the client
+	// can retrieve them (as a whole) before they actually retrieving
+	// the messages.
+	//
+	// This feature is specific for services like APNS where it only
+	// stores the latest notification for users and overwrite the old
+	// notification with the recent one.
+	//
+	// This feature is also used to deal with the unreliability of the
+	// push service: some notification may not be received and the user
+	// should be able to know its exisitence.
+	//
+	// The message ditests will be sent as normal message ditest.
+	// They are the ditests that:
+	//     1. was pushed through push service.
+	//     2. and was not retrieved by the client.
+	CMD_REQ_UNREAD_PUSH
 )
 
 type Command struct {
