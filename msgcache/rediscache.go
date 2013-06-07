@@ -107,12 +107,8 @@ func (self *redisMessageCache) SetPoster(service, username, key string, msg *pro
 	return
 }
 
-func (self *redisMessageCache) GetOrDel(service, username, id string) (msg *proto.Message, err error) {
-	if isMailKey(id) {
-		msg, err = self.del(service, username, id)
-	} else {
-		msg, err = self.get(service, username, id)
-	}
+func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *proto.Message, err error) {
+	msg, err = self.del(service, username, id)
 	return
 }
 

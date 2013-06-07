@@ -19,7 +19,6 @@ package msgcache
 
 import (
 	"crypto/rand"
-	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
 	"io"
@@ -54,50 +53,7 @@ func getCache() Cache {
 	return NewRedisMessageCache("", "", db)
 }
 
-func TestSetGetPoster(t *testing.T) {
-	N := 10
-	msgs := multiRandomMessage(N)
-	cache := getCache()
-	srv := "srv"
-	usr := "usr"
-
-	keys := make([]string, N)
-	ids := make([]string, N)
-
-	for i := 0; i < N; i++ {
-		keys[i] = fmt.Sprintf("%v", i)
-	}
-	for i, msg := range msgs {
-		id, err := cache.SetPoster(srv, usr, keys[i], msg, 0*time.Second)
-		if err != nil {
-			t.Errorf("Set error: %v", err)
-			return
-		}
-		ids[i] = id
-	}
-	for i, msg := range msgs {
-		m, err := cache.GetOrDel(srv, usr, ids[i])
-		if err != nil {
-			t.Errorf("Get error: %v", err)
-			return
-		}
-		if !m.Eq(msg) {
-			t.Errorf("%vth message does not same", i)
-		}
-	}
-	for i, msg := range msgs {
-		m, err := cache.GetOrDel(srv, usr, ids[i])
-		if err != nil {
-			t.Errorf("Get error: %v", err)
-			return
-		}
-		if !m.Eq(msg) {
-			t.Errorf("%vth message does not same", i)
-		}
-	}
-}
-
-func TestGetSetMail(t *testing.T) {
+func TestGetSetMessage(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
@@ -115,7 +71,7 @@ func TestGetSetMail(t *testing.T) {
 		ids[i] = id
 	}
 	for i, msg := range msgs {
-		m, err := cache.GetOrDel(srv, usr, ids[i])
+		m, err := cache.GetThenDel(srv, usr, ids[i])
 		if err != nil {
 			t.Errorf("Del error: %v", err)
 			return
@@ -125,7 +81,7 @@ func TestGetSetMail(t *testing.T) {
 		}
 	}
 	for i, id := range ids {
-		m, err := cache.GetOrDel(srv, usr, id)
+		m, err := cache.GetThenDel(srv, usr, id)
 		if err != nil {
 			t.Errorf("Get error: %v", err)
 			return
@@ -156,7 +112,7 @@ func TestGetSetMailTTL(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 	for i, id := range ids {
-		m, err := cache.GetOrDel(srv, usr, id)
+		m, err := cache.GetThenDel(srv, usr, id)
 		if err != nil {
 			t.Errorf("Get error: %v", err)
 			return

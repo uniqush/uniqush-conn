@@ -28,7 +28,7 @@ type Cache interface {
 
 	// Mail can only be read once before expire
 	// Poster can be read many times before expire
-	GetOrDel(service, username, id string) (msg *proto.Message, err error)
+	GetThenDel(service, username, id string) (msg *proto.Message, err error)
 
 	PosterId(key string) string
 }
