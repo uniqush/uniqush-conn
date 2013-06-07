@@ -28,12 +28,11 @@ import (
 )
 
 type sendMessageRequest struct {
-	Service   string            `json:"service"`
-	Username  string            `json:"username"`
-	Header    map[string]string `json:"header,omitempty"`
-	Body      []byte            `json:"body,omitempty"`
-	TTL       string            `json:"ttl,omitempty"`
-	PosterKey string            `json:"key,omitempty"`
+	Service  string            `json:"service"`
+	Username string            `json:"username"`
+	Header   map[string]string `json:"header,omitempty"`
+	Body     []byte            `json:"body,omitempty"`
+	TTL      string            `json:"ttl,omitempty"`
 }
 
 func parseJson(input io.Reader) (req *sendMessageRequest, err error) {
@@ -93,11 +92,7 @@ func (self *RequestProcessor) sendMessage(req *sendMessageRequest) (errs []error
 		return
 	}
 
-	if len(req.PosterKey) == 0 {
-		res = self.center.SendMail(req.Service, req.Username, msg, extra, ttl)
-	} else {
-		res = self.center.SendPoster(req.Service, req.Username, msg, extra, req.PosterKey, ttl)
-	}
+	res = self.center.SendMessage(req.Service, req.Username, msg, extra, ttl)
 	return
 }
 
