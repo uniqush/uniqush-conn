@@ -343,7 +343,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	wg.Wait()
 }
 
-func TestDigestSettingWithMultiMail(t *testing.T) {
+func TestDigestSettingWithMultiMessages(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
 	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
