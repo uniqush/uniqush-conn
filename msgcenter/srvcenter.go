@@ -74,12 +74,11 @@ type ServiceConfig struct {
 }
 
 type writeMessageRequest struct {
-	user      string
-	msg       *proto.Message
-	posterKey string
-	ttl       time.Duration
-	extra     map[string]string
-	resChan   chan<- []*Result
+	user    string
+	msg     *proto.Message
+	ttl     time.Duration
+	extra   map[string]string
+	resChan chan<- []*Result
 }
 
 type serviceCenter struct {
@@ -114,7 +113,7 @@ func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
 	}
 	receiver := fwdreq.Receiver
 	extra := getPushInfo(fwdreq.Message, nil, true)
-	self.SendMail(receiver, fwdreq.Message, extra, fwdreq.TTL)
+	self.SendMessage(receiver, fwdreq.Message, extra, fwdreq.TTL)
 }
 
 func getPushInfo(msg *proto.Message, extra map[string]string, fwd bool) map[string]string {
@@ -225,19 +224,10 @@ func (self *serviceCenter) reportLogout(service, username, connId, addr string, 
 	}
 }
 
-func (self *serviceCenter) setPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string, err error) {
+func (self *serviceCenter) cacheMessage(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
 	if self.config != nil {
 		if self.config.MsgCache != nil {
-			id, err = self.config.MsgCache.SetPoster(service, username, key, msg, ttl)
-		}
-	}
-	return
-}
-
-func (self *serviceCenter) setMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
-	if self.config != nil {
-		if self.config.MsgCache != nil {
-			id, err = self.config.MsgCache.SetMail(service, username, msg, ttl)
+			id, err = self.config.MsgCache.CacheMessage(service, username, msg, ttl)
 		}
 	}
 	return
@@ -287,9 +277,6 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 		case wreq := <-self.writeReqChan:
 			conns := connMap.GetConn(wreq.user)
 			res := make([]*Result, 0, len(conns))
-			if len(wreq.posterKey) != 0 && len(conns) > 0 {
-				self.setPoster(self.serviceName, wreq.user, wreq.posterKey, wreq.msg, wreq.ttl)
-			}
 			errConns := make([]*connWriteErr, 0, len(conns))
 			n := 0
 			for _, conn := range conns {
@@ -301,11 +288,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				if !ok {
 					continue
 				}
-				if len(wreq.posterKey) == 0 {
-					_, err = sconn.SendMail(wreq.msg, wreq.extra, wreq.ttl)
-				} else {
-					_, err = sconn.SendPoster(wreq.msg, wreq.extra, wreq.posterKey, wreq.ttl, false)
-				}
+				_, err = sconn.SendMessage(wreq.msg, wreq.extra, wreq.ttl)
 				if err != nil {
 					errConns = append(errConns, &connWriteErr{sconn, err})
 					res = append(res, &Result{err, sconn.UniqId(), sconn.Visible()})
@@ -342,23 +325,14 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 						return
 					}
 					var msgIds []string
-					if len(wreq.posterKey) == 0 {
-						msgIds = make([]string, n)
-						var e error
-						for i := 0; i < n; i++ {
-							msgIds[i], e = self.setMail(service, username, msg, wreq.ttl)
-							if e != nil {
-								// FIXME: Dark side of the force
-								return
-							}
-						}
-					} else {
-						id, e := self.setPoster(service, wreq.user, wreq.posterKey, wreq.msg, wreq.ttl)
+					msgIds = make([]string, n)
+					var e error
+					for i := 0; i < n; i++ {
+						msgIds[i], e = self.cacheMessage(service, username, msg, wreq.ttl)
 						if e != nil {
 							// FIXME: Dark side of the force
 							return
 						}
-						msgIds = []string{id}
 					}
 					self.pushNotif(service, username, msg, extra, msgIds, fwd)
 				}()
@@ -378,29 +352,14 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 	}
 }
 
-func (self *serviceCenter) SendMail(username string, msg *proto.Message, extra map[string]string, ttl time.Duration) []*Result {
+func (self *serviceCenter) SendMessage(username string, msg *proto.Message, extra map[string]string, ttl time.Duration) []*Result {
 	req := new(writeMessageRequest)
 	ch := make(chan []*Result)
 	req.msg = msg
-	req.posterKey = ""
 	req.user = username
 	req.ttl = ttl
 	req.resChan = ch
 	req.extra = extra
-	self.writeReqChan <- req
-	res := <-ch
-	return res
-}
-
-func (self *serviceCenter) SendPoster(username string, msg *proto.Message, extra map[string]string, key string, ttl time.Duration) []*Result {
-	req := new(writeMessageRequest)
-	ch := make(chan []*Result)
-	req.msg = msg
-	req.posterKey = key
-	req.ttl = ttl
-	req.extra = extra
-	req.user = username
-	req.resChan = ch
 	self.writeReqChan <- req
 	res := <-ch
 	return res

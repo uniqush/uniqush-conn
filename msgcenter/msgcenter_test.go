@@ -112,7 +112,7 @@ func server2client(center *MessageCenter, clients []client.Conn, errChan chan<- 
 			continue
 		}
 		for _, msg := range msgs {
-			center.SendMail(client.Service(), client.Username(), msg, nil, 0*time.Second)
+			center.SendMessage(client.Service(), client.Username(), msg, nil, 0*time.Second)
 		}
 	}
 }
