@@ -93,20 +93,6 @@ func (self *redisMessageCache) SetMail(service, username string, msg *proto.Mess
 	return
 }
 
-func (self *redisMessageCache) PosterId(key string) string {
-	return "p" + key
-}
-
-func (self *redisMessageCache) SetPoster(service, username, key string, msg *proto.Message, ttl time.Duration) (id string, err error) {
-	id = self.PosterId(key)
-	err = self.set(service, username, id, msg, ttl)
-	if err != nil {
-		id = ""
-		return
-	}
-	return
-}
-
 func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *proto.Message, err error) {
 	msg, err = self.del(service, username, id)
 	return
