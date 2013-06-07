@@ -23,6 +23,6 @@ import (
 )
 
 type Cache interface {
-	SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error)
+	CacheMessage(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error)
 	GetThenDel(service, username, id string) (msg *proto.Message, err error)
 }

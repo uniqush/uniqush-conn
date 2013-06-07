@@ -63,7 +63,7 @@ func TestGetSetMessage(t *testing.T) {
 	ids := make([]string, N)
 
 	for i, msg := range msgs {
-		id, err := cache.SetMail(srv, usr, msg, 0*time.Second)
+		id, err := cache.CacheMessage(srv, usr, msg, 0*time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return
@@ -103,7 +103,7 @@ func TestGetSetMailTTL(t *testing.T) {
 	ids := make([]string, N)
 
 	for i, msg := range msgs {
-		id, err := cache.SetMail(srv, usr, msg, 1*time.Second)
+		id, err := cache.CacheMessage(srv, usr, msg, 1*time.Second)
 		if err != nil {
 			t.Errorf("Set error: %v", err)
 			return

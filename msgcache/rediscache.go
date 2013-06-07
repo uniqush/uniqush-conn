@@ -76,15 +76,8 @@ func randomId() string {
 	return fmt.Sprintf("%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
 }
 
-func isMailKey(id string) bool {
-	if len(id) == 0 {
-		return false
-	}
-	return id[0] == 'm'
-}
-
-func (self *redisMessageCache) SetMail(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
-	id = "m" + randomId()
+func (self *redisMessageCache) CacheMessage(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
+	id = randomId()
 	err = self.set(service, username, id, msg, ttl)
 	if err != nil {
 		id = ""
