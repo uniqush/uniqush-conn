@@ -28,6 +28,8 @@ import (
 	"time"
 )
 
+// TODO: Use decorator pattern to implement an aggregate Push interface
+
 type Push interface {
 	Subscribe(service, username string, info map[string]string) error
 	Unsubscribe(service, username string, info map[string]string) error
