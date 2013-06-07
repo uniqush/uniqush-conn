@@ -47,8 +47,7 @@ type Conn interface {
 	// If the message is larger than the digest threshold,
 	// then send a digest to the client and cache the whole message
 	// in the .
-	SendMail(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error)
-	SendPoster(msg *proto.Message, extra map[string]string, key string, ttl time.Duration, setposter bool) (id string, err error)
+	SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	SetSubscribeRequestChan(subChan chan<- *SubscribeRequest)
@@ -100,10 +99,10 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	return self.WriteMessage(msg, compress)
 }
 
-func (self *serverConn) SendMail(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
+func (self *serverConn) SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
 	sz, sendDigest := self.shouldDigest(msg)
 	if sendDigest {
-		id, err = self.mcache.SetMail(self.Service(), self.Username(), msg, ttl)
+		id, err = self.mcache.CacheMessage(self.Service(), self.Username(), msg, ttl)
 		if err != nil {
 			return
 		}
@@ -114,33 +113,6 @@ func (self *serverConn) SendMail(msg *proto.Message, extra map[string]string, tt
 		return
 	}
 
-	// Otherwise, send the message directly
-	err = self.writeAutoCompress(msg, sz)
-	return
-}
-
-func (self *serverConn) SendPoster(msg *proto.Message, extra map[string]string, key string, ttl time.Duration, setposter bool) (id string, err error) {
-	sz, sendDigest := self.shouldDigest(msg)
-	if sendDigest {
-		if len(key) == 0 {
-			key = "defaultPoster"
-		}
-		if setposter {
-			id, err = self.mcache.SetPoster(self.Service(), self.Username(), key, msg, ttl)
-			if err != nil {
-				return
-			}
-		} else {
-			id = self.mcache.PosterId(key)
-		}
-		err = self.writeDigest(msg, extra, sz, id)
-		if err != nil {
-			return
-		}
-		return
-	}
-
-	id = ""
 	// Otherwise, send the message directly
 	err = self.writeAutoCompress(msg, sz)
 	return
@@ -334,7 +306,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 
 		var rmsg *proto.Message
 
-		rmsg, err = self.mcache.GetOrDel(self.Service(), self.Username(), id)
+		rmsg, err = self.mcache.GetThenDel(self.Service(), self.Username(), id)
 		if err != nil {
 			return
 		}

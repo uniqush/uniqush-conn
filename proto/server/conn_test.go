@@ -186,7 +186,7 @@ func TestDigestSetting(t *testing.T) {
 	// Server:
 	go func() {
 		var err error
-		id, err = servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		id, err = servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -248,7 +248,7 @@ func TestDigestSettingWithFields(t *testing.T) {
 	// Server:
 	go func() {
 		var err error
-		id, err = servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		id, err = servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -311,7 +311,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	// Server:
 	go func() {
 		var err error
-		msgId, err = servConn.SendMail(msg, nil, 0*time.Second)
+		msgId, err = servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -377,7 +377,7 @@ func TestDigestSettingWithMultiMail(t *testing.T) {
 	// Server:
 	go func() {
 		for _, msg := range msgs {
-			msgId, err := servConn.SendMail(msg, nil, 0*time.Second)
+			msgId, err := servConn.SendMessage(msg, nil, 0*time.Second)
 			if err != nil {
 				t.Errorf("Error: %v", err)
 			}
@@ -459,7 +459,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 
 	// Server:
 	go func() {
-		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -508,7 +508,7 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 
 	// Server:
 	go func() {
-		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -558,7 +558,7 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 
 	// Server:
 	go func() {
-		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -632,7 +632,7 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 
 	// Server:
 	go func() {
-		_, err := servConn.SendPoster(msg, nil, "poster", 0*time.Second, true)
+		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
