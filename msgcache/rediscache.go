@@ -95,6 +95,10 @@ func msgKey(service, username, id string) string {
 	return fmt.Sprintf("mcache:%v:%v:%v", service, username, id)
 }
 
+func msgQueueKey(service, username string) string {
+	return fmt.Sprintf("mqueue:%v:%v", service, username)
+}
+
 func msgMarshal(msg *proto.Message) (data []byte, err error) {
 	data, err = json.Marshal(msg)
 	return
@@ -119,12 +123,27 @@ func (self *redisMessageCache) set(service, username, id string, msg *proto.Mess
 	if err != nil {
 		return err
 	}
+	err = conn.Send("MULTI")
+	if err != nil {
+		return err
+	}
 
 	if ttl.Seconds() <= 0.0 {
-		_, err = conn.Do("SET", key, data)
+		err = conn.Send("SET", key, data)
 	} else {
-		_, err = conn.Do("SETEX", key, int64(ttl.Seconds()), data)
+		err = conn.Send("SETEX", key, int64(ttl.Seconds()), data)
 	}
+	if err != nil {
+		conn.Do("DISCARD")
+		return err
+	}
+	msgQK := msgQueueKey(service, username)
+	err = conn.Send("SADD", msgQK, key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return err
+	}
+	_, err = conn.Do("EXEC")
 	if err != nil {
 		return err
 	}
@@ -170,6 +189,12 @@ func (self *redisMessageCache) del(service, username, id string) (msg *proto.Mes
 		conn.Do("DISCARD")
 		return
 	}
+	msgQK := msgQueueKey(service, username)
+	err = conn.Send("SREM", msgQK, key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
 	reply, err := conn.Do("EXEC")
 	if err != nil {
 		return
@@ -179,7 +204,7 @@ func (self *redisMessageCache) del(service, username, id string) (msg *proto.Mes
 	if err != nil {
 		return
 	}
-	if len(bulkReply) != 2 {
+	if len(bulkReply) != 3 {
 		return
 	}
 	if bulkReply[0] == nil {

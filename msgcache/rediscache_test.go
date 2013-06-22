@@ -93,7 +93,7 @@ func TestGetSetMessage(t *testing.T) {
 
 }
 
-func TestGetSetMailTTL(t *testing.T) {
+func TestGetSetMessageTTL(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
