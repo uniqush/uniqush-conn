@@ -99,6 +99,36 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	return self.WriteMessage(msg, compress)
 }
 
+func (self *serverConn) sendAllCachedMessage() error {
+	ids, err := self.mcache.GetAllIds(self.Service(), self.Username())
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	for _, id := range ids {
+		msg, err := self.mcache.Get(self.Service(), self.Username(), id)
+		if err != nil {
+			return err
+		}
+		if msg == nil {
+			continue
+		}
+		sz, sendDigest := self.shouldDigest(msg)
+		if sendDigest {
+			err = self.writeDigest(msg, nil, sz, id)
+			if err != nil {
+				return err
+			}
+		} else {
+			msg.Id = id
+			err = self.writeAutoCompress(msg, sz)
+		}
+	}
+	return nil
+}
+
 func (self *serverConn) SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
 	sz, sendDigest := self.shouldDigest(msg)
 	if sendDigest {
@@ -320,6 +350,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		if self.mcache == nil {
 			return
 		}
+		self.sendAllCachedMessage()
 	}
 	return
 }
