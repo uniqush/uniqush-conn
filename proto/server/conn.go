@@ -45,8 +45,7 @@ type ForwardRequest struct {
 type Conn interface {
 	// Send the message to client.
 	// If the message is larger than the digest threshold,
-	// then send a digest to the client and cache the whole message
-	// in the .
+	// then send a digest to the client and cache the whole message.
 	SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error)
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
