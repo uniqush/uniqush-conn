@@ -316,6 +316,10 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		}
 		rmsg.Id = id
 		err = self.writeAutoCompress(rmsg, rmsg.Size())
+	case proto.CMD_REQ_ALL_CACHED:
+		if self.mcache == nil {
+			return
+		}
 	}
 	return
 }

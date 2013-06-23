@@ -172,3 +172,19 @@ func TestCacheThenRetrieveIds(t *testing.T) {
 		return
 	}
 }
+
+func TestGetNonExistMsg(t *testing.T) {
+	cache := getCache()
+	srv := "srv"
+	usr := "usr"
+
+	msg, err := cache.GetThenDel(srv, usr, "wont-be-a-good-message-id")
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	if msg != nil {
+		t.Errorf("should be nil message")
+		return
+	}
+}

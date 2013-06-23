@@ -188,24 +188,17 @@ const (
 
 	// Sent from client.
 	//
-	// For each message digest pushed through push service (like GCM, APNS),
-	// uniqush-conn will remember the message IDs of them and the client
-	// can retrieve them (as a whole) before they actually retrieving
-	// the messages.
+	// This command will let the server to re-send all cached message.
+	// The message will be treated as normal message, i.e. if it is too large,
+	// a digest will be sent instead.
 	//
-	// This feature is specific for services like APNS where it only
-	// stores the latest notification for users and overwrite the old
-	// notification with the recent one.
-	//
-	// This feature is also used to deal with the unreliability of the
-	// push service: some notification may not be received and the user
-	// should be able to know its exisitence.
-	//
-	// The message ditests will be sent as normal message ditest.
-	// They are the ditests that:
-	//     1. was pushed through push service.
-	//     2. and was not retrieved by the client.
-	CMD_REQ_UNREAD_PUSH
+	// Normally, when the client got a "good" connection with server, it should first
+	// request messages based on the digests it received. After retrieving all those
+	// message, it may want to request all messages remaining in the cache. Because not
+	// all message digests are guaranteed to be received by the client. (The definition
+	// of "good connection" may be vary. Normally it means cheap and stable
+	// network, like home wifi.)
+	CMD_REQ_ALL_CACHED
 )
 
 type Command struct {
