@@ -770,3 +770,38 @@ func TestForwardRequestSameService(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+func TestRequestAllCachedMessages(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	mcache := getCache()
+	servConn.SetMessageCache(mcache)
+
+	msg := randomMessage()
+	id, err := mcache.CacheMessage(servConn.Service(), cliConn.Username(), msg, 0*time.Second)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		cliConn.RequestAllCachedMessages()
+		m, err := cliConn.ReadMessage()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		if !msg.EqContent(m) {
+			t.Errorf("Error: should same: %v != %v", msg, m)
+		}
+		if m.Id != id {
+			t.Errorf("Error: should have same id: %v != %v", m.Id, id)
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}
