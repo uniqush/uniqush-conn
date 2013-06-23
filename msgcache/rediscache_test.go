@@ -19,6 +19,7 @@ package msgcache
 
 import (
 	"crypto/rand"
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
 	"io"
@@ -120,5 +121,54 @@ func TestGetSetMessageTTL(t *testing.T) {
 		if m != nil {
 			t.Errorf("%vth message should be deleted", i)
 		}
+	}
+}
+
+func strSetEq(a, b []string) bool {
+	if len(a) != len(b) {
+		fmt.Printf("Different size\n")
+		return false
+	}
+	for _, s := range a {
+		found := false
+		for _, t := range b {
+			if s == t {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func TestCacheThenRetrieveIds(t *testing.T) {
+	N := 10
+	msgs := multiRandomMessage(N)
+	cache := getCache()
+	srv := "srv"
+	usr := "usr"
+
+	ids := make([]string, N)
+
+	for i, msg := range msgs {
+		id, err := cache.CacheMessage(srv, usr, msg, 0*time.Second)
+		if err != nil {
+			t.Errorf("Set error: %v", err)
+			return
+		}
+		ids[i] = id
+	}
+
+	idShadows, err := cache.GetAllIds(srv, usr)
+	if err != nil {
+		t.Errorf("Set error: %v", err)
+		return
+	}
+	if !strSetEq(idShadows, ids) {
+		t.Errorf("retrieved different ids: %v != %v", idShadows, ids)
+		return
 	}
 }

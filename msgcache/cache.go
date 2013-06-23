@@ -25,4 +25,9 @@ import (
 type Cache interface {
 	CacheMessage(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error)
 	GetThenDel(service, username, id string) (msg *proto.Message, err error)
+
+	// XXX Is there any better way to support retrieve all feature?
+	Get(service, username, id string) (msg *proto.Message, err error)
+	Del(service, username, id string) error
+	GetAllIds(service, username string) (ids []string, err error)
 }

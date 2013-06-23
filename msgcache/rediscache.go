@@ -86,11 +86,6 @@ func (self *redisMessageCache) CacheMessage(service, username string, msg *proto
 	return
 }
 
-func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *proto.Message, err error) {
-	msg, err = self.del(service, username, id)
-	return
-}
-
 func msgKey(service, username, id string) string {
 	return fmt.Sprintf("mcache:%v:%v:%v", service, username, id)
 }
@@ -138,7 +133,7 @@ func (self *redisMessageCache) set(service, username, id string, msg *proto.Mess
 		return err
 	}
 	msgQK := msgQueueKey(service, username)
-	err = conn.Send("SADD", msgQK, key)
+	err = conn.Send("SADD", msgQK, id)
 	if err != nil {
 		conn.Do("DISCARD")
 		return err
@@ -150,7 +145,7 @@ func (self *redisMessageCache) set(service, username, id string, msg *proto.Mess
 	return nil
 }
 
-func (self *redisMessageCache) get(service, username, id string) (msg *proto.Message, err error) {
+func (self *redisMessageCache) Get(service, username, id string) (msg *proto.Message, err error) {
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -170,7 +165,34 @@ func (self *redisMessageCache) get(service, username, id string) (msg *proto.Mes
 	return
 }
 
-func (self *redisMessageCache) del(service, username, id string) (msg *proto.Message, err error) {
+func (self *redisMessageCache) Del(service, username, id string) error {
+	key := msgKey(service, username, id)
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	err := conn.Send("MULTI")
+	if err != nil {
+		return err
+	}
+	err = conn.Send("DEL", key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return err
+	}
+	msgQK := msgQueueKey(service, username)
+	err = conn.Send("SREM", msgQK, id)
+	if err != nil {
+		conn.Do("DISCARD")
+		return err
+	}
+	_, err = conn.Do("EXEC")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *proto.Message, err error) {
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -190,7 +212,7 @@ func (self *redisMessageCache) del(service, username, id string) (msg *proto.Mes
 		return
 	}
 	msgQK := msgQueueKey(service, username)
-	err = conn.Send("SREM", msgQK, key)
+	err = conn.Send("SREM", msgQK, id)
 	if err != nil {
 		conn.Do("DISCARD")
 		return
@@ -218,5 +240,33 @@ func (self *redisMessageCache) del(service, username, id string) (msg *proto.Mes
 		return
 	}
 	msg, err = msgUnmarshal(data)
+	return
+}
+
+func (self *redisMessageCache) GetAllIds(service, username string) (ids []string, err error) {
+	msgQK := msgQueueKey(service, username)
+	conn := self.pool.Get()
+	defer conn.Close()
+
+	reply, err := conn.Do("SMEMBERS", msgQK)
+	if err != nil {
+		return
+	}
+	bulkReply, err := redis.Values(reply, err)
+	if err != nil {
+		return
+	}
+	n := len(bulkReply)
+	if n == 0 {
+		return
+	}
+	idshadow := make([]string, n)
+	for i := 0; i < n; i++ {
+		idshadow[i], err = redis.String(bulkReply[i], nil)
+		if err != nil {
+			return
+		}
+	}
+	ids = idshadow
 	return
 }
