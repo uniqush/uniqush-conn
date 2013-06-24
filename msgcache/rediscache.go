@@ -289,7 +289,7 @@ func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *pr
 	return
 }
 
-func (self *redisMessageCache) GetAllIds(service, username string) (ids []string, err error) {
+func (self *redisMessageCache) GetAllIds(service, username string, excludes ...string) (ids []string, err error) {
 	msgQK := msgQueueKey(service, username)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -306,11 +306,22 @@ func (self *redisMessageCache) GetAllIds(service, username string) (ids []string
 	if n == 0 {
 		return
 	}
-	idshadow := make([]string, n)
+	idshadow := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		idshadow[i], err = redis.String(bulkReply[i], nil)
+		var id string
+		id, err = redis.String(bulkReply[i], nil)
 		if err != nil {
 			return
+		}
+		skip := false
+		for _, d := range excludes {
+			if d == id {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			idshadow = append(idshadow, id)
 		}
 	}
 	ids = idshadow
