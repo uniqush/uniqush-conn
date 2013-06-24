@@ -123,6 +123,10 @@ func (self *serverConn) sendAllCachedMessage() error {
 		} else {
 			msg.Id = id
 			err = self.writeAutoCompress(msg, sz)
+			if err != nil {
+				return err
+			}
+			err = self.mcache.Del(self.Service(), self.Username(), id)
 		}
 	}
 	return nil
