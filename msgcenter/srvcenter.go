@@ -325,6 +325,32 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 						return
 					}
 					var msgIds []string
+
+					// XXX should we store multiple copies of message,
+					// one for each device. Or we should only store
+					// one copy for all devices.
+					//
+					// NOTICE: one copy can only be read once. It
+					// will be deleted once it was sent to the client.
+					// This means if we store one copy per message,
+					// there will be a competetion between devices
+					// and there will be only one winner who gets
+					// the message.
+					//
+					// However, since we provide retrieve-all-cached-messages
+					// feature, one device may retrieve other devices' message
+					// if it request all cached messages.
+					//
+					// One possible solution is: any message can be read
+					// multiple times and they will be deleted only when
+					// it is expired (ttl=0).
+					//
+					// Right now, we will store only one copy for
+					// each message.
+					//
+					// It can be changed to store multiple copies by
+					// deleting the line below.
+					n = 1
 					msgIds = make([]string, n)
 					var e error
 					for i := 0; i < n; i++ {
