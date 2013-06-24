@@ -94,6 +94,18 @@ func msgQueueKey(service, username string) string {
 	return fmt.Sprintf("mqueue:%v:%v", service, username)
 }
 
+func msgWeightKey(service, username, id string) string {
+	return fmt.Sprintf("w_mcache:%v:%v:%v", service, username, id)
+}
+
+func msgWeightPattern(service, username string) string {
+	return fmt.Sprintf("w_mcache:%v:%v:", service, username)
+}
+
+func counterKey(service, username string) string {
+	return "msgCounter"
+}
+
 func msgMarshal(msg *proto.Message) (data []byte, err error) {
 	data, err = json.Marshal(msg)
 	return
@@ -118,6 +130,18 @@ func (self *redisMessageCache) set(service, username, id string, msg *proto.Mess
 	if err != nil {
 		return err
 	}
+
+	reply, err := conn.Do("INCR", counterKey(service, username))
+	if err != nil {
+		return err
+	}
+
+	weight, err := redis.Int64(reply, err)
+	if err != nil {
+		return err
+	}
+	wkey := msgWeightKey(service, username, id)
+
 	err = conn.Send("MULTI")
 	if err != nil {
 		return err
@@ -125,8 +149,18 @@ func (self *redisMessageCache) set(service, username, id string, msg *proto.Mess
 
 	if ttl.Seconds() <= 0.0 {
 		err = conn.Send("SET", key, data)
+		if err != nil {
+			conn.Do("DISCARD")
+			return err
+		}
+		err = conn.Send("SET", wkey, weight)
 	} else {
 		err = conn.Send("SETEX", key, int64(ttl.Seconds()), data)
+		if err != nil {
+			conn.Do("DISCARD")
+			return err
+		}
+		err = conn.Send("SETEX", wkey, int64(ttl.Seconds()), weight)
 	}
 	if err != nil {
 		conn.Do("DISCARD")
@@ -167,6 +201,7 @@ func (self *redisMessageCache) Get(service, username, id string) (msg *proto.Mes
 
 func (self *redisMessageCache) Del(service, username, id string) error {
 	key := msgKey(service, username, id)
+	wkey := msgWeightKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
 
@@ -175,6 +210,11 @@ func (self *redisMessageCache) Del(service, username, id string) error {
 		return err
 	}
 	err = conn.Send("DEL", key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return err
+	}
+	err = conn.Send("DEL", wkey)
 	if err != nil {
 		conn.Do("DISCARD")
 		return err
@@ -194,6 +234,7 @@ func (self *redisMessageCache) Del(service, username, id string) error {
 
 func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *proto.Message, err error) {
 	key := msgKey(service, username, id)
+	wkey := msgWeightKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
 
@@ -207,6 +248,11 @@ func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *pr
 		return
 	}
 	err = conn.Send("DEL", key)
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	err = conn.Send("DEL", wkey)
 	if err != nil {
 		conn.Do("DISCARD")
 		return
@@ -226,7 +272,7 @@ func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *pr
 	if err != nil {
 		return
 	}
-	if len(bulkReply) != 3 {
+	if len(bulkReply) != 4 {
 		return
 	}
 	if bulkReply[0] == nil {
@@ -248,7 +294,7 @@ func (self *redisMessageCache) GetAllIds(service, username string) (ids []string
 	conn := self.pool.Get()
 	defer conn.Close()
 
-	reply, err := conn.Do("SMEMBERS", msgQK)
+	reply, err := conn.Do("SORT", msgQK, "BY", msgWeightPattern(service, username))
 	if err != nil {
 		return
 	}
