@@ -29,5 +29,5 @@ type Cache interface {
 	// XXX Is there any better way to support retrieve all feature?
 	Get(service, username, id string) (msg *proto.Message, err error)
 	Del(service, username, id string) error
-	GetAllIds(service, username string, excludes ...string) (ids []string, err error)
+	GetCachedMessages(service, username string, excludes ...string) (msgs []*proto.Message, err error)
 }

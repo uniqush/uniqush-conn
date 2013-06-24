@@ -90,6 +90,10 @@ func msgKey(service, username, id string) string {
 	return fmt.Sprintf("mcache:%v:%v:%v", service, username, id)
 }
 
+func msgKeyPattern(service, username string) string {
+	return fmt.Sprintf("mcache:%v:%v:*", service, username)
+}
+
 func msgQueueKey(service, username string) string {
 	return fmt.Sprintf("mqueue:%v:%v", service, username)
 }
@@ -99,7 +103,7 @@ func msgWeightKey(service, username, id string) string {
 }
 
 func msgWeightPattern(service, username string) string {
-	return fmt.Sprintf("w_mcache:%v:%v:", service, username)
+	return fmt.Sprintf("w_mcache:%v:%v:*", service, username)
 }
 
 func counterKey(service, username string) string {
@@ -122,6 +126,7 @@ func msgUnmarshal(data []byte) (msg *proto.Message, err error) {
 }
 
 func (self *redisMessageCache) set(service, username, id string, msg *proto.Message, ttl time.Duration) error {
+	msg.Id = id
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -289,12 +294,16 @@ func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *pr
 	return
 }
 
-func (self *redisMessageCache) GetAllIds(service, username string, excludes ...string) (ids []string, err error) {
+func (self *redisMessageCache) GetCachedMessages(service, username string, excludes ...string) (msgs []*proto.Message, err error) {
 	msgQK := msgQueueKey(service, username)
 	conn := self.pool.Get()
 	defer conn.Close()
 
-	reply, err := conn.Do("SORT", msgQK, "BY", msgWeightPattern(service, username))
+	reply, err := conn.Do("SORT", msgQK,
+		"BY",
+		msgWeightPattern(service, username),
+		"GET",
+		msgKeyPattern(service, username))
 	if err != nil {
 		return
 	}
@@ -306,24 +315,32 @@ func (self *redisMessageCache) GetAllIds(service, username string, excludes ...s
 	if n == 0 {
 		return
 	}
-	idshadow := make([]string, 0, n)
-	for i := 0; i < n; i++ {
-		var id string
-		id, err = redis.String(bulkReply[i], nil)
+	msgShadow := make([]*proto.Message, 0, n)
+	for _, reply := range bulkReply {
+		var data []byte
+		var msg *proto.Message
+		if reply == nil {
+			continue
+		}
+		data, err = redis.Bytes(reply, err)
 		if err != nil {
 			return
 		}
+		if len(data) == 0 {
+			continue
+		}
+		msg, err = msgUnmarshal(data)
 		skip := false
 		for _, d := range excludes {
-			if d == id {
+			if d == msg.Id {
 				skip = true
 				break
 			}
 		}
 		if !skip {
-			idshadow = append(idshadow, id)
+			msgShadow = append(msgShadow, msg)
 		}
 	}
-	ids = idshadow
+	msgs = msgShadow
 	return
 }

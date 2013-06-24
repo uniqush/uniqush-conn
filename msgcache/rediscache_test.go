@@ -19,7 +19,6 @@ package msgcache
 
 import (
 	"crypto/rand"
-	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/proto"
 	"io"
@@ -45,6 +44,14 @@ func multiRandomMessage(N int) []*proto.Message {
 	return msgs
 }
 
+func clearDb() {
+	db := 1
+	c, _ := redis.Dial("tcp", "localhost:6379")
+	c.Do("SELECT", db)
+	c.Do("FLUSHDB")
+	c.Close()
+}
+
 func getCache() Cache {
 	db := 1
 	c, _ := redis.Dial("tcp", "localhost:6379")
@@ -58,6 +65,7 @@ func TestGetSetMessage(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
+	defer clearDb()
 	srv := "srv"
 	usr := "usr"
 
@@ -98,6 +106,7 @@ func TestGetSetMessageTTL(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
+	defer clearDb()
 	srv := "srv"
 	usr := "usr"
 
@@ -124,30 +133,11 @@ func TestGetSetMessageTTL(t *testing.T) {
 	}
 }
 
-func strSetEq(a, b []string) bool {
-	if len(a) != len(b) {
-		fmt.Printf("Different size\n")
-		return false
-	}
-	for _, s := range a {
-		found := false
-		for _, t := range b {
-			if s == t {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
-}
-
-func TestCacheThenRetrieveIds(t *testing.T) {
+func TestCacheThenRetrieveAll(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
 	cache := getCache()
+	defer clearDb()
 	srv := "srv"
 	usr := "usr"
 
@@ -162,19 +152,22 @@ func TestCacheThenRetrieveIds(t *testing.T) {
 		ids[i] = id
 	}
 
-	idShadows, err := cache.GetAllIds(srv, usr)
+	retrievedMsgs, err := cache.GetCachedMessages(srv, usr)
 	if err != nil {
 		t.Errorf("Set error: %v", err)
 		return
 	}
-	if !strSetEq(idShadows, ids) {
-		t.Errorf("retrieved different ids: %v != %v", idShadows, ids)
-		return
+	for i, id := range ids {
+		if retrievedMsgs[i].Id != id {
+			t.Errorf("retrieved different ids: %v != %v", retrievedMsgs, ids)
+			return
+		}
 	}
 }
 
 func TestGetNonExistMsg(t *testing.T) {
 	cache := getCache()
+	defer clearDb()
 	srv := "srv"
 	usr := "usr"
 
