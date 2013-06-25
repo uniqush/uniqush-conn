@@ -98,47 +98,45 @@ func (self *serverConn) writeAutoCompress(msg *proto.Message, sz int) error {
 	return self.WriteMessage(msg, compress)
 }
 
-func (self *serverConn) sendAllCachedMessage() error {
-	ids, err := self.mcache.GetAllIds(self.Service(), self.Username())
+func (self *serverConn) sendAllCachedMessage(excludes ...string) error {
+	msgs, err := self.mcache.GetCachedMessages(self.Service(), self.Username(), excludes...)
 	if err != nil {
 		return err
 	}
-	if len(ids) == 0 {
+	if len(msgs) == 0 {
 		return nil
 	}
-	for _, id := range ids {
-		msg, err := self.mcache.Get(self.Service(), self.Username(), id)
-		if err != nil {
-			return err
-		}
+	for _, msg := range msgs {
 		if msg == nil {
 			continue
 		}
 		sz, sendDigest := self.shouldDigest(msg)
 		if sendDigest {
-			err = self.writeDigest(msg, nil, sz, id)
+			err = self.writeDigest(msg, nil, sz, msg.Id)
 			if err != nil {
 				return err
 			}
 		} else {
-			msg.Id = id
 			err = self.writeAutoCompress(msg, sz)
 			if err != nil {
 				return err
 			}
-			err = self.mcache.Del(self.Service(), self.Username(), id)
 		}
 	}
 	return nil
 }
 
 func (self *serverConn) SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
-	sz, sendDigest := self.shouldDigest(msg)
-	if sendDigest {
+	// we will always cache the message first.
+	if self.mcache != nil {
 		id, err = self.mcache.CacheMessage(self.Service(), self.Username(), msg, ttl)
 		if err != nil {
 			return
 		}
+	}
+
+	sz, sendDigest := self.shouldDigest(msg)
+	if sendDigest {
 		err = self.writeDigest(msg, extra, sz, id)
 		if err != nil {
 			return
@@ -147,6 +145,7 @@ func (self *serverConn) SendMessage(msg *proto.Message, extra map[string]string,
 	}
 
 	// Otherwise, send the message directly
+	msg.Id = id
 	err = self.writeAutoCompress(msg, sz)
 	return
 }
@@ -339,7 +338,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 
 		var rmsg *proto.Message
 
-		rmsg, err = self.mcache.GetThenDel(self.Service(), self.Username(), id)
+		rmsg, err = self.mcache.Get(self.Service(), self.Username(), id)
 		if err != nil {
 			return
 		}

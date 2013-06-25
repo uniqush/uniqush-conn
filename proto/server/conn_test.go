@@ -80,7 +80,7 @@ func sendTestMessages(s2c, c2s proto.Conn, serverToClient bool, msgs ...*proto.M
 			}
 			msg.Sender = dst.Username()
 			msg.SenderService = dst.Service()
-			if !m.Eq(msg) {
+			if !m.EqContent(msg) {
 				ed = fmt.Errorf("corrupted data")
 				return
 			}
@@ -209,8 +209,7 @@ func TestDigestSetting(t *testing.T) {
 		}
 		msg.Sender = servConn.Username()
 		msg.SenderService = servConn.Service()
-		m.Id = ""
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -274,8 +273,7 @@ func TestDigestSettingWithFields(t *testing.T) {
 		}
 		msg.Sender = servConn.Username()
 		msg.SenderService = servConn.Service()
-		m.Id = ""
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -334,8 +332,7 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 		if m.Id != msgId {
 			t.Errorf("Error: wrong Id")
 		}
-		m.Id = ""
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -420,8 +417,7 @@ func TestDigestSettingWithMultiMessages(t *testing.T) {
 
 				msg.Sender = servConn.Username()
 				msg.SenderService = servConn.Service()
-				m.Id = ""
-				if !msg.Eq(m) {
+				if !msg.EqContent(m) {
 					t.Errorf("Error: should same: %v != %v", msg, m)
 				}
 				i++
@@ -473,7 +469,7 @@ func TestForwardFromServerSameService(t *testing.T) {
 			t.Errorf("Error: %v", err)
 		}
 		msg.SenderService = cliConn.Service()
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -522,7 +518,7 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 			t.Errorf("Error: %v", err)
 		}
 		msg.SenderService = cliConn.Service()
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -571,7 +567,7 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -645,7 +641,7 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		if !msg.Eq(m) {
+		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
 		wg.Done()
@@ -695,7 +691,7 @@ func TestForwardRequestDifferentService(t *testing.T) {
 		}
 		msg.Sender = cliConn.Username()
 		msg.SenderService = cliConn.Service()
-		if !msg.Eq(fwdreq.Message) {
+		if !msg.EqContent(fwdreq.Message) {
 			t.Errorf("Error: should same: %v != %v", msg, fwdreq.Message)
 		}
 		wg.Done()
@@ -754,7 +750,7 @@ func TestForwardRequestSameService(t *testing.T) {
 		}
 		msg.Sender = cliConn.Username()
 		msg.SenderService = cliConn.Service()
-		if !msg.Eq(fwdreq.Message) {
+		if !msg.EqContent(fwdreq.Message) {
 			t.Errorf("Error: should same: %v != %v", msg, fwdreq.Message)
 		}
 		wg.Done()
