@@ -181,3 +181,44 @@ func TestGetNonExistMsg(t *testing.T) {
 		return
 	}
 }
+
+func TestCacheThenRetrieveAllWithTTL(t *testing.T) {
+	N := 10
+	msgs := multiRandomMessage(N)
+	cache := getCache()
+	defer clearDb()
+	srv := "srv"
+	usr := "usr"
+
+	ids := make([]string, N)
+
+	ttl := 0
+	nrDead := 2
+	for i, msg := range msgs {
+		if i == len(msgs)-nrDead {
+			ttl = 1
+		}
+		id, err := cache.CacheMessage(srv, usr, msg, time.Duration(ttl)*time.Second)
+		if err != nil {
+			t.Errorf("Set error: %v", err)
+			return
+		}
+		ids[i] = id
+	}
+	time.Sleep(2 * time.Second)
+	retrievedMsgs, err := cache.GetCachedMessages(srv, usr)
+	if err != nil {
+		t.Errorf("Set error: %v", err)
+		return
+	}
+	if len(retrievedMsgs) != len(msgs)-nrDead {
+		t.Errorf("retrieved %v objects", len(retrievedMsgs))
+		return
+	}
+	for i, id := range ids[:len(msgs)-nrDead] {
+		if retrievedMsgs[i].Id != id {
+			t.Errorf("retrieved different ids: %v != %v", retrievedMsgs, ids)
+			return
+		}
+	}
+}

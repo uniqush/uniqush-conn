@@ -299,11 +299,28 @@ func (self *redisMessageCache) GetCachedMessages(service, username string, exclu
 	conn := self.pool.Get()
 	defer conn.Close()
 
-	reply, err := conn.Do("SORT", msgQK,
+	err = conn.Send("MULTI")
+	if err != nil {
+		return
+	}
+	err = conn.Send("SORT", msgQK,
 		"BY",
 		msgWeightPattern(service, username),
 		"GET",
 		msgKeyPattern(service, username))
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+	err = conn.Send("SORT", msgQK,
+		"BY",
+		msgWeightPattern(service, username))
+	if err != nil {
+		conn.Do("DISCARD")
+		return
+	}
+
+	reply, err := conn.Do("EXEC")
 	if err != nil {
 		return
 	}
@@ -311,15 +328,34 @@ func (self *redisMessageCache) GetCachedMessages(service, username string, exclu
 	if err != nil {
 		return
 	}
-	n := len(bulkReply)
+	if len(bulkReply) != 2 {
+		return
+	}
+
+	msgObjs, err := redis.Values(bulkReply[0], nil)
+	if err != nil {
+		return
+	}
+	msgIds, err := redis.Values(bulkReply[1], nil)
+	if err != nil {
+		return
+	}
+	n := len(msgObjs)
 	if n == 0 {
 		return
 	}
 	msgShadow := make([]*proto.Message, 0, n)
-	for _, reply := range bulkReply {
+	removed := make([]interface{}, 1, n+1)
+	removed[0] = msgQK
+
+	for i, reply := range msgObjs {
 		var data []byte
 		var msg *proto.Message
 		if reply == nil {
+			id, err := redis.String(msgIds[i], nil)
+			if err == nil {
+				removed = append(removed, id)
+			}
 			continue
 		}
 		data, err = redis.Bytes(reply, err)
@@ -327,6 +363,10 @@ func (self *redisMessageCache) GetCachedMessages(service, username string, exclu
 			return
 		}
 		if len(data) == 0 {
+			id, err := redis.String(msgIds[i], nil)
+			if err == nil {
+				removed = append(removed, id)
+			}
 			continue
 		}
 		msg, err = msgUnmarshal(data)
@@ -339,6 +379,13 @@ func (self *redisMessageCache) GetCachedMessages(service, username string, exclu
 		}
 		if !skip {
 			msgShadow = append(msgShadow, msg)
+		}
+	}
+
+	if len(removed) > 1 {
+		_, err = conn.Do("SREM", removed...)
+		if err != nil {
+			return
 		}
 	}
 	msgs = msgShadow
