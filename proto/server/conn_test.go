@@ -801,3 +801,52 @@ func TestRequestAllCachedMessages(t *testing.T) {
 	}()
 	wg.Wait()
 }
+
+func TestRequestAllCachedMessagesExceptSome(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	defer servConn.Close()
+	defer cliConn.Close()
+
+	mcache := getCache()
+	servConn.SetMessageCache(mcache)
+
+	N := 10
+	nrOmit := 2
+	msgs := make([]*proto.Message, 0, N)
+	excludes := make([]string, 0, nrOmit)
+	for i := 0; i < N; i++ {
+		msg := randomMessage()
+		id, err := mcache.CacheMessage(servConn.Service(), cliConn.Username(), msg, 0*time.Second)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		if i < nrOmit {
+			excludes = append(excludes, id)
+		}
+		msgs = append(msgs, msg)
+	}
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		cliConn.RequestAllCachedMessages(excludes...)
+		for i := 0; i < N-nrOmit; i++ {
+			m, err := cliConn.ReadMessage()
+			if err != nil {
+				t.Errorf("Error: %v", err)
+			}
+			if !msgs[i+nrOmit].EqContent(m) {
+				t.Errorf("Error: should same: %v != %v", msgs[i+nrOmit], m)
+			}
+		}
+		wg.Done()
+	}()
+	wg.Wait()
+}

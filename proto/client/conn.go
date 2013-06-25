@@ -30,7 +30,7 @@ type Conn interface {
 	Config(digestThreshold, compressThreshold int, digestFields []string) error
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
-	RequestAllCachedMessages() error
+	RequestAllCachedMessages(excludes ...string) error
 	ForwardRequest(receiver, service string, msg *proto.Message, ttl time.Duration) error
 	SetVisibility(v bool) error
 	SendMessage(msg *proto.Message) error
@@ -86,9 +86,19 @@ func (self *clientConn) Unsubscribe(params map[string]string) error {
 	return self.subscribe(params, false)
 }
 
-func (self *clientConn) RequestAllCachedMessages() error {
+func (self *clientConn) RequestAllCachedMessages(excludes ...string) error {
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_REQ_ALL_CACHED
+	if len(excludes) > 0 {
+		msg := new(proto.Message)
+		data := make([]byte, 0, len(excludes)*90)
+		for _, i := range excludes {
+			data = append(data, []byte(i)...)
+			data = append(data, byte(0))
+		}
+		msg.Body = data
+		cmd.Message = msg
+	}
 	return self.cmdio.WriteCommand(cmd, false)
 }
 

@@ -354,6 +354,7 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		}
 		excludes := make([]string, 0, 10)
 		if cmd.Message != nil {
+			msg := cmd.Message
 			if len(msg.Body) > 0 {
 				data := msg.Body
 				for len(data) > 0 {
