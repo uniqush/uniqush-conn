@@ -352,8 +352,41 @@ func (self *serverConn) ProcessCommand(cmd *proto.Command) (msg *proto.Message, 
 		if self.mcache == nil {
 			return
 		}
-		self.sendAllCachedMessage()
+		excludes := make([]string, 0, 10)
+		if cmd.Message != nil {
+			if len(msg.Body) > 0 {
+				data := msg.Body
+				for len(data) > 0 {
+					var id []byte
+					var err error
+					id, data, err = cutString(data)
+					if err != nil {
+						break
+					}
+					excludes = append(excludes, string(id))
+				}
+			}
+		}
+		self.sendAllCachedMessage(excludes...)
 	}
+	return
+}
+
+func cutString(data []byte) (str, rest []byte, err error) {
+	var idx int
+	var d byte
+	idx = -1
+	for idx, d = range data {
+		if d == 0 {
+			break
+		}
+	}
+	if idx < 0 {
+		err = proto.ErrMalformedCommand
+		return
+	}
+	str = data[:idx]
+	rest = data[idx+1:]
 	return
 }
 
