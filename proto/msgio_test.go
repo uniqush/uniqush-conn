@@ -22,6 +22,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 )
 
@@ -38,12 +39,13 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 	}
 	pub := &priv.PublicKey
 
-	ch := make(chan bool)
+	wg := new(sync.WaitGroup)
+	wg.Add(2)
 	var ec error
 	var es error
 	go func() {
 		defer func() {
-			ch <- true
+			wg.Done()
 		}()
 		ks, err := ClientKeyExchange(pub, c2sConn)
 		if err != nil {
@@ -78,7 +80,7 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 	}()
 	go func() {
 		defer func() {
-			ch <- true
+			wg.Done()
 		}()
 		ks, err := ServerKeyExchange(priv, s2cConn)
 		if err != nil {
@@ -95,18 +97,12 @@ func testMessageExchange(addr string, msgs ...*Message) error {
 			}
 		}
 	}()
-	i := 0
-	for _ = range ch {
-		if es != nil {
-			return es
-		}
-		if ec != nil {
-			return ec
-		}
-		i++
-		if i >= 2 {
-			break
-		}
+	wg.Wait()
+	if es != nil {
+		return es
+	}
+	if ec != nil {
+		return ec
 	}
 	return nil
 }
