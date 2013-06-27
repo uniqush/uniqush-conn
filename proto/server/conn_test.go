@@ -183,18 +183,28 @@ func TestDigestSetting(t *testing.T) {
 
 	var id string
 
+	readyToRead := make(chan bool)
+
 	// Server:
 	go func() {
+		defer wg.Done()
 		var err error
 		id, err = servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
+			readyToRead <- false
 			t.Errorf("Error: %v", err)
+			return
 		}
-		wg.Done()
+		readyToRead <- true
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
+		read := <-readyToRead
+		if !read {
+			return
+		}
 		digest := <-diChan
 		if nil == digest {
 			t.Errorf("Error: Empty digest")
@@ -212,7 +222,6 @@ func TestDigestSetting(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -243,19 +252,28 @@ func TestDigestSettingWithFields(t *testing.T) {
 	wg.Add(2)
 
 	var id string
+	readyToRead := make(chan bool)
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		var err error
 		id, err = servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
+			readyToRead <- false
+			return
 		}
-		wg.Done()
+		readyToRead <- true
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
+		read := <-readyToRead
+		if !read {
+			return
+		}
 		digest := <-diChan
 		if nil == digest {
 			t.Errorf("Error: Empty digest")
@@ -276,7 +294,6 @@ func TestDigestSettingWithFields(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -305,19 +322,29 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	wg.Add(2)
 
 	var msgId string
+	readyToRead := make(chan bool)
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		var err error
 		msgId, err = servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
+			readyToRead <- false
+			return
 		}
-		wg.Done()
+		readyToRead <- true
+		return
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
+		read := <-readyToRead
+		if !read {
+			return
+		}
 		digest := <-diChan
 		if nil == digest {
 			t.Errorf("Error: Empty digest")
@@ -335,7 +362,6 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -373,6 +399,7 @@ func TestDigestSettingWithMultiMessages(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		for _, msg := range msgs {
 			msgId, err := servConn.SendMessage(msg, nil, 0*time.Second)
 			if err != nil {
@@ -382,11 +409,11 @@ func TestDigestSettingWithMultiMessages(t *testing.T) {
 			msgIdMap[msgId] = msg
 			msgIdMapLock.Unlock()
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		msgChan := make(chan *proto.Message)
 		go func() {
 			for {
@@ -423,7 +450,6 @@ func TestDigestSettingWithMultiMessages(t *testing.T) {
 				i++
 			}
 		}
-		wg.Done()
 
 	}()
 	wg.Wait()
@@ -455,15 +481,16 @@ func TestForwardFromServerSameService(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		m, err := cliConn.ReadMessage()
 		if err != nil {
 			t.Errorf("Error: %v", err)
@@ -472,7 +499,6 @@ func TestForwardFromServerSameService(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -504,15 +530,16 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		m, err := cliConn.ReadMessage()
 		if err != nil {
 			t.Errorf("Error: %v", err)
@@ -521,7 +548,6 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -554,15 +580,16 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		m, err := cliConn.ReadMessage()
 		if err != nil {
 			t.Errorf("Error: %v", err)
@@ -570,7 +597,6 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -628,15 +654,16 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		m, err := cliConn.ReadMessage()
 		if err != nil {
 			t.Errorf("Error: %v", err)
@@ -644,7 +671,6 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 		if !msg.EqContent(m) {
 			t.Errorf("Error: should same: %v != %v", msg, m)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -682,6 +708,7 @@ func TestForwardRequestDifferentService(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		fwdreq := <-fwdChan
 		if fwdreq.Receiver != fwd {
 			t.Errorf("Receiver is not correct: %v", fwdreq)
@@ -694,16 +721,15 @@ func TestForwardRequestDifferentService(t *testing.T) {
 		if !msg.EqContent(fwdreq.Message) {
 			t.Errorf("Error: should same: %v != %v", msg, fwdreq.Message)
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		err := cliConn.ForwardRequest(fwd, fwdSrv, msg, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -741,6 +767,7 @@ func TestForwardRequestSameService(t *testing.T) {
 
 	// Server:
 	go func() {
+		defer wg.Done()
 		fwdreq := <-fwdChan
 		if fwdreq.Receiver != fwd {
 			t.Errorf("Receiver is not correct: %v", fwdreq)
@@ -753,16 +780,15 @@ func TestForwardRequestSameService(t *testing.T) {
 		if !msg.EqContent(fwdreq.Message) {
 			t.Errorf("Error: should same: %v != %v", msg, fwdreq.Message)
 		}
-		wg.Done()
 	}()
 
 	// Client:
 	go func() {
+		defer wg.Done()
 		err := cliConn.ForwardRequest(fwd, fwdSrv, msg, 24*time.Hour)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -786,6 +812,7 @@ func TestRequestAllCachedMessages(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		cliConn.RequestAllCachedMessages()
 		m, err := cliConn.ReadMessage()
 		if err != nil {
@@ -797,7 +824,6 @@ func TestRequestAllCachedMessages(t *testing.T) {
 		if m.Id != id {
 			t.Errorf("Error: should have same id: %v != %v", m.Id, id)
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
@@ -836,6 +862,7 @@ func TestRequestAllCachedMessagesExceptSome(t *testing.T) {
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		cliConn.RequestAllCachedMessages(excludes...)
 		for i := 0; i < N-nrOmit; i++ {
 			m, err := cliConn.ReadMessage()
@@ -846,7 +873,6 @@ func TestRequestAllCachedMessagesExceptSome(t *testing.T) {
 				t.Errorf("Error: should same: %v != %v", msgs[i+nrOmit], m)
 			}
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
