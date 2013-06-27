@@ -232,12 +232,15 @@ func TestClientsSendToServer(t *testing.T) {
 
 	wg := new(sync.WaitGroup)
 	wg.Add(N)
+	start := make(chan bool)
 	for _, client := range clients {
-		msg := msgs[client.Username()]
 		go func() {
+			<-start
+			msg := msgs[client.Username()]
 			client.SendMessage(msg)
 			wg.Done()
 		}()
 	}
+	close(start)
 	wg.Wait()
 }
