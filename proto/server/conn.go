@@ -45,8 +45,8 @@ type ForwardRequest struct {
 type Conn interface {
 	// Send the message to client.
 	// If the message is larger than the digest threshold,
-	// then send a digest to the client and cache the whole message.
-	SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error)
+	// then send a digest to the client.
+	SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration, id string) error
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	SetSubscribeRequestChan(subChan chan<- *SubscribeRequest)
@@ -126,28 +126,20 @@ func (self *serverConn) sendAllCachedMessage(excludes ...string) error {
 	return nil
 }
 
-func (self *serverConn) SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration) (id string, err error) {
-	// we will always cache the message first.
-	if self.mcache != nil {
-		id, err = self.mcache.CacheMessage(self.Service(), self.Username(), msg, ttl)
-		if err != nil {
-			return
-		}
-	}
-
+func (self *serverConn) SendMessage(msg *proto.Message, extra map[string]string, ttl time.Duration, id string) error {
 	sz, sendDigest := self.shouldDigest(msg)
 	if sendDigest {
-		err = self.writeDigest(msg, extra, sz, id)
+		err := self.writeDigest(msg, extra, sz, id)
 		if err != nil {
-			return
+			return err
 		}
-		return
+		return nil
 	}
 
 	// Otherwise, send the message directly
 	msg.Id = id
-	err = self.writeAutoCompress(msg, sz)
-	return
+	err := self.writeAutoCompress(msg, sz)
+	return err
 }
 
 func (self *serverConn) fromServer(msg *proto.Message) bool {

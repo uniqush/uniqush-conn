@@ -189,7 +189,14 @@ func TestDigestSetting(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		var err error
-		id, err = servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		id, err = mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			readyToRead <- false
+			t.Errorf("Error: %v", err)
+			return
+		}
+		err = servConn.SendMessage(msg, nil, ttl, id)
 		if err != nil {
 			readyToRead <- false
 			t.Errorf("Error: %v", err)
@@ -258,7 +265,14 @@ func TestDigestSettingWithFields(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		var err error
-		id, err = servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		id, err = mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			readyToRead <- false
+			return
+		}
+		err = servConn.SendMessage(msg, nil, ttl, id)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 			readyToRead <- false
@@ -328,7 +342,14 @@ func TestDigestSettingWithMessageQueue(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		var err error
-		msgId, err = servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		msgId, err = mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			readyToRead <- false
+			return
+		}
+		err = servConn.SendMessage(msg, nil, ttl, msgId)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 			readyToRead <- false
@@ -401,7 +422,9 @@ func TestDigestSettingWithMultiMessages(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for _, msg := range msgs {
-			msgId, err := servConn.SendMessage(msg, nil, 0*time.Second)
+			ttl := 0 * time.Second
+			msgId, err := mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+			err = servConn.SendMessage(msg, nil, ttl, msgId)
 			if err != nil {
 				t.Errorf("Error: %v", err)
 			}
@@ -482,7 +505,13 @@ func TestForwardFromServerSameService(t *testing.T) {
 	// Server:
 	go func() {
 		defer wg.Done()
-		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		msgId, err := mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		err = servConn.SendMessage(msg, nil, 0*time.Second, msgId)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -531,7 +560,13 @@ func TestForwardFromServerSameServiceWithId(t *testing.T) {
 	// Server:
 	go func() {
 		defer wg.Done()
-		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		msgId, err := mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		err = servConn.SendMessage(msg, nil, 0*time.Second, msgId)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -581,7 +616,13 @@ func TestForwardFromServerDifferentServiceWithId(t *testing.T) {
 	// Server:
 	go func() {
 		defer wg.Done()
-		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		msgId, err := mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		err = servConn.SendMessage(msg, nil, ttl, msgId)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
@@ -655,7 +696,12 @@ func TestForwardFromServerDifferentService(t *testing.T) {
 	// Server:
 	go func() {
 		defer wg.Done()
-		_, err := servConn.SendMessage(msg, nil, 0*time.Second)
+		ttl := 0 * time.Second
+		msgId, err := mcache.CacheMessage(servConn.Service(), servConn.Username(), msg, ttl)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+		err = servConn.SendMessage(msg, nil, ttl, msgId)
 		if err != nil {
 			t.Errorf("Error: %v", err)
 		}
