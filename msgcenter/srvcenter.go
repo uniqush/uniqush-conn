@@ -279,6 +279,11 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 			res := make([]*Result, 0, len(conns))
 			errConns := make([]*connWriteErr, 0, len(conns))
 			n := 0
+			mid, err := self.cacheMessage(self.serviceName, wreq.user, wreq.msg, wreq.ttl)
+			if err != nil {
+				self.reportError(self.serviceName, wreq.user, "", "", err)
+				continue
+			}
 			for _, conn := range conns {
 				if conn == nil {
 					continue
@@ -288,7 +293,7 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 				if !ok {
 					continue
 				}
-				_, err = sconn.SendMessage(wreq.msg, wreq.extra, wreq.ttl)
+				err = sconn.SendMessage(wreq.msg, wreq.extra, wreq.ttl, mid)
 				if err != nil {
 					errConns = append(errConns, &connWriteErr{sconn, err})
 					res = append(res, &Result{err, sconn.UniqId(), sconn.Visible()})
@@ -322,11 +327,6 @@ func (self *serviceCenter) process(maxNrConns, maxNrConnsPerUser, maxNrUsers int
 					defer self.pushServiceLock.RUnlock()
 					n := self.nrDeliveryPoints(service, username)
 					if n <= 0 {
-						return
-					}
-					mid, e := self.cacheMessage(service, username, msg, wreq.ttl)
-					if e != nil {
-						// FIXME: Dark side of the force
 						return
 					}
 					msgIds := []string{mid}
