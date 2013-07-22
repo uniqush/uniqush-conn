@@ -59,6 +59,9 @@ func (self *MessageCenter) process() {
 	for {
 		select {
 		case fwdreq := <-self.fwdChan:
+			if fwdreq == nil {
+				return
+			}
 			srv := fwdreq.ReceiverService
 			self.srvCentersLock.Lock()
 			center, ok := self.serviceCenterMap[srv]

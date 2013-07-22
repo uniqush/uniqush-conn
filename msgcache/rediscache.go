@@ -73,7 +73,7 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 }
 
 func randomId() string {
-	return fmt.Sprintf("%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
+	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
 }
 
 func (self *redisMessageCache) CacheMessage(service, username string, msg *proto.Message, ttl time.Duration) (id string, err error) {
