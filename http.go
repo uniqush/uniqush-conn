@@ -108,6 +108,11 @@ func NewHttpRequestProcessor(addr string, center *msgcenter.MessageCenter) *Http
 	return ret
 }
 
+type sendMessageResponse struct {
+	Errors  []string            `json:"errors,omitempty"`
+	Results []*msgcenter.Result `json:"results,omitempty"`
+}
+
 func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	req, err := parseJson(r.Body)
@@ -116,12 +121,16 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	errs, res := self.sendMessage(req)
+
+	resp := &sendMessageResponse{}
+	resp.Results = res
+	resp.Errors = make([]string, 0, len(errs))
 	for _, e := range errs {
-		fmt.Fprintf(w, "%v\r\n", e)
+		resp.Errors = append(resp.Errors, e.Error())
 	}
-	for _, r := range res {
-		fmt.Fprintf(w, "%v\r\n", r)
-	}
+
+	encoder := json.NewEncoder(w)
+	encoder.Encode(resp)
 	return
 }
 
