@@ -36,10 +36,11 @@ func randomMessage() *proto.Message {
 	return msg
 }
 
-func multiRandomMessage(N int) []*proto.Message {
-	msgs := make([]*proto.Message, N)
+func multiRandomMessage(N int) []*MessageInfo {
+	msgs := make([]*MessageInfo, N)
 	for i := 0; i < N; i++ {
-		msgs[i] = randomMessage()
+		msgs[i] = new(MessageInfo)
+		msgs[i].Message = randomMessage()
 	}
 	return msgs
 }
@@ -80,26 +81,15 @@ func TestGetSetMessage(t *testing.T) {
 		ids[i] = id
 	}
 	for i, msg := range msgs {
-		m, err := cache.GetThenDel(srv, usr, ids[i])
+		m, err := cache.Get(srv, usr, ids[i])
 		if err != nil {
 			t.Errorf("Del error: %v", err)
 			return
 		}
-		if !m.Eq(msg) {
+		if !m.Message.Eq(msg.Message) {
 			t.Errorf("%vth message does not same", i)
 		}
 	}
-	for i, id := range ids {
-		m, err := cache.GetThenDel(srv, usr, id)
-		if err != nil {
-			t.Errorf("Get error: %v", err)
-			return
-		}
-		if m != nil {
-			t.Errorf("%vth message should be deleted", i)
-		}
-	}
-
 }
 
 func TestGetSetMessageTTL(t *testing.T) {
@@ -122,7 +112,7 @@ func TestGetSetMessageTTL(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 	for i, id := range ids {
-		m, err := cache.GetThenDel(srv, usr, id)
+		m, err := cache.Get(srv, usr, id)
 		if err != nil {
 			t.Errorf("Get error: %v", err)
 			return
@@ -171,7 +161,7 @@ func TestGetNonExistMsg(t *testing.T) {
 	srv := "srv"
 	usr := "usr"
 
-	msg, err := cache.GetThenDel(srv, usr, "wont-be-a-good-message-id")
+	msg, err := cache.Get(srv, usr, "wont-be-a-good-message-id")
 	if err != nil {
 		t.Errorf("%v", err)
 		return
