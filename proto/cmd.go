@@ -17,7 +17,13 @@
 
 package proto
 
-import "errors"
+import (
+	"crypto/rand"
+	"errors"
+	"io"
+	"math/big"
+	weakrand "math/rand"
+)
 
 const (
 	cmdflag_COMPRESS = 1 << iota
@@ -158,6 +164,82 @@ const (
 
 var ErrTooManyParams = errors.New("Too many parameters: 16 max")
 var ErrTooManyHeaders = errors.New("Too many headers: 4096 max")
+
+func randomBytes(N int) []byte {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(N)))
+	if err != nil {
+		return nil
+	}
+
+	ret := make([]byte, n.Int64())
+
+	io.ReadFull(rand.Reader, ret)
+	return ret
+}
+
+func (self *Command) Randomize() {
+	if self.Type == CMD_AUTH || self.Type == CMD_AUTHOK ||
+		self.Type == CMD_BYE || self.Type == CMD_MSG_RETRIEVE ||
+		self.Type == CMD_SET_VISIBILITY ||
+		self.Type == CMD_SUBSCRIPTION ||
+		self.Type == CMD_REQ_ALL_CACHED {
+
+		// For these types, we can safely append random parameters.
+		self.appendRandomParams()
+	}
+	if self.Message == nil {
+		// If there's no message, we plut a random message.
+		self.plugRandomMessage()
+	}
+}
+
+func randomMessage(maxNrHeader, maxBodyLen, maxStrLen int) *Message {
+	nrHeaders := weakrand.Intn(maxNrHeaders)
+	bodyLen := weakrand.Intn(maxBodyLen)
+	if nrHeaders <= 0 && bodyLen <= 0 {
+		return nil
+	}
+
+	msg := new(Message)
+	if bodyLen > 0 {
+		msg.Body = randomBytes(maxBodyLen)
+	}
+	if nrHeaders <= 0 {
+		return msg
+	}
+
+	msg.Header = make(map[string]string, nrHeaders)
+
+	for i := 0; i < nrHeaders; i++ {
+		msg.Header[string(randomBytes(maxStrLen))] = string(randomBytes(maxStrLen))
+	}
+	return msg
+}
+
+func (self *Command) plugRandomMessage() {
+	if self.Message != nil {
+		self.Message = randomMessage(4, 16, 8)
+	}
+}
+
+// Randomly append parameters.
+func (self *Command) appendRandomParams() {
+	maxnr := maxNrParams - len(self.Params)
+	if maxnr <= 0 {
+		return
+	}
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(maxnr)))
+	if err != nil {
+		return
+	}
+	maxStrLen := 32
+	max := int(n.Int64())
+	for i := 0; i < max; i++ {
+		b := randomBytes(maxStrLen)
+		self.Params = append(self.Params, string(b))
+	}
+	return
+}
 
 // | Type | NrParams | Reserved | NrHeaders | Params | Header | Body |
 //

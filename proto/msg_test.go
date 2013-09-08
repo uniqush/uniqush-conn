@@ -80,6 +80,22 @@ func TestCommandMarshal(t *testing.T) {
 	marshalUnmarshal(cmd)
 }
 
+func TestRandomize(t *testing.T) {
+	cmd := new(Command)
+	cmd.Type = 1
+	cmd.Params = make([]string, 2)
+	cmd.Params[0] = "hello"
+	cmd.Params[1] = "new"
+	cmd.Message = new(Message)
+	cmd.Message.Header = make(map[string]string, 3)
+	cmd.Message.Header["a"] = "h"
+	cmd.Message.Header["b"] = "i"
+	cmd.Message.Header["b"] = "j"
+	cmd.Message.Body = []byte{1, 2, 3, 3}
+	marshalUnmarshal(cmd)
+	cmd.Randomize()
+}
+
 func BenchmarkCommandMarshalUnmarshal(b *testing.B) {
 	b.StopTimer()
 	cmds := make([]*Command, b.N)
