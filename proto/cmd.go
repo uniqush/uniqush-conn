@@ -149,6 +149,8 @@ const (
 	// of "good connection" may be vary. Normally it means cheap and stable
 	// network, like home wifi.)
 	CMD_REQ_ALL_CACHED
+
+	CMD_NR_CMDS
 )
 
 type Command struct {

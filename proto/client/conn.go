@@ -36,6 +36,10 @@ type Conn interface {
 	SendMessageToUser(receiver, service string, msg *proto.Message, ttl time.Duration) error
 	SendMessageToServer(msg *proto.Message) error
 	ReceiveMessage() (mc *proto.MessageContainer, err error)
+
+	Config(digestThreshold, compressThreshold int, digestFields ...string) error
+	SetDigestChannel(digestChan chan<- *Digest)
+	RequestMessage(id string) error
 }
 
 type CommandProcessor interface {
@@ -46,6 +50,7 @@ type clientConn struct {
 	cmdio             *proto.CommandIO
 	conn              net.Conn
 	compressThreshold int32
+	digestThreshold   int32
 	service           string
 	username          string
 	connId            string
@@ -143,6 +148,46 @@ func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error)
 	return
 }
 
+func (self *clientConn) setCommandProcessor(cmdType uint8, proc CommandProcessor) {
+	if cmdType >= proto.CMD_NR_CMDS {
+		return
+	}
+	if len(self.cmdProcs) <= int(cmdType) {
+		self.cmdProcs = make([]CommandProcessor, proto.CMD_NR_CMDS)
+	}
+	self.cmdProcs[cmdType] = proc
+}
+
+func (self *clientConn) SetDigestChannel(digestChan chan<- *Digest) {
+	proc := new(digestProcessor)
+	proc.digestChan = digestChan
+	proc.service = self.Service()
+	self.setCommandProcessor(proto.CMD_DIGEST, proc)
+}
+
+func (self *clientConn) Config(digestThreshold, compressThreshold int, digestFields ...string) error {
+	self.digestThreshold = int32(digestThreshold)
+	self.compressThreshold = int32(compressThreshold)
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_SETTING
+	cmd.Params = make([]string, 2, 2+len(digestFields))
+	cmd.Params[0] = fmt.Sprintf("%v", self.digestThreshold)
+	cmd.Params[1] = fmt.Sprintf("%v", self.compressThreshold)
+	for _, f := range digestFields {
+		cmd.Params = append(cmd.Params, f)
+	}
+	err := self.cmdio.WriteCommand(cmd, false)
+	return err
+}
+
+func (self *clientConn) RequestMessage(id string) error {
+	cmd := &proto.Command{
+		Type:   proto.CMD_MSG_RETRIEVE,
+		Params: []string{id},
+	}
+	return self.cmdio.WriteCommand(cmd, false)
+}
+
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
 	ret := new(clientConn)
 	ret.conn = conn
@@ -150,5 +195,7 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	ret.service = service
 	ret.username = username
 	ret.connId = fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
+
+	ret.cmdProcs = make([]CommandProcessor, proto.CMD_NR_CMDS)
 	return ret
 }

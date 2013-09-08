@@ -19,20 +19,20 @@ package server
 
 import (
 	"fmt"
+	"github.com/uniqush/uniqush-conn/msgcache"
+	"github.com/uniqush/uniqush-conn/proto"
 	"io"
 	"math/rand"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/uniqush/uniqush-conn/proto"
-	"net"
 )
 
-// SendMessage() and ForwardMessage() should never be called concurrently.
+// SendMessage() and ForwardMessage() are goroutine-safe.
+// SendMessage() and ForwardMessage() will send a message ditest,
+// instead of the message itself, if the message is too large.
 // ReceiveMessage() should nevery be called concurrently.
-// ReceiveMessage() can be called concurrently with SendMessage() or
-// with ForwardMessage()
 type Conn interface {
 	Close() error
 	Service() string
@@ -50,6 +50,8 @@ type Conn interface {
 	// ReceiveMessage() will keep receiving Commands from the client
 	// until it receives a Command with type CMD_DATA.
 	ReceiveMessage() (msg *proto.Message, err error)
+
+	SetMessageCache(cache msgcache.Cache)
 }
 
 type serverConn struct {
@@ -62,8 +64,7 @@ type serverConn struct {
 	connId            string
 	digestFielsLock   sync.Mutex
 	digestFields      []string
-
-	cmdProcs []CommandProcessor
+	cmdProcs          []CommandProcessor
 }
 
 type CommandProcessor interface {
@@ -144,8 +145,11 @@ func (self *serverConn) writeDigest(mc *proto.MessageContainer, extra map[string
 }
 
 func (self *serverConn) SendMessage(msg *proto.Message, id string, extra map[string]string) error {
-	sz := msg.Size()
-	if sz == 0 {
+	return self.send(msg, id, extra, true)
+}
+
+func (self *serverConn) send(msg *proto.Message, id string, extra map[string]string, tryDigest bool) error {
+	if msg == nil {
 		cmd := &proto.Command{
 			Type: proto.CMD_EMPTY,
 		}
@@ -154,7 +158,8 @@ func (self *serverConn) SendMessage(msg *proto.Message, id string, extra map[str
 		}
 		return self.cmdio.WriteCommand(cmd, false)
 	}
-	if self.shouldDigest(sz) {
+	sz := msg.Size()
+	if tryDigest && self.shouldDigest(sz) {
 		container := &proto.MessageContainer{
 			Id:      id,
 			Message: msg,
@@ -170,11 +175,15 @@ func (self *serverConn) SendMessage(msg *proto.Message, id string, extra map[str
 }
 
 func (self *serverConn) ForwardMessage(sender, senderService string, msg *proto.Message, id string) error {
+	return self.forward(sender, senderService, msg, id, true)
+}
+
+func (self *serverConn) forward(sender, senderService string, msg *proto.Message, id string, tryDigest bool) error {
 	sz := msg.Size()
 	if sz == 0 {
 		return nil
 	}
-	if self.shouldDigest(sz) {
+	if tryDigest && self.shouldDigest(sz) {
 		container := &proto.MessageContainer{
 			Id:            id,
 			Sender:        sender,
@@ -230,6 +239,26 @@ func (self *serverConn) ReceiveMessage() (msg *proto.Message, err error) {
 	return
 }
 
+func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
+	if cache == nil {
+		return
+	}
+	proc := new(messageRetriever)
+	proc.cache = cache
+	proc.conn = self
+	self.setCommandProcessor(proto.CMD_MSG_RETRIEVE, proc)
+}
+
+func (self *serverConn) setCommandProcessor(cmdType uint8, proc CommandProcessor) {
+	if cmdType >= proto.CMD_NR_CMDS {
+		return
+	}
+	if len(self.cmdProcs) <= int(cmdType) {
+		self.cmdProcs = make([]CommandProcessor, proto.CMD_NR_CMDS)
+	}
+	self.cmdProcs[cmdType] = proc
+}
+
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
 	ret := new(serverConn)
 	ret.conn = conn
@@ -239,5 +268,9 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	ret.connId = fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
 	ret.digestThreshold = -1
 	ret.compressThreshold = -1
+
+	settingproc := new(settingProcessor)
+	settingproc.conn = ret
+	ret.setCommandProcessor(proto.CMD_SETTING, settingproc)
 	return ret
 }
