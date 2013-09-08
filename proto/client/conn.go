@@ -20,6 +20,7 @@ package client
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
+	"io"
 	"math/rand"
 	"net"
 	"sync/atomic"
@@ -32,8 +33,13 @@ type Conn interface {
 	Username() string
 	UniqId() string
 
-	SendMessageToUser(receiver, service string, msg *proto.Message, ttl time.Duration)
-	SendMessageToServer(msg *proto.Message)
+	SendMessageToUser(receiver, service string, msg *proto.Message, ttl time.Duration) error
+	SendMessageToServer(msg *proto.Message) error
+	ReceiveMessage() (msg *proto.Message, err error)
+}
+
+type CommandProcessor interface {
+	ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error)
 }
 
 type clientConn struct {
@@ -43,6 +49,7 @@ type clientConn struct {
 	service           string
 	username          string
 	connId            string
+	cmdProcs          []CommandProcessor
 }
 
 func (self *clientConn) Service() string {
@@ -89,9 +96,47 @@ func (self *clientConn) SendMessageToUser(receiver, service string, msg *proto.M
 		cmd.Params = append(cmd.Params, service)
 	}
 	cmd.Message = msg
-	sz := msg.Size()
 	compress := self.shouldCompress(msg.Size())
 	return self.cmdio.WriteCommand(cmd, compress)
+}
+
+func (self *clientConn) processCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+	if cmd == nil {
+		return
+	}
+
+	t := int(cmd.Type)
+	if t > len(self.cmdProcs) {
+		return
+	}
+	proc := self.cmdProcs[t]
+	if proc != nil {
+		msg, err = proc.ProcessCommand(cmd)
+	}
+	return
+}
+
+func (self *clientConn) ReceiveMessage() (msg *proto.Message, err error) {
+	cmd, err := self.cmdio.ReadCommand()
+	if err != nil {
+		return
+	}
+	for {
+		switch cmd.Type {
+		case proto.CMD_DATA:
+			msg = cmd.Message
+			return
+		case proto.CMD_BYE:
+			err = io.EOF
+			return
+		default:
+			msg, err = self.processCommand(cmd)
+			if err != nil || msg != nil {
+				return
+			}
+		}
+	}
+	return
 }
 
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
