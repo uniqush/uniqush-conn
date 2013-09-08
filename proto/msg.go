@@ -35,6 +35,19 @@ func (self *MessageContainer) FromUser() bool {
 	return !self.FromServer()
 }
 
+func (a *MessageContainer) Eq(b *MessageContainer) bool {
+	if a.Id != b.Id {
+		return false
+	}
+	if a.Sender != b.Sender {
+		return false
+	}
+	if a.SenderService != b.SenderService {
+		return false
+	}
+	return a.Message.Eq(b.Message)
+}
+
 type Message struct {
 	Id            string            `json:"id,omitempty"`
 	Sender        string            `json:"sender,omitempty"`
