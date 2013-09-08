@@ -110,7 +110,7 @@ func xorBytes(longer, shorter []byte) []byte {
 	return ret
 }
 
-func bytesEq(a, b []byte) bool {
+func xorBytesEq(a, b []byte) bool {
 	if len(b) > len(a) {
 		// to prevent timing attack
 		xorBytes(b, a)

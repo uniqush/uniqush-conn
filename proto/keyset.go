@@ -18,6 +18,7 @@
 package proto
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"fmt"
@@ -36,16 +37,16 @@ func (self *keySet) String() string {
 }
 
 func (self *keySet) eq(ks *keySet) bool {
-	if !bytesEq(self.serverEncrKey, ks.serverEncrKey) {
+	if !bytes.Equal(self.serverEncrKey, ks.serverEncrKey) {
 		return false
 	}
-	if !bytesEq(self.serverAuthKey, ks.serverAuthKey) {
+	if !bytes.Equal(self.serverAuthKey, ks.serverAuthKey) {
 		return false
 	}
-	if !bytesEq(self.clientEncrKey, ks.clientEncrKey) {
+	if !bytes.Equal(self.clientEncrKey, ks.clientEncrKey) {
 		return false
 	}
-	if !bytesEq(self.clientAuthKey, ks.clientAuthKey) {
+	if !bytes.Equal(self.clientAuthKey, ks.clientAuthKey) {
 		return false
 	}
 	return true
@@ -81,7 +82,7 @@ func (self *keySet) checkServerHMAC(data, mac []byte) error {
 	if err != nil {
 		return err
 	}
-	if !bytesEq(hmac, mac) {
+	if !xorBytesEq(hmac, mac) {
 		return ErrCorruptedData
 	}
 	return nil
@@ -116,7 +117,7 @@ func (self *keySet) checkClientHMAC(data, mac []byte) error {
 	if err != nil {
 		return err
 	}
-	if !bytesEq(hmac, mac) {
+	if !xorBytesEq(hmac, mac) {
 		return ErrCorruptedData
 	}
 	return nil

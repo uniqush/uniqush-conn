@@ -97,7 +97,7 @@ func (self *CommandIO) readAndCmpHmac(mac []byte) error {
 	if n != len(macRecved) {
 		return ErrCorruptedData
 	}
-	if !bytesEq(mac, macRecved) {
+	if !xorBytesEq(mac, macRecved) {
 		return ErrCorruptedData
 	}
 	return nil

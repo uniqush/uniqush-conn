@@ -23,36 +23,36 @@ func TestXorBytesEq(t *testing.T) {
 	a := []byte{0, 2, 1, 3}
 	b := []byte{0, 2, 1, 3}
 
-	if !bytesEq(a, b) {
+	if !xorBytesEq(a, b) {
 		t.Errorf("should be eq")
 	}
-	if !bytesEq(b, a) {
+	if !xorBytesEq(b, a) {
 		t.Errorf("should be eq")
 	}
-	if !bytesEq(nil, nil) {
+	if !xorBytesEq(nil, nil) {
 		t.Errorf("should be eq")
 	}
 
 	b = []byte{1, 2, 3, 4}
-	if bytesEq(a, b) {
+	if xorBytesEq(a, b) {
 		t.Errorf("should not be eq")
 	}
-	if bytesEq(b, a) {
+	if xorBytesEq(b, a) {
 		t.Errorf("should not be eq")
 	}
 
 	b = []byte{1, 2, 3}
-	if bytesEq(a, b) {
+	if xorBytesEq(a, b) {
 		t.Errorf("should not be eq")
 	}
-	if bytesEq(b, a) {
+	if xorBytesEq(b, a) {
 		t.Errorf("should not be eq")
 	}
 
-	if bytesEq(a, nil) {
+	if xorBytesEq(a, nil) {
 		t.Errorf("should not be eq")
 	}
-	if bytesEq(b, nil) {
+	if xorBytesEq(b, nil) {
 		t.Errorf("should not be eq")
 	}
 }

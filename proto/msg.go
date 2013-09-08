@@ -98,7 +98,7 @@ func (a *Message) Eq(b *Message) bool {
 			return false
 		}
 	}
-	return bytesEq(a.Body, b.Body)
+	return xorBytesEq(a.Body, b.Body)
 }
 
 /*
