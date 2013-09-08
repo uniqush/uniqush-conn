@@ -35,11 +35,11 @@ type Conn interface {
 
 	SendMessageToUser(receiver, service string, msg *proto.Message, ttl time.Duration) error
 	SendMessageToServer(msg *proto.Message) error
-	ReceiveMessage() (msg *proto.Message, err error)
+	ReceiveMessage() (mc *proto.MessageContainer, err error)
 }
 
 type CommandProcessor interface {
-	ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error)
+	ProcessCommand(cmd *proto.Command) (mc *proto.MessageContainer, err error)
 }
 
 type clientConn struct {
@@ -100,7 +100,7 @@ func (self *clientConn) SendMessageToUser(receiver, service string, msg *proto.M
 	return self.cmdio.WriteCommand(cmd, compress)
 }
 
-func (self *clientConn) processCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *clientConn) processCommand(cmd *proto.Command) (mc *proto.MessageContainer, err error) {
 	if cmd == nil {
 		return
 	}
@@ -111,12 +111,12 @@ func (self *clientConn) processCommand(cmd *proto.Command) (msg *proto.Message, 
 	}
 	proc := self.cmdProcs[t]
 	if proc != nil {
-		msg, err = proc.ProcessCommand(cmd)
+		mc, err = proc.ProcessCommand(cmd)
 	}
 	return
 }
 
-func (self *clientConn) ReceiveMessage() (msg *proto.Message, err error) {
+func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error) {
 	cmd, err := self.cmdio.ReadCommand()
 	if err != nil {
 		return
@@ -124,14 +124,18 @@ func (self *clientConn) ReceiveMessage() (msg *proto.Message, err error) {
 	for {
 		switch cmd.Type {
 		case proto.CMD_DATA:
-			msg = cmd.Message
+			mc = new(proto.MessageContainer)
+			mc.Message = cmd.Message
+			if len(cmd.Params[0]) > 0 {
+				mc.Id = cmd.Params[0]
+			}
 			return
 		case proto.CMD_BYE:
 			err = io.EOF
 			return
 		default:
-			msg, err = self.processCommand(cmd)
-			if err != nil || msg != nil {
+			mc, err = self.processCommand(cmd)
+			if err != nil || mc != nil {
 				return
 			}
 		}
