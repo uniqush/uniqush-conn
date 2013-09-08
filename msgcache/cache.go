@@ -22,16 +22,9 @@ import (
 	"time"
 )
 
-type MessageInfo struct {
-	Id         string         `json:"id"`
-	Message    *proto.Message `json:"msg"`
-	Sender     string         `json:"sender,omitempty"`
-	SrcService string         `json:"srcSrv,omitempty"`
-}
-
 type Cache interface {
-	CacheMessage(service, username string, msg *MessageInfo, ttl time.Duration) (id string, err error)
+	CacheMessage(service, username string, msg *proto.MessageContainer, ttl time.Duration) (id string, err error)
 	// XXX Is there any better way to support retrieve all feature?
-	Get(service, username, id string) (msg *MessageInfo, err error)
-	GetCachedMessages(service, username string, excludes ...string) (msgs []*MessageInfo, err error)
+	Get(service, username, id string) (msg *proto.MessageContainer, err error)
+	GetCachedMessages(service, username string, excludes ...string) (msgs []*proto.MessageContainer, err error)
 }

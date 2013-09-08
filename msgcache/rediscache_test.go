@@ -36,10 +36,10 @@ func randomMessage() *proto.Message {
 	return msg
 }
 
-func multiRandomMessage(N int) []*MessageInfo {
-	msgs := make([]*MessageInfo, N)
+func multiRandomMessage(N int) []*proto.MessageContainer {
+	msgs := make([]*proto.MessageContainer, N)
 	for i := 0; i < N; i++ {
-		msgs[i] = new(MessageInfo)
+		msgs[i] = new(proto.MessageContainer)
 		msgs[i].Message = randomMessage()
 	}
 	return msgs
