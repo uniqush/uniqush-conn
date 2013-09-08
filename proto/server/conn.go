@@ -52,6 +52,7 @@ type Conn interface {
 	ReceiveMessage() (msg *proto.Message, err error)
 
 	SetMessageCache(cache msgcache.Cache)
+	Visible() bool
 }
 
 type serverConn struct {
@@ -65,10 +66,16 @@ type serverConn struct {
 	digestFielsLock   sync.Mutex
 	digestFields      []string
 	cmdProcs          []CommandProcessor
+	visible           int32
 }
 
 type CommandProcessor interface {
 	ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error)
+}
+
+func (self *serverConn) Visible() bool {
+	v := atomic.LoadInt32(&self.visible)
+	return v > 0
 }
 
 func (self *serverConn) Close() error {
@@ -236,7 +243,6 @@ func (self *serverConn) ReceiveMessage() (msg *proto.Message, err error) {
 			}
 		}
 	}
-	return
 }
 
 func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
@@ -266,11 +272,17 @@ func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Co
 	ret.service = service
 	ret.username = username
 	ret.connId = fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
-	ret.digestThreshold = -1
-	ret.compressThreshold = -1
+	ret.digestThreshold = 1024
+	ret.compressThreshold = 1024
 
 	settingproc := new(settingProcessor)
 	settingproc.conn = ret
 	ret.setCommandProcessor(proto.CMD_SETTING, settingproc)
+
+	visproc := new(visibilityProcessor)
+	visproc.conn = ret
+	ret.setCommandProcessor(proto.CMD_SET_VISIBILITY, visproc)
+
+	ret.visible = 1
 	return ret
 }
