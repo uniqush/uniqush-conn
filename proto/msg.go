@@ -17,6 +17,24 @@
 
 package proto
 
+// MessageContainer is used to represent a message inside
+// the program. It has meta-data about a message like:
+// the message id, the sender and the service of the sender.
+type MessageContainer struct {
+	Message       *Message `json:"msg"`
+	Id            string   `json:"id,omitempty"`
+	Sender        string   `json:"sender,omitempty"`
+	SenderService string   `json:"service,omitempty"`
+}
+
+func (self *MessageContainer) FromServer() bool {
+	return len(self.Sender) == 0
+}
+
+func (self *MessageContainer) FromUser() bool {
+	return !self.FromServer()
+}
+
 type Message struct {
 	Id            string            `json:"id,omitempty"`
 	Sender        string            `json:"sender,omitempty"`
