@@ -40,6 +40,7 @@ type Conn interface {
 	Config(digestThreshold, compressThreshold int, digestFields ...string) error
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
+	SetVisibility(v bool) error
 }
 
 type CommandProcessor interface {
@@ -185,6 +186,19 @@ func (self *clientConn) RequestMessage(id string) error {
 		Type:   proto.CMD_MSG_RETRIEVE,
 		Params: []string{id},
 	}
+	return self.cmdio.WriteCommand(cmd, false)
+}
+
+func (self *clientConn) SetVisibility(v bool) error {
+	cmd := &proto.Command{
+		Type: proto.CMD_SET_VISIBILITY,
+	}
+	if v {
+		cmd.Params = []string{"1"}
+	} else {
+		cmd.Params = []string{"0"}
+	}
+	fmt.Printf("client: set visibility: %+v\n", cmd)
 	return self.cmdio.WriteCommand(cmd, false)
 }
 

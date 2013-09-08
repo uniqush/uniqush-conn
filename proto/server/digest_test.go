@@ -98,6 +98,9 @@ func TestSendMessageDigestFromServerToClient(t *testing.T) {
 			}
 			cliConn.RequestMessage(digest.MsgId)
 		}
+		if i != N {
+			t.Errorf("received %v digest", i)
+		}
 	}()
 	err = iterateOverContainers(src, dst, mcs...)
 	if err != nil {
