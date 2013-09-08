@@ -49,18 +49,26 @@ func (a *MessageContainer) Eq(b *MessageContainer) bool {
 }
 
 type Message struct {
-	Id            string            `json:"id,omitempty"`
-	Sender        string            `json:"sender,omitempty"`
-	SenderService string            `json:"service,omitempty"`
-	Header        map[string]string `json:"header,omitempty"`
-	Body          []byte            `json:"body,omitempty"`
+	/*
+		Id            string            `json:"id,omitempty"`
+		Sender        string            `json:"sender,omitempty"`
+		SenderService string            `json:"service,omitempty"`
+	*/
+	Header map[string]string `json:"header,omitempty"`
+	Body   []byte            `json:"body,omitempty"`
 }
 
 func (self *Message) IsEmpty() bool {
+	if self == nil {
+		return true
+	}
 	return len(self.Header) == 0 && len(self.Body) == 0
 }
 
 func (self *Message) Size() int {
+	if self == nil {
+		return 8
+	}
 	ret := len(self.Body)
 	for k, v := range self.Header {
 		ret += len(k) + 1
@@ -70,7 +78,14 @@ func (self *Message) Size() int {
 	return ret
 }
 
-func (a *Message) EqContent(b *Message) bool {
+func (a *Message) Eq(b *Message) bool {
+	if a == nil {
+		if b == nil {
+			return true
+		} else {
+			return false
+		}
+	}
 	if len(a.Header) != len(b.Header) {
 		return false
 	}
@@ -86,6 +101,7 @@ func (a *Message) EqContent(b *Message) bool {
 	return bytesEq(a.Body, b.Body)
 }
 
+/*
 func (a *Message) Eq(b *Message) bool {
 	if !a.EqContent(b) {
 		return false
@@ -101,3 +117,4 @@ func (a *Message) Eq(b *Message) bool {
 	}
 	return true
 }
+*/
