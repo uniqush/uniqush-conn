@@ -67,7 +67,7 @@ func (self *Message) IsEmpty() bool {
 
 func (self *Message) Size() int {
 	if self == nil {
-		return 8
+		return 0
 	}
 	ret := len(self.Body)
 	for k, v := range self.Header {
