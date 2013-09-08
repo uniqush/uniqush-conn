@@ -21,6 +21,8 @@ import (
 	"errors"
 	"hash"
 	"io"
+
+	"net"
 )
 
 var ErrZeroEntropy = errors.New("Need more random number")
@@ -91,16 +93,45 @@ func copyWithLeftPad(dest, src []byte) {
 	copy(dest[numPaddingBytes:], src)
 }
 
+func xorBytes(longer, shorter []byte) []byte {
+	if len(longer) == 0 {
+		return nil
+	}
+	ret := make([]byte, len(longer))
+
+	for i, c := range shorter {
+		ret[i] = c ^ longer[i]
+	}
+
+	for i := len(shorter); i < len(longer); i++ {
+		ret[i] = longer[i]
+	}
+
+	return ret
+}
+
 func bytesEq(a, b []byte) bool {
-	if len(a) != len(b) {
+	if len(b) > len(a) {
+		// to prevent timing attack
+		xorBytes(b, a)
+		return false
+	} else if len(a) > len(b) {
+		xorBytes(a, b)
 		return false
 	}
-	for i, e := range a {
-		if b[i] != e {
-			return false
+
+	x := xorBytes(a, b)
+	if x == nil {
+		return true
+	}
+
+	ret := true
+	for _, c := range x {
+		if c != 0 {
+			ret = false
 		}
 	}
-	return true
+	return ret
 }
 
 func writen(w io.Writer, buf []byte) error {
@@ -108,6 +139,11 @@ func writen(w io.Writer, buf []byte) error {
 	for n >= 0 {
 		l, err := w.Write(buf)
 		if err != nil {
+			if ne, ok := err.(net.Error); ok {
+				if ne.Temporary() {
+					continue
+				}
+			}
 			return err
 		}
 		if l >= n {
