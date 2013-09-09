@@ -28,7 +28,7 @@ type messageRetriever struct {
 }
 
 func (self *messageRetriever) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
-	if cmd.Type != proto.CMD_MSG_RETRIEVE || self.conn == nil || self.cache == nil {
+	if cmd == nil || cmd.Type != proto.CMD_MSG_RETRIEVE || self.conn == nil || self.cache == nil {
 		return
 	}
 	if len(cmd.Params) < 1 {

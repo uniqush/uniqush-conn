@@ -259,6 +259,11 @@ func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
 	proc.cache = cache
 	proc.conn = self
 	self.setCommandProcessor(proto.CMD_MSG_RETRIEVE, proc)
+
+	p2 := new(retriaveAllMessages)
+	p2.cache = cache
+	p2.conn = self
+	self.setCommandProcessor(proto.CMD_REQ_ALL_CACHED, p2)
 }
 
 func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
