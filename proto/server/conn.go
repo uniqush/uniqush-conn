@@ -52,6 +52,7 @@ type Conn interface {
 	ReceiveMessage() (msg *proto.Message, err error)
 
 	SetMessageCache(cache msgcache.Cache)
+	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	Visible() bool
 }
 
@@ -257,6 +258,16 @@ func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
 	proc.cache = cache
 	proc.conn = self
 	self.setCommandProcessor(proto.CMD_MSG_RETRIEVE, proc)
+}
+
+func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
+	if fwdChan == nil {
+		return
+	}
+	proc := new(forwardProcessor)
+	proc.conn = self
+	proc.fwdChan = fwdChan
+	self.setCommandProcessor(proto.CMD_FWD_REQ, proc)
 }
 
 func (self *serverConn) setCommandProcessor(cmdType uint8, proc CommandProcessor) {

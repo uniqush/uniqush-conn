@@ -137,6 +137,23 @@ func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error)
 				mc.Id = cmd.Params[0]
 			}
 			return
+		case proto.CMD_FWD:
+			if len(cmd.Params) < 1 {
+				err = proto.ErrBadPeerImpl
+				return
+			}
+			mc = new(proto.MessageContainer)
+			mc.Message = cmd.Message
+			mc.Sender = cmd.Params[0]
+			if len(cmd.Params) > 1 {
+				mc.SenderService = cmd.Params[1]
+			} else {
+				mc.SenderService = self.Service()
+			}
+			if len(cmd.Params) > 2 {
+				mc.Id = cmd.Params[2]
+			}
+			return
 		case proto.CMD_BYE:
 			err = io.EOF
 			return

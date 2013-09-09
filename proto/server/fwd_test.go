@@ -19,12 +19,14 @@ package server
 
 import (
 	"fmt"
+
 	"github.com/uniqush/uniqush-conn/proto"
+
 	"testing"
 	"time"
 )
 
-func TestSetInvisible(t *testing.T) {
+func TestForwardMessageFromServerToClient(t *testing.T) {
 	addr := "127.0.0.1:8088"
 	token := "token"
 	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
@@ -33,39 +35,27 @@ func TestSetInvisible(t *testing.T) {
 	}
 	defer servConn.Close()
 	defer cliConn.Close()
-	N := 1
+	N := 100
 	mcs := make([]*proto.MessageContainer, N)
 
 	for i := 0; i < N; i++ {
 		mcs[i] = &proto.MessageContainer{
-			Message: randomMessage(),
-			Id:      fmt.Sprintf("%v", i),
+			Message:       randomMessage(),
+			Id:            fmt.Sprintf("%v", i),
+			Sender:        "sender",
+			SenderService: "someservice",
 		}
 	}
 
-	src := &clientSender{
-		conn: cliConn,
-	}
-
-	dst := &serverReceiver{
+	src := &serverSender{
 		conn: servConn,
 	}
 
-	cliConn.SetVisibility(false)
+	dst := &clientReceiver{
+		conn: cliConn,
+	}
 	err = iterateOverContainers(src, dst, mcs...)
 	if err != nil {
 		t.Errorf("Error: %v", err)
-	}
-
-	if servConn.Visible() {
-		t.Errorf("Error: should be invisible")
-	}
-	cliConn.SetVisibility(true)
-	err = iterateOverContainers(src, dst, mcs...)
-	if err != nil {
-		t.Errorf("Error: %v", err)
-	}
-	if !servConn.Visible() {
-		t.Errorf("Error: should be visible")
 	}
 }
