@@ -66,10 +66,11 @@ type clientForwarder struct {
 }
 
 func (self *clientForwarder) ProcessMessageContainer(mc *proto.MessageContainer) error {
-	if mc.Sender == "" {
-		return self.conn.SendMessageToServer(mc.Message)
+	err := self.conn.SendMessageToUser(mc.SenderService, mc.Sender, mc.Message, 1*time.Hour)
+	if err != nil {
+		return err
 	}
-	return self.conn.SendMessageToUser(mc.SenderService, mc.Sender, mc.Message, 1*time.Hour)
+	return self.conn.SendMessageToServer(mc.Message)
 }
 
 func TestForwardRequestFromClientToServer(t *testing.T) {
@@ -85,21 +86,21 @@ func TestForwardRequestFromClientToServer(t *testing.T) {
 	mcs := make([]*proto.MessageContainer, N)
 
 	receiver := "receiver"
-	recceiverService := "someservice"
+	receiverService := "someservice"
 
 	for i := 0; i < N; i++ {
 		mcs[i] = &proto.MessageContainer{
 			Message:       randomMessage(),
 			Id:            fmt.Sprintf("%v", i),
 			Sender:        receiver, // This is confusing. We hacked the struct.
-			SenderService: recceiverService,
+			SenderService: receiverService,
 		}
 	}
 
 	fwdChan := make(chan *ForwardRequest)
 
 	servConn.SetForwardRequestChannel(fwdChan)
-	src := &clientSender{
+	src := &clientForwarder{
 		conn: cliConn,
 	}
 
@@ -112,9 +113,14 @@ func TestForwardRequestFromClientToServer(t *testing.T) {
 		for fwdreq := range fwdChan {
 			mc := mcs[i]
 			i++
-
 			if !mc.Message.Eq(fwdreq.MessageContainer.Message) {
 				t.Errorf("corrupted data")
+			}
+			if fwdreq.Receiver != receiver {
+				t.Errorf("receiver is %v, not %v", fwdreq.Receiver, receiver)
+			}
+			if fwdreq.ReceiverService != receiverService {
+				t.Errorf("receiver's service is %v, not %v", fwdreq.ReceiverService, receiverService)
 			}
 		}
 		if i != N {
