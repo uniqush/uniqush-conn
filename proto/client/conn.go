@@ -43,6 +43,7 @@ type Conn interface {
 	SetVisibility(v bool) error
 	Subscribe(params map[string]string) error
 	Unsubscribe(params map[string]string) error
+	RequestAllCachedMessages(excludes ...string) error
 }
 
 type CommandProcessor interface {
@@ -240,6 +241,22 @@ func (self *clientConn) Subscribe(params map[string]string) error {
 
 func (self *clientConn) Unsubscribe(params map[string]string) error {
 	return self.subscribe(params, false)
+}
+
+func (self *clientConn) RequestAllCachedMessages(excludes ...string) error {
+	cmd := &proto.Command{}
+	cmd.Type = proto.CMD_REQ_ALL_CACHED
+	if len(excludes) > 0 {
+		msg := new(proto.Message)
+		data := make([]byte, 0, len(excludes)*90)
+		for _, i := range excludes {
+			data = append(data, []byte(i)...)
+			data = append(data, byte(0))
+		}
+		msg.Body = data
+		cmd.Message = msg
+	}
+	return self.cmdio.WriteCommand(cmd, false)
 }
 
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
