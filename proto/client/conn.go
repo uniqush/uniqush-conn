@@ -33,7 +33,7 @@ type Conn interface {
 	Username() string
 	UniqId() string
 
-	SendMessageToUser(receiver, service string, msg *proto.Message, ttl time.Duration) error
+	SendMessageToUser(service, receiver string, msg *proto.Message, ttl time.Duration) error
 	SendMessageToServer(msg *proto.Message) error
 	ReceiveMessage() (mc *proto.MessageContainer, err error)
 
@@ -92,7 +92,7 @@ func (self *clientConn) SendMessageToServer(msg *proto.Message) error {
 	return err
 }
 
-func (self *clientConn) SendMessageToUser(receiver, service string, msg *proto.Message, ttl time.Duration) error {
+func (self *clientConn) SendMessageToUser(service, receiver string, msg *proto.Message, ttl time.Duration) error {
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_FWD_REQ
 	cmd.Params = make([]string, 2, 3)

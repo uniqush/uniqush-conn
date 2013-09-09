@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/proto/client"
 
 	"testing"
 	"time"
@@ -58,4 +59,73 @@ func TestForwardMessageFromServerToClient(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
+}
+
+type clientForwarder struct {
+	conn client.Conn
+}
+
+func (self *clientForwarder) ProcessMessageContainer(mc *proto.MessageContainer) error {
+	if mc.Sender == "" {
+		return self.conn.SendMessageToServer(mc.Message)
+	}
+	return self.conn.SendMessageToUser(mc.SenderService, mc.Sender, mc.Message, 1*time.Hour)
+}
+
+func TestForwardRequestFromClientToServer(t *testing.T) {
+	addr := "127.0.0.1:8088"
+	token := "token"
+	servConn, cliConn, err := buildServerClientConns(addr, token, 3*time.Second)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+	defer servConn.Close()
+	defer cliConn.Close()
+	N := 100
+	mcs := make([]*proto.MessageContainer, N)
+
+	receiver := "receiver"
+	recceiverService := "someservice"
+
+	for i := 0; i < N; i++ {
+		mcs[i] = &proto.MessageContainer{
+			Message:       randomMessage(),
+			Id:            fmt.Sprintf("%v", i),
+			Sender:        receiver, // This is confusing. We hacked the struct.
+			SenderService: recceiverService,
+		}
+	}
+
+	fwdChan := make(chan *ForwardRequest)
+
+	servConn.SetForwardRequestChannel(fwdChan)
+	src := &clientSender{
+		conn: cliConn,
+	}
+
+	dst := &serverReceiver{
+		conn: servConn,
+	}
+
+	go func() {
+		i := 0
+		for fwdreq := range fwdChan {
+			mc := mcs[i]
+			i++
+
+			if !mc.Message.Eq(fwdreq.MessageContainer.Message) {
+				t.Errorf("corrupted data")
+			}
+		}
+		if i != N {
+			t.Errorf("received only %v fwdreq", i)
+		}
+	}()
+	err = iterateOverContainers(src, dst, mcs...)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	close(fwdChan)
+	cliConn.Close()
 }
