@@ -41,6 +41,8 @@ type Conn interface {
 	SetDigestChannel(digestChan chan<- *Digest)
 	RequestMessage(id string) error
 	SetVisibility(v bool) error
+	Subscribe(params map[string]string) error
+	Unsubscribe(params map[string]string) error
 }
 
 type CommandProcessor interface {
@@ -217,6 +219,27 @@ func (self *clientConn) SetVisibility(v bool) error {
 		cmd.Params = []string{"0"}
 	}
 	return self.cmdio.WriteCommand(cmd, false)
+}
+
+func (self *clientConn) subscribe(params map[string]string, sub bool) error {
+	cmd := new(proto.Command)
+	cmd.Type = proto.CMD_SUBSCRIPTION
+	if sub {
+		cmd.Params = []string{"1"}
+	} else {
+		cmd.Params = []string{"0"}
+	}
+	cmd.Message = new(proto.Message)
+	cmd.Message.Header = params
+	return self.cmdio.WriteCommand(cmd, false)
+}
+
+func (self *clientConn) Subscribe(params map[string]string) error {
+	return self.subscribe(params, true)
+}
+
+func (self *clientConn) Unsubscribe(params map[string]string) error {
+	return self.subscribe(params, false)
 }
 
 func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
