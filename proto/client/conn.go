@@ -123,11 +123,12 @@ func (self *clientConn) processCommand(cmd *proto.Command) (mc *proto.MessageCon
 }
 
 func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error) {
-	cmd, err := self.cmdio.ReadCommand()
-	if err != nil {
-		return
-	}
+	var cmd *proto.Command
 	for {
+		cmd, err = self.cmdio.ReadCommand()
+		if err != nil {
+			return
+		}
 		switch cmd.Type {
 		case proto.CMD_DATA:
 			mc = new(proto.MessageContainer)

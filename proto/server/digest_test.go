@@ -71,7 +71,13 @@ func TestSendMessageDigestFromServerToClient(t *testing.T) {
 		conn: cliConn,
 	}
 
-	cliConn.Config(0, 2048, difieldNames...)
+	err = cliConn.Config(0, 2048, difieldNames...)
+	if err != nil {
+		t.Errorf("Error: %v\n")
+	}
+	go func() {
+		servConn.ReceiveMessage()
+	}()
 
 	digestChan := make(chan *client.Digest)
 	cliConn.SetDigestChannel(digestChan)
@@ -107,4 +113,5 @@ func TestSendMessageDigestFromServerToClient(t *testing.T) {
 		t.Errorf("Error: %v", err)
 	}
 	close(digestChan)
+	cliConn.Close()
 }

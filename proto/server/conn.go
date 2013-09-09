@@ -224,11 +224,15 @@ func (self *serverConn) processCommand(cmd *proto.Command) (msg *proto.Message, 
 }
 
 func (self *serverConn) ReceiveMessage() (msg *proto.Message, err error) {
-	cmd, err := self.cmdio.ReadCommand()
-	if err != nil {
-		return
-	}
+	var cmd *proto.Command
 	for {
+		cmd, err = self.cmdio.ReadCommand()
+		if err != nil {
+			if err == io.ErrUnexpectedEOF || err == io.EOF {
+				err = io.EOF
+			}
+			return
+		}
 		switch cmd.Type {
 		case proto.CMD_DATA:
 			msg = cmd.Message
