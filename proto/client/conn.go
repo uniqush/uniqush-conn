@@ -199,7 +199,6 @@ func (self *clientConn) SetVisibility(v bool) error {
 	} else {
 		cmd.Params = []string{"0"}
 	}
-	fmt.Printf("client: set visibility: %+v\n", cmd)
 	return self.cmdio.WriteCommand(cmd, false)
 }
 

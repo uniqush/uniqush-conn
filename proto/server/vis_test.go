@@ -43,12 +43,12 @@ func TestSetInvisible(t *testing.T) {
 		}
 	}
 
-	src := &serverSender{
-		conn: servConn,
+	src := &clientSender{
+		conn: cliConn,
 	}
 
-	dst := &clientReceiver{
-		conn: cliConn,
+	dst := &serverReceiver{
+		conn: servConn,
 	}
 
 	cliConn.SetVisibility(false)

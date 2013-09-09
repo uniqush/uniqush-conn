@@ -18,7 +18,6 @@
 package server
 
 import (
-	"fmt"
 	"sync/atomic"
 
 	"github.com/uniqush/uniqush-conn/proto"
@@ -29,7 +28,6 @@ type visibilityProcessor struct {
 }
 
 func (self *visibilityProcessor) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
-	fmt.Printf("visible: %+v\n", cmd)
 	if cmd == nil || cmd.Type != proto.CMD_SET_VISIBILITY {
 		return
 	}
