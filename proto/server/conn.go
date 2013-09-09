@@ -53,6 +53,7 @@ type Conn interface {
 
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
+	SetSubscribeRequestChan(subChan chan<- *SubscribeRequest)
 	Visible() bool
 }
 
@@ -268,6 +269,16 @@ func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
 	proc.conn = self
 	proc.fwdChan = fwdChan
 	self.setCommandProcessor(proto.CMD_FWD_REQ, proc)
+}
+
+func (self *serverConn) SetSubscribeRequestChan(subChan chan<- *SubscribeRequest) {
+	if subChan == nil {
+		return
+	}
+	proc := new(subscribeProcessor)
+	proc.conn = self
+	proc.subChan = subChan
+	self.setCommandProcessor(proto.CMD_SUBSCRIPTION, proc)
 }
 
 func (self *serverConn) setCommandProcessor(cmdType uint8, proc CommandProcessor) {
