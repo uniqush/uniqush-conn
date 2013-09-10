@@ -63,7 +63,7 @@ func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err er
 	}
 }
 
-func (self *webHook) post(data interface{}) int {
+func (self *webHook) post(data interface{}, out interface{}) int {
 	if len(self.URL) == 0 || self.URL == "none" {
 		return self.Default
 	}
@@ -81,6 +81,14 @@ func (self *webHook) post(data interface{}) int {
 		return self.Default
 	}
 	defer resp.Body.Close()
+
+	if out != nil {
+		e := json.NewDecoder(resp.Body)
+		err = e.Decode(out)
+		if err != nil {
+			return self.Default
+		}
+	}
 	return resp.StatusCode
 }
 
@@ -96,7 +104,7 @@ type LoginHandler struct {
 }
 
 func (self *LoginHandler) OnLogin(service, username, connId, addr string) {
-	self.post(&loginEvent{service, username, connId, addr})
+	self.post(&loginEvent{service, username, connId, addr}, nil)
 }
 
 type logoutEvent struct {
@@ -112,7 +120,7 @@ type LogoutHandler struct {
 }
 
 func (self *LogoutHandler) OnLogout(service, username, connId, addr string, reason error) {
-	self.post(&logoutEvent{service, username, connId, addr, reason.Error()})
+	self.post(&logoutEvent{service, username, connId, addr, reason.Error()}, nil)
 }
 
 type messageEvent struct {
@@ -133,7 +141,7 @@ func (self *MessageHandler) OnMessage(service, username, connId string, msg *rpc
 		ConnID:   connId,
 		Msg:      msg,
 	}
-	self.post(evt)
+	self.post(evt, nil)
 }
 
 type errorEvent struct {
@@ -149,7 +157,7 @@ type ErrorHandler struct {
 }
 
 func (self *ErrorHandler) OnError(service, username, connId, addr string, reason error) {
-	self.post(&errorEvent{service, username, connId, addr, reason.Error()})
+	self.post(&errorEvent{service, username, connId, addr, reason.Error()}, nil)
 }
 
 type ForwardRequestHandler struct {
@@ -167,7 +175,14 @@ type forwardEvent struct {
 	TTL             time.Duration `json:"ttl"`
 }
 
-func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *rpc.Message) bool {
+type forwardDecision struct {
+	ShouldForward bool              `json:"should-forward"`
+	ShouldPush    bool              `json:"should-push"`
+	PushInfo      map[string]string `json:"push-info"`
+}
+
+func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService, receiver string,
+	ttl time.Duration, msg *rpc.Message) (shouldForward, shouldPush bool, pushInfo map[string]string) {
 	fwd := &forwardEvent{
 		Sender:          sender,
 		SenderService:   senderService,
@@ -177,7 +192,15 @@ func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiver
 		Message:         msg,
 	}
 
-	return self.post(fwd) == 200
+	res := &forwardDecision{
+		PushInfo: make(map[string]string, 10),
+	}
+
+	status := self.post(fwd, res)
+	if status != 200 {
+		res.ShouldForward = false
+	}
+	return res.ShouldForward, res.ShouldPush, res.PushInfo
 }
 
 func (self *ForwardRequestHandler) SetMaxTTL(ttl time.Duration) {
@@ -205,7 +228,7 @@ func (self *AuthHandler) Authenticate(srv, usr, token, addr string) (pass bool, 
 	evt.Username = usr
 	evt.Token = token
 	evt.Addr = addr
-	pass = self.post(evt) == 200
+	pass = self.post(evt, nil) == 200
 	return
 }
 
@@ -224,19 +247,7 @@ func (self *SubscribeHandler) ShouldSubscribe(service, username string, info map
 	evt.Service = service
 	evt.Username = username
 	evt.Info = info
-	return self.post(evt) == 200
-}
-
-type PushHandler struct {
-	webHook
-}
-
-func (self *PushHandler) ShouldPush(service, username string, info map[string]string) bool {
-	evt := new(pushRelatedEvent)
-	evt.Service = service
-	evt.Username = username
-	evt.Info = info
-	return self.post(evt) == 200
+	return self.post(evt, nil) == 200
 }
 
 type UnsubscribeHandler struct {
@@ -244,10 +255,10 @@ type UnsubscribeHandler struct {
 }
 
 func (self *UnsubscribeHandler) OnUnsubscribe(service, username string, info map[string]string) {
-	evt := new(pushRelatedEvent)
+	evt := &pushRelatedEvent{}
 	evt.Service = service
 	evt.Username = username
 	evt.Info = info
-	self.post(evt)
+	self.post(evt, nil)
 	return
 }

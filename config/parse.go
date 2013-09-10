@@ -211,16 +211,6 @@ func parseUnsubscribeHandler(node yaml.Node, timeout time.Duration) (h evthandle
 	return
 }
 
-func parsePushHandler(node yaml.Node, timeout time.Duration) (h evthandler.PushHandler, err error) {
-	hd := new(webhook.PushHandler)
-	err = setWebHook(hd, node, timeout)
-	if err != nil {
-		return
-	}
-	h = hd
-	return
-}
-
 func parseUniqushPush(node yaml.Node, timeout time.Duration) (p push.Push, err error) {
 	kv, ok := node.(yaml.Map)
 	if !ok {
@@ -327,8 +317,6 @@ func parseService(service string, node yaml.Node, defaultConfig *ServiceConfig) 
 			config.LoginHandler, err = parseLoginHandler(value, timeout)
 		case "fwd":
 			config.ForwardRequestHandler, err = parseForwardRequestHandler(value, timeout)
-		case "push":
-			config.PushHandler, err = parsePushHandler(value, timeout)
 		case "subscribe":
 			config.SubscribeHandler, err = parseSubscribeHandler(value, timeout)
 		case "unsubscribe":

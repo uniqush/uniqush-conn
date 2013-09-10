@@ -59,10 +59,6 @@ default:
     default: allow
     url: http://localhost:8080/unsubscribe
     timeout: 3s
-  push:
-    default: disallow
-    url: http://localhost:8080/push
-    timeout: 3s
   uniqush-push:
     addr: localhost:9898
     timeout: 3s

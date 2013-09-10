@@ -20,7 +20,6 @@ package msgcenter
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/config"
-
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"io"

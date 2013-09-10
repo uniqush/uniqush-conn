@@ -78,7 +78,6 @@ type ServiceConfig struct {
 	// Push related web hooks
 	SubscribeHandler   evthandler.SubscribeHandler
 	UnsubscribeHandler evthandler.UnsubscribeHandler
-	PushHandler        evthandler.PushHandler
 
 	PushService push.Push
 }
@@ -107,7 +106,6 @@ func (self *ServiceConfig) clone(srv string, dst *ServiceConfig) *ServiceConfig 
 	// Push related web hooks
 	dst.SubscribeHandler = self.SubscribeHandler
 	dst.UnsubscribeHandler = self.UnsubscribeHandler
-	dst.PushHandler = self.PushHandler
 
 	dst.PushService = self.PushService
 	return dst
@@ -118,13 +116,6 @@ func (self *ServiceConfig) Cache() msgcache.Cache {
 		return nil
 	}
 	return self.MsgCache
-}
-
-func (self *ServiceConfig) ShouldPush(username string, info map[string]string) bool {
-	if self == nil || self.PushHandler == nil {
-		return false
-	}
-	return self.PushHandler.ShouldPush(self.ServiceName, username, info)
 }
 
 func (self *ServiceConfig) Subscribe(username string, info map[string]string) {

@@ -39,7 +39,7 @@ type MessageHandler interface {
 }
 
 type ForwardRequestHandler interface {
-	ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *rpc.Message) bool
+	ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *rpc.Message) (shouldForward bool, shouldPush bool, pushInfo map[string]string)
 	MaxTTL() time.Duration
 }
 
@@ -53,8 +53,4 @@ type SubscribeHandler interface {
 
 type UnsubscribeHandler interface {
 	OnUnsubscribe(service, username string, info map[string]string)
-}
-
-type PushHandler interface {
-	ShouldPush(service, username string, info map[string]string) bool
 }
