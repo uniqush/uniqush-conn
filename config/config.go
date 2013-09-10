@@ -20,6 +20,7 @@ package config
 import (
 	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/msgcache"
+	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/push"
 	"time"
 )
@@ -68,4 +69,66 @@ type ServiceConfig struct {
 	PushHandler        evthandler.PushHandler
 
 	PushService push.Push
+}
+
+func (self *ServiceConfig) Cache() msgcache.Cache {
+	if self == nil {
+		return nil
+	}
+	return self.MsgCache
+}
+
+func (self *ServiceConfig) ShouldPush(service, username string, info map[string]string) bool {
+	if self == nil || self.PushHandler == nil {
+		return false
+	}
+	return self.PushHandler.ShouldPush(service, username, info)
+}
+
+func (self *ServiceConfig) Subscribe(service, username string, info map[string]string) {
+	if self == nil || self.PushService == nil {
+		return
+	}
+	go self.PushService.Subscribe(service, username, info)
+	return
+}
+
+func (self *ServiceConfig) Unsubscribe(service, username string, info map[string]string) {
+	if self == nil || self.PushService == nil {
+		return
+	}
+	go self.PushService.Unsubscribe(service, username, info)
+	return
+}
+
+func (self *ServiceConfig) OnError(service, username, connId, addr string, err error) {
+	if self == nil || self.ErrorHandler == nil {
+		return
+	}
+	go self.ErrorHandler.OnError(service, username, connId, addr, err)
+	return
+}
+
+func (self *ServiceConfig) OnLogin(service, username, connId, addr string) {
+	if self == nil || self.LoginHandler == nil {
+		return
+	}
+	go self.LoginHandler.OnLogin(service, username, connId, addr)
+	return
+}
+
+func (self *ServiceConfig) OnLogout(service, username, connId, addr string, reason error) {
+	if self == nil || self.LogoutHandler == nil {
+		return
+	}
+	go self.LogoutHandler.OnLogout(service, username, connId, addr, reason)
+	return
+}
+
+func (self *ServiceConfig) OnMessage(service, username, connId string, msg *proto.Message) {
+	if self == nil || self.MessageHandler == nil {
+		return
+	}
+	go self.MessageHandler.OnMessage(service, username, connId, msg)
+	return
 }

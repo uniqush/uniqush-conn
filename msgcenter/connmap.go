@@ -20,6 +20,7 @@ package msgcenter
 import (
 	"errors"
 	"github.com/petar/GoLLRB/llrb"
+	"sync"
 )
 
 type minimalConn interface {
@@ -83,9 +84,16 @@ type treeBasedConnMap struct {
 	maxNrConnsPerUser int
 
 	nrConn int
+	lock   sync.Mutex
 }
 
 func (self *treeBasedConnMap) GetConn(user string) []minimalConn {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	return self.getConn(user)
+}
+
+func (self *treeBasedConnMap) getConn(user string) []minimalConn {
 	key := &connListItem{name: user, list: nil}
 	clif := self.tree.Get(key)
 	cl, ok := clif.(*connListItem)
@@ -100,6 +108,8 @@ var ErrTooManyConnForThisUser = errors.New("too many connections under this user
 var ErrTooManyConns = errors.New("too many connections")
 
 func (self *treeBasedConnMap) AddConn(conn minimalConn) error {
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	if conn == nil {
 		return nil
 	}
@@ -111,7 +121,7 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn) error {
 		return ErrTooManyUsers
 	}
 	var cl []minimalConn
-	cl = self.GetConn(connKey(conn))
+	cl = self.getConn(connKey(conn))
 	if cl == nil {
 		cl = make([]minimalConn, 0, 3)
 	}
@@ -131,10 +141,12 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn) error {
 }
 
 func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	if conn == nil {
 		return false
 	}
-	cl := self.GetConn(connKey(conn))
+	cl := self.getConn(connKey(conn))
 	if cl == nil {
 		return false
 	}
