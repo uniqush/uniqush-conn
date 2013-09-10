@@ -18,13 +18,13 @@
 package msgcache
 
 import (
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"time"
 )
 
 type Cache interface {
-	CacheMessage(service, username string, msg *proto.MessageContainer, ttl time.Duration) (id string, err error)
+	CacheMessage(service, username string, msg *rpc.MessageContainer, ttl time.Duration) (id string, err error)
 	// XXX Is there any better way to support retrieve all feature?
-	Get(service, username, id string) (msg *proto.MessageContainer, err error)
-	GetCachedMessages(service, username string, excludes ...string) (msgs []*proto.MessageContainer, err error)
+	Get(service, username, id string) (msg *rpc.MessageContainer, err error)
+	GetCachedMessages(service, username string, excludes ...string) (msgs []*rpc.MessageContainer, err error)
 }

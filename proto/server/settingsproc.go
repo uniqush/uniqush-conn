@@ -18,17 +18,17 @@
 package server
 
 import (
+	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"strconv"
 	"sync/atomic"
-
-	"github.com/uniqush/uniqush-conn/proto"
 )
 
 type settingProcessor struct {
 	conn *serverConn
 }
 
-func (self *settingProcessor) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *settingProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
 	if cmd.Type != proto.CMD_SETTING || self.conn == nil {
 		return
 	}

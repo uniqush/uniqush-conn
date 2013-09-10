@@ -15,30 +15,13 @@
  *
  */
 
-package server
+package rpc
 
-import (
-	"github.com/uniqush/uniqush-conn/proto"
-	"github.com/uniqush/uniqush-conn/rpc"
-	"sync/atomic"
-)
+import "time"
 
-type visibilityProcessor struct {
-	conn *serverConn
-}
-
-func (self *visibilityProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
-	if cmd == nil || cmd.Type != proto.CMD_SET_VISIBILITY {
-		return
-	}
-	if len(cmd.Params) < 1 {
-		err = proto.ErrBadPeerImpl
-		return
-	}
-	if cmd.Params[0] == "0" {
-		atomic.StoreInt32(&self.conn.visible, 0)
-	} else if cmd.Params[0] == "1" {
-		atomic.StoreInt32(&self.conn.visible, 1)
-	}
-	return
+type ForwardRequest struct {
+	Receiver        string        `json:"receiver"`
+	ReceiverService string        `json:"receiver-service"`
+	TTL             time.Duration `json:"ttl"`
+	MessageContainer
 }

@@ -18,24 +18,17 @@
 package server
 
 import (
-	"time"
-
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
+	"time"
 )
 
 type forwardProcessor struct {
 	conn    *serverConn
-	fwdChan chan<- *ForwardRequest
+	fwdChan chan<- *rpc.ForwardRequest
 }
 
-type ForwardRequest struct {
-	Receiver         string                 `json:"receiver"`
-	ReceiverService  string                 `json:"service"`
-	TTL              time.Duration          `json:"ttl"`
-	MessageContainer proto.MessageContainer `json:"msg"`
-}
-
-func (self *forwardProcessor) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *forwardProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
 	if cmd == nil || cmd.Type != proto.CMD_FWD_REQ || self.conn == nil || self.fwdChan == nil {
 		return
 	}
@@ -47,10 +40,10 @@ func (self *forwardProcessor) ProcessCommand(cmd *proto.Command) (msg *proto.Mes
 	if self.fwdChan == nil {
 		return
 	}
-	fwdreq := new(ForwardRequest)
-	fwdreq.MessageContainer.Sender = self.conn.Username()
-	fwdreq.MessageContainer.SenderService = self.conn.Service()
-	fwdreq.MessageContainer.Message = cmd.Message
+	fwdreq := new(rpc.ForwardRequest)
+	fwdreq.Sender = self.conn.Username()
+	fwdreq.SenderService = self.conn.Service()
+	fwdreq.Message = cmd.Message
 	fwdreq.TTL, err = time.ParseDuration(cmd.Params[0])
 
 	if err != nil {

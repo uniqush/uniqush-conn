@@ -20,14 +20,14 @@ package msgcache
 import (
 	"crypto/rand"
 	"github.com/garyburd/redigo/redis"
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"testing"
 	"time"
 )
 
-func randomMessage() *proto.Message {
-	msg := new(proto.Message)
+func randomMessage() *rpc.Message {
+	msg := new(rpc.Message)
 	msg.Body = make([]byte, 10)
 	io.ReadFull(rand.Reader, msg.Body)
 	msg.Header = make(map[string]string, 2)
@@ -36,10 +36,10 @@ func randomMessage() *proto.Message {
 	return msg
 }
 
-func multiRandomMessage(N int) []*proto.MessageContainer {
-	msgs := make([]*proto.MessageContainer, N)
+func multiRandomMessage(N int) []*rpc.MessageContainer {
+	msgs := make([]*rpc.MessageContainer, N)
 	for i := 0; i < N; i++ {
-		msgs[i] = new(proto.MessageContainer)
+		msgs[i] = new(rpc.MessageContainer)
 		msgs[i].Message = randomMessage()
 	}
 	return msgs

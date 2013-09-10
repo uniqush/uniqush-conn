@@ -20,8 +20,8 @@ package server
 import (
 	"fmt"
 
-	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/client"
+	"github.com/uniqush/uniqush-conn/rpc"
 
 	"testing"
 	"time"
@@ -37,10 +37,10 @@ func TestForwardMessageFromServerToClient(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 	N := 100
-	mcs := make([]*proto.MessageContainer, N)
+	mcs := make([]*rpc.MessageContainer, N)
 
 	for i := 0; i < N; i++ {
-		mcs[i] = &proto.MessageContainer{
+		mcs[i] = &rpc.MessageContainer{
 			Message:       randomMessage(),
 			Id:            fmt.Sprintf("%v", i),
 			Sender:        "sender",
@@ -65,7 +65,7 @@ type clientForwarder struct {
 	conn client.Conn
 }
 
-func (self *clientForwarder) ProcessMessageContainer(mc *proto.MessageContainer) error {
+func (self *clientForwarder) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	err := self.conn.SendMessageToUser(mc.SenderService, mc.Sender, mc.Message, 1*time.Hour)
 	if err != nil {
 		return err
@@ -83,13 +83,13 @@ func TestForwardRequestFromClientToServer(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 	N := 100
-	mcs := make([]*proto.MessageContainer, N)
+	mcs := make([]*rpc.MessageContainer, N)
 
 	receiver := "receiver"
 	receiverService := "someservice"
 
 	for i := 0; i < N; i++ {
-		mcs[i] = &proto.MessageContainer{
+		mcs[i] = &rpc.MessageContainer{
 			Message:       randomMessage(),
 			Id:            fmt.Sprintf("%v", i),
 			Sender:        receiver, // This is confusing. We hacked the struct.
@@ -97,7 +97,7 @@ func TestForwardRequestFromClientToServer(t *testing.T) {
 		}
 	}
 
-	fwdChan := make(chan *ForwardRequest)
+	fwdChan := make(chan *rpc.ForwardRequest)
 
 	servConn.SetForwardRequestChannel(fwdChan)
 	src := &clientForwarder{
@@ -113,7 +113,7 @@ func TestForwardRequestFromClientToServer(t *testing.T) {
 		for fwdreq := range fwdChan {
 			mc := mcs[i]
 			i++
-			if !mc.Message.Eq(fwdreq.MessageContainer.Message) {
+			if !mc.Message.Eq(fwdreq.Message) {
 				t.Errorf("corrupted data")
 			}
 			if fwdreq.Receiver != receiver {

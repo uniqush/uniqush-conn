@@ -19,7 +19,7 @@ package server
 
 import (
 	"fmt"
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"testing"
 	"time"
 )
@@ -34,10 +34,10 @@ func TestSetInvisible(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 	N := 1
-	mcs := make([]*proto.MessageContainer, N)
+	mcs := make([]*rpc.MessageContainer, N)
 
 	for i := 0; i < N; i++ {
-		mcs[i] = &proto.MessageContainer{
+		mcs[i] = &rpc.MessageContainer{
 			Message: randomMessage(),
 			Id:      fmt.Sprintf("%v", i),
 		}

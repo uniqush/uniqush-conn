@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/msgcache"
-	"github.com/uniqush/uniqush-conn/proto"
+
 	"github.com/uniqush/uniqush-conn/push"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"net"
 	"time"
 )
@@ -84,7 +85,8 @@ type ServiceConfig struct {
 
 func (self *ServiceConfig) clone(srv string, dst *ServiceConfig) *ServiceConfig {
 	if self == nil {
-		return nil
+		dst = new(ServiceConfig)
+		return dst
 	}
 	if dst == nil {
 		dst = new(ServiceConfig)
@@ -172,7 +174,7 @@ func (self *ServiceConfig) OnLogout(c connDescriptor, reason error) {
 	return
 }
 
-func (self *ServiceConfig) OnMessage(c connDescriptor, msg *proto.Message) {
+func (self *ServiceConfig) OnMessage(c connDescriptor, msg *rpc.Message) {
 	if self == nil || self.MessageHandler == nil {
 		return
 	}
@@ -180,7 +182,7 @@ func (self *ServiceConfig) OnMessage(c connDescriptor, msg *proto.Message) {
 	return
 }
 
-func (self *ServiceConfig) CacheMessage(username string, mc *proto.MessageContainer, ttl time.Duration) (string, error) {
+func (self *ServiceConfig) CacheMessage(username string, mc *rpc.MessageContainer, ttl time.Duration) (string, error) {
 	if self == nil || self.MsgCache == nil {
 		return "", fmt.Errorf("no cache available")
 	}

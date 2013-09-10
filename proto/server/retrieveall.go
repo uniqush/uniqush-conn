@@ -20,6 +20,7 @@ package server
 import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 )
 
 type retriaveAllMessages struct {
@@ -66,7 +67,7 @@ func (self *retriaveAllMessages) sendAllCachedMessage(excludes ...string) error 
 	return nil
 }
 
-func (self *retriaveAllMessages) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *retriaveAllMessages) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
 	if cmd == nil || cmd.Type != proto.CMD_REQ_ALL_CACHED || self.conn == nil || self.cache == nil {
 		return
 	}

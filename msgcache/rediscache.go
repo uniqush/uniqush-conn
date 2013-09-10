@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"math/rand"
 	"time"
 )
@@ -76,7 +76,7 @@ func randomId() string {
 	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
 }
 
-func (self *redisMessageCache) CacheMessage(service, username string, msg *proto.MessageContainer, ttl time.Duration) (id string, err error) {
+func (self *redisMessageCache) CacheMessage(service, username string, msg *rpc.MessageContainer, ttl time.Duration) (id string, err error) {
 	id = randomId()
 	err = self.set(service, username, id, msg, ttl)
 	if err != nil {
@@ -110,13 +110,13 @@ func counterKey(service, username string) string {
 	return "msgCounter"
 }
 
-func msgMarshal(msg *proto.MessageContainer) (data []byte, err error) {
+func msgMarshal(msg *rpc.MessageContainer) (data []byte, err error) {
 	data, err = json.Marshal(msg)
 	return
 }
 
-func msgUnmarshal(data []byte) (msg *proto.MessageContainer, err error) {
-	msg = new(proto.MessageContainer)
+func msgUnmarshal(data []byte) (msg *rpc.MessageContainer, err error) {
+	msg = new(rpc.MessageContainer)
 	err = json.Unmarshal(data, msg)
 	if err != nil {
 		msg = nil
@@ -125,7 +125,7 @@ func msgUnmarshal(data []byte) (msg *proto.MessageContainer, err error) {
 	return
 }
 
-func (self *redisMessageCache) set(service, username, id string, msg *proto.MessageContainer, ttl time.Duration) error {
+func (self *redisMessageCache) set(service, username, id string, msg *rpc.MessageContainer, ttl time.Duration) error {
 	msg.Id = id
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
@@ -184,7 +184,7 @@ func (self *redisMessageCache) set(service, username, id string, msg *proto.Mess
 	return nil
 }
 
-func (self *redisMessageCache) Get(service, username, id string) (msg *proto.MessageContainer, err error) {
+func (self *redisMessageCache) Get(service, username, id string) (msg *rpc.MessageContainer, err error) {
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -300,7 +300,7 @@ func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *pr
 }
 */
 
-func (self *redisMessageCache) GetCachedMessages(service, username string, excludes ...string) (msgs []*proto.MessageContainer, err error) {
+func (self *redisMessageCache) GetCachedMessages(service, username string, excludes ...string) (msgs []*rpc.MessageContainer, err error) {
 	msgQK := msgQueueKey(service, username)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -350,13 +350,13 @@ func (self *redisMessageCache) GetCachedMessages(service, username string, exclu
 	if n == 0 {
 		return
 	}
-	msgShadow := make([]*proto.MessageContainer, 0, n)
+	msgShadow := make([]*rpc.MessageContainer, 0, n)
 	removed := make([]interface{}, 1, n+1)
 	removed[0] = msgQK
 
 	for i, reply := range msgObjs {
 		var data []byte
-		var msg *proto.MessageContainer
+		var msg *rpc.MessageContainer
 		if reply == nil {
 			id, err := redis.String(msgIds[i], nil)
 			if err == nil {

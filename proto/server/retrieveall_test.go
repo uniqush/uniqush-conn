@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"github.com/uniqush/uniqush-conn/msgcache"
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 
 	"testing"
 	"time"
@@ -33,7 +33,7 @@ type serverCache struct {
 	conn  Conn
 }
 
-func (self *serverCache) ProcessMessageContainer(mc *proto.MessageContainer) error {
+func (self *serverCache) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	_, err := self.cache.CacheMessage(self.conn.Service(), self.conn.Username(), mc, 1*time.Hour)
 	return err
 }
@@ -52,10 +52,10 @@ func TestRequestAllCachedMessages(t *testing.T) {
 	servConn.SetMessageCache(cache)
 
 	N := 100
-	mcs := make([]*proto.MessageContainer, N)
+	mcs := make([]*rpc.MessageContainer, N)
 
 	for i := 0; i < N; i++ {
-		mcs[i] = &proto.MessageContainer{
+		mcs[i] = &rpc.MessageContainer{
 			Message: randomMessage(),
 			Id:      fmt.Sprintf("%v", i),
 		}

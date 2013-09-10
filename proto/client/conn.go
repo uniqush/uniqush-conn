@@ -20,6 +20,7 @@ package client
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"math/rand"
 	"net"
@@ -33,9 +34,9 @@ type Conn interface {
 	Username() string
 	UniqId() string
 
-	SendMessageToUser(service, receiver string, msg *proto.Message, ttl time.Duration) error
-	SendMessageToServer(msg *proto.Message) error
-	ReceiveMessage() (mc *proto.MessageContainer, err error)
+	SendMessageToUser(service, receiver string, msg *rpc.Message, ttl time.Duration) error
+	SendMessageToServer(msg *rpc.Message) error
+	ReceiveMessage() (mc *rpc.MessageContainer, err error)
 
 	Config(digestThreshold, compressThreshold int, digestFields ...string) error
 	SetDigestChannel(digestChan chan<- *Digest)
@@ -47,7 +48,7 @@ type Conn interface {
 }
 
 type CommandProcessor interface {
-	ProcessCommand(cmd *proto.Command) (mc *proto.MessageContainer, err error)
+	ProcessCommand(cmd *proto.Command) (mc *rpc.MessageContainer, err error)
 }
 
 type clientConn struct {
@@ -85,7 +86,7 @@ func (self *clientConn) shouldCompress(size int) bool {
 	return false
 }
 
-func (self *clientConn) SendMessageToServer(msg *proto.Message) error {
+func (self *clientConn) SendMessageToServer(msg *rpc.Message) error {
 	compress := self.shouldCompress(msg.Size())
 
 	cmd := new(proto.Command)
@@ -95,7 +96,7 @@ func (self *clientConn) SendMessageToServer(msg *proto.Message) error {
 	return err
 }
 
-func (self *clientConn) SendMessageToUser(service, receiver string, msg *proto.Message, ttl time.Duration) error {
+func (self *clientConn) SendMessageToUser(service, receiver string, msg *rpc.Message, ttl time.Duration) error {
 	cmd := new(proto.Command)
 	cmd.Type = proto.CMD_FWD_REQ
 	cmd.Params = make([]string, 2, 3)
@@ -109,7 +110,7 @@ func (self *clientConn) SendMessageToUser(service, receiver string, msg *proto.M
 	return self.cmdio.WriteCommand(cmd, compress)
 }
 
-func (self *clientConn) processCommand(cmd *proto.Command) (mc *proto.MessageContainer, err error) {
+func (self *clientConn) processCommand(cmd *proto.Command) (mc *rpc.MessageContainer, err error) {
 	if cmd == nil {
 		return
 	}
@@ -125,7 +126,7 @@ func (self *clientConn) processCommand(cmd *proto.Command) (mc *proto.MessageCon
 	return
 }
 
-func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error) {
+func (self *clientConn) ReceiveMessage() (mc *rpc.MessageContainer, err error) {
 	var cmd *proto.Command
 	for {
 		cmd, err = self.cmdio.ReadCommand()
@@ -134,7 +135,7 @@ func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error)
 		}
 		switch cmd.Type {
 		case proto.CMD_DATA:
-			mc = new(proto.MessageContainer)
+			mc = new(rpc.MessageContainer)
 			mc.Message = cmd.Message
 			if len(cmd.Params[0]) > 0 {
 				mc.Id = cmd.Params[0]
@@ -145,7 +146,7 @@ func (self *clientConn) ReceiveMessage() (mc *proto.MessageContainer, err error)
 				err = proto.ErrBadPeerImpl
 				return
 			}
-			mc = new(proto.MessageContainer)
+			mc = new(rpc.MessageContainer)
 			mc.Message = cmd.Message
 			mc.Sender = cmd.Params[0]
 			if len(cmd.Params) > 1 {
@@ -230,7 +231,7 @@ func (self *clientConn) subscribe(params map[string]string, sub bool) error {
 	} else {
 		cmd.Params = []string{"0"}
 	}
-	cmd.Message = new(proto.Message)
+	cmd.Message = new(rpc.Message)
 	cmd.Message.Header = params
 	return self.cmdio.WriteCommand(cmd, false)
 }
@@ -247,7 +248,7 @@ func (self *clientConn) RequestAllCachedMessages(excludes ...string) error {
 	cmd := &proto.Command{}
 	cmd.Type = proto.CMD_REQ_ALL_CACHED
 	if len(excludes) > 0 {
-		msg := new(proto.Message)
+		msg := new(rpc.Message)
 		data := make([]byte, 0, len(excludes)*90)
 		for _, i := range excludes {
 			data = append(data, []byte(i)...)

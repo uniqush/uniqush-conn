@@ -20,7 +20,7 @@ package msgcenter
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/config"
-	"github.com/uniqush/uniqush-conn/proto"
+
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
@@ -30,7 +30,7 @@ import (
 
 type serviceCenter struct {
 	config     *config.ServiceConfig
-	fwdChan    chan<- *server.ForwardRequest
+	fwdChan    chan<- *rpc.ForwardRequest
 	subReqChan chan<- *server.SubscribeRequest
 	conns      connMap
 }
@@ -81,12 +81,12 @@ func (self *serviceCenter) NewConn(conn server.Conn) {
 	return
 }
 
-func (self *serviceCenter) Send(callId string, username string, msg *proto.Message, ttl time.Duration, infoForPush map[string]string) *rpc.Result {
+func (self *serviceCenter) Send(callId string, username string, msg *rpc.Message, ttl time.Duration, infoForPush map[string]string) *rpc.Result {
 	conns := self.conns.GetConn(username)
 	ret := new(rpc.Result)
 	ret.CallID = callId
 	var mid string
-	mc := &proto.MessageContainer{
+	mc := &rpc.MessageContainer{
 		Sender:        "",
 		SenderService: "",
 		Message:       msg,
@@ -118,7 +118,7 @@ func (self *serviceCenter) Send(callId string, username string, msg *proto.Messa
 	return ret
 }
 
-func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *server.ForwardRequest, subReqChan chan<- *server.SubscribeRequest) *serviceCenter {
+func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, subReqChan chan<- *server.SubscribeRequest) *serviceCenter {
 	if conf == nil || fwdChan == nil || subReqChan == nil {
 		return nil
 	}

@@ -18,7 +18,7 @@
 package evthandler
 
 import (
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"time"
 )
 
@@ -35,11 +35,11 @@ type LogoutHandler interface {
 }
 
 type MessageHandler interface {
-	OnMessage(service, username, connId string, msg *proto.Message)
+	OnMessage(service, username, connId string, msg *rpc.Message)
 }
 
 type ForwardRequestHandler interface {
-	ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *proto.Message) bool
+	ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *rpc.Message) bool
 	MaxTTL() time.Duration
 }
 

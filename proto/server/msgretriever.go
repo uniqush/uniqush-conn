@@ -20,6 +20,7 @@ package server
 import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 )
 
 type messageRetriever struct {
@@ -27,7 +28,7 @@ type messageRetriever struct {
 	cache msgcache.Cache
 }
 
-func (self *messageRetriever) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *messageRetriever) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
 	if cmd == nil || cmd.Type != proto.CMD_MSG_RETRIEVE || self.conn == nil || self.cache == nil {
 		return
 	}

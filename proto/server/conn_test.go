@@ -23,8 +23,9 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/msgcache"
-	"github.com/uniqush/uniqush-conn/proto"
+
 	"github.com/uniqush/uniqush-conn/proto/client"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"sync"
 	"testing"
@@ -46,10 +47,10 @@ func getCache() msgcache.Cache {
 }
 
 type messageContainerProcessor interface {
-	ProcessMessageContainer(mc *proto.MessageContainer) error
+	ProcessMessageContainer(mc *rpc.MessageContainer) error
 }
 
-func iterateOverContainers(srcProc, dstProc messageContainerProcessor, mcs ...*proto.MessageContainer) error {
+func iterateOverContainers(srcProc, dstProc messageContainerProcessor, mcs ...*rpc.MessageContainer) error {
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
 
@@ -79,8 +80,8 @@ func iterateOverContainers(srcProc, dstProc messageContainerProcessor, mcs ...*p
 	return nil
 }
 
-func randomMessage() *proto.Message {
-	msg := new(proto.Message)
+func randomMessage() *rpc.Message {
+	msg := new(rpc.Message)
 	msg.Body = make([]byte, 10)
 	io.ReadFull(rand.Reader, msg.Body)
 	msg.Header = make(map[string]string, 2)
@@ -94,7 +95,7 @@ type serverSender struct {
 	extra map[string]string
 }
 
-func (self *serverSender) ProcessMessageContainer(mc *proto.MessageContainer) error {
+func (self *serverSender) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	if mc.FromUser() {
 		return self.conn.ForwardMessage(mc.Sender, mc.SenderService, mc.Message, mc.Id)
 	}
@@ -105,7 +106,7 @@ type serverReceiver struct {
 	conn Conn
 }
 
-func (self *serverReceiver) ProcessMessageContainer(mc *proto.MessageContainer) error {
+func (self *serverReceiver) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	msg, err := self.conn.ReceiveMessage()
 	if err != nil {
 		return err
@@ -120,7 +121,7 @@ type clientReceiver struct {
 	conn client.Conn
 }
 
-func (self *clientReceiver) ProcessMessageContainer(mc *proto.MessageContainer) error {
+func (self *clientReceiver) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	rmc, err := self.conn.ReceiveMessage()
 	if err != nil {
 		return err
@@ -135,7 +136,7 @@ type clientSender struct {
 	conn client.Conn
 }
 
-func (self *clientSender) ProcessMessageContainer(mc *proto.MessageContainer) error {
+func (self *clientSender) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	return self.conn.SendMessageToServer(mc.Message)
 }
 
@@ -149,10 +150,10 @@ func TestSendMessageFromServerToClient(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 	N := 100
-	mcs := make([]*proto.MessageContainer, N)
+	mcs := make([]*rpc.MessageContainer, N)
 
 	for i := 0; i < N; i++ {
-		mcs[i] = &proto.MessageContainer{
+		mcs[i] = &rpc.MessageContainer{
 			Message: randomMessage(),
 			Id:      fmt.Sprintf("%v", i),
 		}
@@ -181,10 +182,10 @@ func TestSendMessageFromClientToServer(t *testing.T) {
 	defer servConn.Close()
 	defer cliConn.Close()
 	N := 100
-	mcs := make([]*proto.MessageContainer, N)
+	mcs := make([]*rpc.MessageContainer, N)
 
 	for i := 0; i < N; i++ {
-		mcs[i] = &proto.MessageContainer{
+		mcs[i] = &rpc.MessageContainer{
 			Message: randomMessage(),
 			Id:      fmt.Sprintf("%v", i),
 		}

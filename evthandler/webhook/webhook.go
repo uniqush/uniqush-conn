@@ -20,8 +20,7 @@ package webhook
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/uniqush/uniqush-conn/proto"
-
+	"github.com/uniqush/uniqush-conn/rpc"
 	"net"
 	"net/http"
 	"time"
@@ -117,17 +116,17 @@ func (self *LogoutHandler) OnLogout(service, username, connId, addr string, reas
 }
 
 type messageEvent struct {
-	ConnID   string         `json:"connId"`
-	Msg      *proto.Message `json:"msg"`
-	Service  string         `json:"service"`
-	Username string         `json:"username"`
+	ConnID   string       `json:"connId"`
+	Msg      *rpc.Message `json:"msg"`
+	Service  string       `json:"service"`
+	Username string       `json:"username"`
 }
 
 type MessageHandler struct {
 	webHook
 }
 
-func (self *MessageHandler) OnMessage(service, username, connId string, msg *proto.Message) {
+func (self *MessageHandler) OnMessage(service, username, connId string, msg *rpc.Message) {
 	evt := &messageEvent{
 		Service:  service,
 		Username: username,
@@ -159,16 +158,16 @@ type ForwardRequestHandler struct {
 }
 
 type forwardEvent struct {
-	SenderService   string         `json:"sender-service"`
-	Sender          string         `json:"sender"`
-	ConnID          string         `json:"connId"`
-	ReceiverService string         `json:"receiver-service"`
-	Receiver        string         `json:"receiver"`
-	Message         *proto.Message `json:"msg"`
-	TTL             time.Duration  `json:"ttl"`
+	SenderService   string        `json:"sender-service"`
+	Sender          string        `json:"sender"`
+	ConnID          string        `json:"connId"`
+	ReceiverService string        `json:"receiver-service"`
+	Receiver        string        `json:"receiver"`
+	Message         *rpc.Message  `json:"msg"`
+	TTL             time.Duration `json:"ttl"`
 }
 
-func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *proto.Message) bool {
+func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *rpc.Message) bool {
 	fwd := &forwardEvent{
 		Sender:          sender,
 		SenderService:   senderService,

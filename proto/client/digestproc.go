@@ -18,9 +18,9 @@
 package client
 
 import (
-	"strconv"
-
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
+	"strconv"
 )
 
 type Digest struct {
@@ -36,7 +36,7 @@ type digestProcessor struct {
 	service    string
 }
 
-func (self *digestProcessor) ProcessCommand(cmd *proto.Command) (mc *proto.MessageContainer, err error) {
+func (self *digestProcessor) ProcessCommand(cmd *proto.Command) (mc *rpc.MessageContainer, err error) {
 	if cmd.Type != proto.CMD_DIGEST || self.digestChan == nil {
 		return
 	}

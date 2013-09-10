@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"testing"
 )
@@ -177,7 +178,7 @@ func randomCommand() *Command {
 	cmd.Params = make([]string, 2)
 	cmd.Params[0] = "123"
 	cmd.Params[1] = "223"
-	cmd.Message = new(Message)
+	cmd.Message = new(rpc.Message)
 	cmd.Message.Header = make(map[string]string, 2)
 	cmd.Message.Header["a"] = "hello"
 	cmd.Message.Header["b"] = "hell"

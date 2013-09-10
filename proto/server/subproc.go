@@ -17,7 +17,10 @@
 
 package server
 
-import "github.com/uniqush/uniqush-conn/proto"
+import (
+	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
+)
 
 type SubscribeRequest struct {
 	Subscribe bool // false: unsubscribe; true: subscribe
@@ -31,7 +34,7 @@ type subscribeProcessor struct {
 	subChan chan<- *SubscribeRequest
 }
 
-func (self *subscribeProcessor) ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *subscribeProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
 	if cmd == nil || cmd.Type != proto.CMD_SUBSCRIPTION || self.conn == nil || self.subChan == nil {
 		return
 	}

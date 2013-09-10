@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"math/rand"
 	"net"
@@ -42,18 +43,18 @@ type Conn interface {
 
 	// If the message is generated from the server, then use SendMessage()
 	// to send it to the client.
-	SendMessage(msg *proto.Message, id string, extra map[string]string) error
+	SendMessage(msg *rpc.Message, id string, extra map[string]string) error
 
 	// If the message is generated from another client, then
 	// use ForwardMessage() to send it to the client.
-	ForwardMessage(sender, senderService string, msg *proto.Message, id string) error
+	ForwardMessage(sender, senderService string, msg *rpc.Message, id string) error
 
 	// ReceiveMessage() will keep receiving Commands from the client
 	// until it receives a Command with type CMD_DATA.
-	ReceiveMessage() (msg *proto.Message, err error)
+	ReceiveMessage() (msg *rpc.Message, err error)
 
 	SetMessageCache(cache msgcache.Cache)
-	SetForwardRequestChannel(fwdChan chan<- *ForwardRequest)
+	SetForwardRequestChannel(fwdChan chan<- *rpc.ForwardRequest)
 	SetSubscribeRequestChan(subChan chan<- *SubscribeRequest)
 	Visible() bool
 }
@@ -73,7 +74,7 @@ type serverConn struct {
 }
 
 type CommandProcessor interface {
-	ProcessCommand(cmd *proto.Command) (msg *proto.Message, err error)
+	ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error)
 }
 
 func (self *serverConn) Visible() bool {
@@ -129,7 +130,7 @@ func (self *serverConn) shouldDigest(sz int) bool {
 	return false
 }
 
-func (self *serverConn) writeDigest(mc *proto.MessageContainer, extra map[string]string, sz int) error {
+func (self *serverConn) writeDigest(mc *rpc.MessageContainer, extra map[string]string, sz int) error {
 	digest := &proto.Command{
 		Type: proto.CMD_DIGEST,
 	}
@@ -161,7 +162,7 @@ func (self *serverConn) writeDigest(mc *proto.MessageContainer, extra map[string
 		}
 	}
 	if len(header) > 0 {
-		digest.Message = &proto.Message{
+		digest.Message = &rpc.Message{
 			Header: header,
 		}
 	}
@@ -170,11 +171,11 @@ func (self *serverConn) writeDigest(mc *proto.MessageContainer, extra map[string
 	return self.cmdio.WriteCommand(digest, compress)
 }
 
-func (self *serverConn) SendMessage(msg *proto.Message, id string, extra map[string]string) error {
+func (self *serverConn) SendMessage(msg *rpc.Message, id string, extra map[string]string) error {
 	return self.send(msg, id, extra, true)
 }
 
-func (self *serverConn) send(msg *proto.Message, id string, extra map[string]string, tryDigest bool) error {
+func (self *serverConn) send(msg *rpc.Message, id string, extra map[string]string, tryDigest bool) error {
 	if msg == nil {
 		cmd := &proto.Command{
 			Type: proto.CMD_EMPTY,
@@ -186,7 +187,7 @@ func (self *serverConn) send(msg *proto.Message, id string, extra map[string]str
 	}
 	sz := msg.Size()
 	if tryDigest && self.shouldDigest(sz) {
-		container := &proto.MessageContainer{
+		container := &rpc.MessageContainer{
 			Id:      id,
 			Message: msg,
 		}
@@ -200,17 +201,17 @@ func (self *serverConn) send(msg *proto.Message, id string, extra map[string]str
 	return self.cmdio.WriteCommand(cmd, self.shouldCompress(sz))
 }
 
-func (self *serverConn) ForwardMessage(sender, senderService string, msg *proto.Message, id string) error {
+func (self *serverConn) ForwardMessage(sender, senderService string, msg *rpc.Message, id string) error {
 	return self.forward(sender, senderService, msg, id, true)
 }
 
-func (self *serverConn) forward(sender, senderService string, msg *proto.Message, id string, tryDigest bool) error {
+func (self *serverConn) forward(sender, senderService string, msg *rpc.Message, id string, tryDigest bool) error {
 	sz := msg.Size()
 	if sz == 0 {
 		return nil
 	}
 	if tryDigest && self.shouldDigest(sz) {
-		container := &proto.MessageContainer{
+		container := &rpc.MessageContainer{
 			Id:            id,
 			Sender:        sender,
 			SenderService: senderService,
@@ -226,7 +227,7 @@ func (self *serverConn) forward(sender, senderService string, msg *proto.Message
 	return self.cmdio.WriteCommand(cmd, self.shouldCompress(sz))
 }
 
-func (self *serverConn) processCommand(cmd *proto.Command) (msg *proto.Message, err error) {
+func (self *serverConn) processCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
 	if cmd == nil {
 		return
 	}
@@ -242,7 +243,7 @@ func (self *serverConn) processCommand(cmd *proto.Command) (msg *proto.Message, 
 	return
 }
 
-func (self *serverConn) ReceiveMessage() (msg *proto.Message, err error) {
+func (self *serverConn) ReceiveMessage() (msg *rpc.Message, err error) {
 	var cmd *proto.Command
 	for {
 		cmd, err = self.cmdio.ReadCommand()
@@ -283,7 +284,7 @@ func (self *serverConn) SetMessageCache(cache msgcache.Cache) {
 	self.setCommandProcessor(proto.CMD_REQ_ALL_CACHED, p2)
 }
 
-func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *ForwardRequest) {
+func (self *serverConn) SetForwardRequestChannel(fwdChan chan<- *rpc.ForwardRequest) {
 	if fwdChan == nil {
 		return
 	}

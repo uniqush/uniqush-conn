@@ -19,6 +19,7 @@ package proto
 
 import (
 	"fmt"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"labix.org/v2/mgo/bson"
 	"testing"
 )
@@ -57,7 +58,7 @@ func TestCommandMarshalNoBody(t *testing.T) {
 	cmd.Params = make([]string, 2)
 	cmd.Params[0] = "hello"
 	cmd.Params[1] = ""
-	cmd.Message = new(Message)
+	cmd.Message = new(rpc.Message)
 	cmd.Message.Header = make(map[string]string, 3)
 	cmd.Message.Header["a"] = "h"
 	cmd.Message.Header["b"] = "i"
@@ -71,7 +72,7 @@ func TestCommandMarshal(t *testing.T) {
 	cmd.Params = make([]string, 2)
 	cmd.Params[0] = "hello"
 	cmd.Params[1] = "new"
-	cmd.Message = new(Message)
+	cmd.Message = new(rpc.Message)
 	cmd.Message.Header = make(map[string]string, 3)
 	cmd.Message.Header["a"] = "h"
 	cmd.Message.Header["b"] = "i"
@@ -86,7 +87,7 @@ func TestRandomize(t *testing.T) {
 	cmd.Params = make([]string, 2)
 	cmd.Params[0] = "hello"
 	cmd.Params[1] = "new"
-	cmd.Message = new(Message)
+	cmd.Message = new(rpc.Message)
 	cmd.Message.Header = make(map[string]string, 3)
 	cmd.Message.Header["a"] = "h"
 	cmd.Message.Header["b"] = "i"

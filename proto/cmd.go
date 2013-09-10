@@ -20,6 +20,7 @@ package proto
 import (
 	"crypto/rand"
 	"errors"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"math/big"
 	weakrand "math/rand"
@@ -156,7 +157,7 @@ const (
 type Command struct {
 	Type    uint8
 	Params  []string
-	Message *Message
+	Message *rpc.Message
 }
 
 const (
@@ -195,14 +196,14 @@ func (self *Command) Randomize() {
 	}
 }
 
-func randomMessage(maxNrHeader, maxBodyLen, maxStrLen int) *Message {
+func randomMessage(maxNrHeader, maxBodyLen, maxStrLen int) *rpc.Message {
 	nrHeaders := weakrand.Intn(maxNrHeaders)
 	bodyLen := weakrand.Intn(maxBodyLen)
 	if nrHeaders <= 0 && bodyLen <= 0 {
 		return nil
 	}
 
-	msg := new(Message)
+	msg := new(rpc.Message)
 	if bodyLen > 0 {
 		msg.Body = randomBytes(maxBodyLen)
 	}
@@ -358,10 +359,10 @@ func UnmarshalCommand(data []byte) (cmd *Command, err error) {
 			cmd.Params[i] = string(str)
 		}
 	}
-	var msg *Message
+	var msg *rpc.Message
 	msg = nil
 	if nrHeaders > 0 {
-		msg = new(Message)
+		msg = new(rpc.Message)
 		msg.Header = make(map[string]string, nrHeaders)
 		var key []byte
 		var value []byte
@@ -379,7 +380,7 @@ func UnmarshalCommand(data []byte) (cmd *Command, err error) {
 	}
 	if len(data) > 0 {
 		if msg == nil {
-			msg = new(Message)
+			msg = new(rpc.Message)
 		}
 		msg.Body = data
 	}
