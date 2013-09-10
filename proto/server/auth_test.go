@@ -20,6 +20,7 @@ package server
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	. "github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto/client"
 	"net"
 	"sync"

@@ -20,15 +20,12 @@ package server
 import (
 	"crypto/rsa"
 	"errors"
+	. "github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
 	"strings"
 	"time"
 )
-
-type Authenticator interface {
-	Authenticate(srv, usr, token, addr string) (bool, error)
-}
 
 var ErrAuthFail = errors.New("authentication failed")
 

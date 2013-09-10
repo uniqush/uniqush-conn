@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/uniqush/uniqush-conn/proto"
-	"github.com/uniqush/uniqush-conn/proto/server"
+
 	"net"
 	"net/http"
 	"time"
@@ -117,18 +117,23 @@ func (self *LogoutHandler) OnLogout(service, username, connId, addr string, reas
 }
 
 type messageEvent struct {
-	ConnID string         `json:"connId"`
-	Msg    *proto.Message `json:"msg"`
+	ConnID   string         `json:"connId"`
+	Msg      *proto.Message `json:"msg"`
+	Service  string         `json:"service"`
+	Username string         `json:"username"`
 }
 
 type MessageHandler struct {
 	webHook
 }
 
-func (self *MessageHandler) OnMessage(connId string, msg *proto.Message) {
-	evt := new(messageEvent)
-	evt.ConnID = connId
-	evt.Msg = msg
+func (self *MessageHandler) OnMessage(service, username, connId string, msg *proto.Message) {
+	evt := &messageEvent{
+		Service:  service,
+		Username: username,
+		ConnID:   connId,
+		Msg:      msg,
+	}
 	self.post(evt)
 }
 
@@ -153,7 +158,26 @@ type ForwardRequestHandler struct {
 	maxTTL time.Duration
 }
 
-func (self *ForwardRequestHandler) ShouldForward(fwd *server.ForwardRequest) bool {
+type forwardEvent struct {
+	SenderService   string         `json:"sender-service"`
+	Sender          string         `json:"sender"`
+	ConnID          string         `json:"connId"`
+	ReceiverService string         `json:"receiver-service"`
+	Receiver        string         `json:"receiver"`
+	Message         *proto.Message `json:"msg"`
+	TTL             time.Duration  `json:"ttl"`
+}
+
+func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *proto.Message) bool {
+	fwd := &forwardEvent{
+		Sender:          sender,
+		SenderService:   senderService,
+		Receiver:        receiver,
+		ReceiverService: receiverService,
+		TTL:             ttl,
+		Message:         msg,
+	}
+
 	return self.post(fwd) == 200
 }
 

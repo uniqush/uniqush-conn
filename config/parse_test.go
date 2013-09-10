@@ -15,7 +15,7 @@
  *
  */
 
-package configparser
+package config
 
 import (
 	"os"

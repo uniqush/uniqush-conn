@@ -19,9 +19,12 @@ package evthandler
 
 import (
 	"github.com/uniqush/uniqush-conn/proto"
-	"github.com/uniqush/uniqush-conn/proto/server"
 	"time"
 )
+
+type Authenticator interface {
+	Authenticate(srv, usr, token, addr string) (bool, error)
+}
 
 type LoginHandler interface {
 	OnLogin(service, username, connId, addr string)
@@ -32,11 +35,11 @@ type LogoutHandler interface {
 }
 
 type MessageHandler interface {
-	OnMessage(connId string, msg *proto.Message)
+	OnMessage(service, username, connId string, msg *proto.Message)
 }
 
 type ForwardRequestHandler interface {
-	ShouldForward(fwd *server.ForwardRequest) bool
+	ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *proto.Message) bool
 	MaxTTL() time.Duration
 }
 

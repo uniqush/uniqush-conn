@@ -15,7 +15,7 @@
  *
  */
 
-package configparser
+package config
 
 import (
 	"fmt"
@@ -23,38 +23,12 @@ import (
 	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/evthandler/webhook"
 	"github.com/uniqush/uniqush-conn/msgcache"
-	"github.com/uniqush/uniqush-conn/msgcenter"
-	"github.com/uniqush/uniqush-conn/proto/server"
+
 	"github.com/uniqush/uniqush-conn/push"
 	"net"
 	"strconv"
 	"time"
 )
-
-type Config struct {
-	HandshakeTimeout time.Duration
-	HttpAddr         string
-	Auth             server.Authenticator
-	ErrorHandler     evthandler.ErrorHandler
-	filename         string
-	srvConfig        map[string]*msgcenter.ServiceConfig
-	defaultConfig    *msgcenter.ServiceConfig
-}
-
-func (self *Config) AllServices() []string {
-	ret := make([]string, 0, len(self.srvConfig))
-	for srv, _ := range self.srvConfig {
-		ret = append(ret, srv)
-	}
-	return ret
-}
-
-func (self *Config) ReadConfig(srv string) *msgcenter.ServiceConfig {
-	if ret, ok := self.srvConfig[srv]; ok {
-		return ret
-	}
-	return self.defaultConfig
-}
 
 func parseInt(node yaml.Node) (n int, err error) {
 	if scalar, ok := node.(yaml.Scalar); ok {
@@ -145,7 +119,7 @@ func setWebHook(hd webhook.WebHook, node yaml.Node, timeout time.Duration) error
 	return nil
 }
 
-func parseAuthHandler(node yaml.Node, timeout time.Duration) (h server.Authenticator, err error) {
+func parseAuthHandler(node yaml.Node, timeout time.Duration) (h evthandler.Authenticator, err error) {
 	hd := new(webhook.AuthHandler)
 	err = setWebHook(hd, node, timeout)
 	if err != nil {
@@ -319,7 +293,7 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 	return
 }
 
-func parseService(service string, node yaml.Node, defaultConfig *msgcenter.ServiceConfig) (config *msgcenter.ServiceConfig, err error) {
+func parseService(service string, node yaml.Node, defaultConfig *ServiceConfig) (config *ServiceConfig, err error) {
 	if node == nil {
 		config = defaultConfig
 		return
@@ -339,7 +313,7 @@ func parseService(service string, node yaml.Node, defaultConfig *msgcenter.Servi
 		}
 	}
 
-	config = new(msgcenter.ServiceConfig)
+	config = new(ServiceConfig)
 
 	if defaultConfig != nil {
 		*config = *defaultConfig
@@ -408,7 +382,7 @@ func Parse(filename string) (config *Config, err error) {
 	config.filename = filename
 	switch t := root.(type) {
 	case yaml.Map:
-		config.srvConfig = make(map[string]*msgcenter.ServiceConfig, len(t))
+		config.srvConfig = make(map[string]*ServiceConfig, len(t))
 		if dc, ok := t["default"]; ok {
 			config.defaultConfig, err = parseService("default", dc, nil)
 		}
@@ -454,7 +428,7 @@ func Parse(filename string) (config *Config, err error) {
 				// Don't need to parse the default service again.
 				continue
 			}
-			var sconf *msgcenter.ServiceConfig
+			var sconf *ServiceConfig
 			sconf, err = parseService(srv, node, config.defaultConfig)
 			if err != nil {
 				config = nil
