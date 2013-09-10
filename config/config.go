@@ -18,6 +18,7 @@
 package config
 
 import (
+	"fmt"
 	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
@@ -177,4 +178,11 @@ func (self *ServiceConfig) OnMessage(c connDescriptor, msg *proto.Message) {
 	}
 	go self.MessageHandler.OnMessage(c.Service(), c.Username(), c.UniqId(), msg)
 	return
+}
+
+func (self *ServiceConfig) CacheMessage(username string, mc *proto.MessageContainer, ttl time.Duration) (string, error) {
+	if self == nil || self.MsgCache == nil {
+		return "", fmt.Errorf("no cache available")
+	}
+	return self.MsgCache.CacheMessage(self.ServiceName, username, mc, ttl)
 }

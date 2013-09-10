@@ -20,9 +20,12 @@ package msgcenter
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/config"
+	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/proto/server"
+	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"strings"
+	"time"
 )
 
 type serviceCenter struct {
@@ -76,6 +79,43 @@ func (self *serviceCenter) NewConn(conn server.Conn) {
 
 	go self.serveConn(conn)
 	return
+}
+
+func (self *serviceCenter) Send(callId string, username string, msg *proto.Message, ttl time.Duration, infoForPush map[string]string) *rpc.Result {
+	conns := self.conns.GetConn(username)
+	ret := new(rpc.Result)
+	ret.CallID = callId
+	var mid string
+	mc := &proto.MessageContainer{
+		Sender:        "",
+		SenderService: "",
+		Message:       msg,
+	}
+	mid, ret.Error = self.config.CacheMessage(username, mc, ttl)
+	if ret.Error != nil {
+		return ret
+	}
+
+	n := 0
+
+	for _, minc := range conns {
+		if conn, ok := minc.(server.Conn); ok {
+			err := conn.SendMessage(msg, mid, nil)
+			ret.Append(conn, err)
+			if err != nil {
+				conn.Close()
+			} else {
+				n++
+			}
+		} else {
+			self.conns.DelConn(minc)
+		}
+	}
+
+	if n == 0 {
+		// TODO push
+	}
+	return ret
 }
 
 func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *server.ForwardRequest, subReqChan chan<- *server.SubscribeRequest) *serviceCenter {
