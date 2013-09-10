@@ -34,10 +34,11 @@ import (
 // instead of the message itself, if the message is too large.
 // ReceiveMessage() should nevery be called concurrently.
 type Conn interface {
-	Close() error
+	RemoteAddr() net.Addr
 	Service() string
 	Username() string
 	UniqId() string
+	Close() error
 
 	// If the message is generated from the server, then use SendMessage()
 	// to send it to the client.
@@ -80,19 +81,35 @@ func (self *serverConn) Visible() bool {
 	return v > 0
 }
 
+func (self *serverConn) RemoteAddr() net.Addr {
+	return self.conn.RemoteAddr()
+}
+
 func (self *serverConn) Close() error {
+	if self == nil {
+		return nil
+	}
 	return self.conn.Close()
 }
 
 func (self *serverConn) Service() string {
+	if self == nil {
+		return ""
+	}
 	return self.service
 }
 
 func (self *serverConn) Username() string {
+	if self == nil {
+		return ""
+	}
 	return self.username
 }
 
 func (self *serverConn) UniqId() string {
+	if self == nil {
+		return ""
+	}
 	return self.connId
 }
 

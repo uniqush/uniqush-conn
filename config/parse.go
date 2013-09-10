@@ -294,8 +294,8 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 }
 
 func parseService(service string, node yaml.Node, defaultConfig *ServiceConfig) (config *ServiceConfig, err error) {
+	config = defaultConfig.clone(service, config)
 	if node == nil {
-		config = defaultConfig
 		return
 	}
 	fields, ok := node.(yaml.Map)
@@ -312,8 +312,6 @@ func parseService(service string, node yaml.Node, defaultConfig *ServiceConfig) 
 			return
 		}
 	}
-
-	config = new(ServiceConfig)
 
 	if defaultConfig != nil {
 		*config = *defaultConfig

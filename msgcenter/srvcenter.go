@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/config"
 	"github.com/uniqush/uniqush-conn/proto/server"
+	"io"
 	"strings"
 )
 
@@ -31,18 +32,50 @@ type serviceCenter struct {
 	conns      connMap
 }
 
-func (self *serviceCenter) NewConn(conn server.Conn) error {
+func (self *serviceCenter) serveConn(conn server.Conn) {
+	var reason error
+	defer func() {
+		self.conns.DelConn(conn)
+		self.config.OnLogout(conn, reason)
+		conn.Close()
+	}()
+	for {
+		msg, err := conn.ReceiveMessage()
+		if err != nil {
+			if err != io.EOF {
+				self.config.OnError(conn, err)
+				reason = err
+			}
+		}
+		if msg != nil {
+			self.config.OnMessage(conn, msg)
+		}
+	}
+}
+
+func (self *serviceCenter) NewConn(conn server.Conn) {
 	if conn == nil {
-		return fmt.Errorf("[Username=%v] Invalid Username")
+		//self.config.OnError(conn, fmt.Errorf("Nil conn")
+		return
 	}
 	usr := conn.Username()
 	if len(usr) == 0 || strings.Contains(usr, ":") || strings.Contains(usr, "\n") {
-		return fmt.Errorf("[Username=%v] Invalid Username")
+		self.config.OnError(conn, fmt.Errorf("invalid username"))
+		conn.Close()
+		return
 	}
 	conn.SetMessageCache(self.config.Cache())
 	conn.SetForwardRequestChannel(self.fwdChan)
 	conn.SetSubscribeRequestChan(self.subReqChan)
-	return nil
+	err := self.conns.AddConn(conn)
+	if err != nil {
+		self.config.OnError(conn, err)
+		conn.Close()
+		return
+	}
+
+	go self.serveConn(conn)
+	return
 }
 
 func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *server.ForwardRequest, subReqChan chan<- *server.SubscribeRequest) *serviceCenter {

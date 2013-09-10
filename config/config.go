@@ -22,6 +22,7 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/push"
+	"net"
 	"time"
 )
 
@@ -33,6 +34,14 @@ type Config struct {
 	filename         string
 	srvConfig        map[string]*ServiceConfig
 	defaultConfig    *ServiceConfig
+}
+
+func (self *Config) OnError(err error) {
+	if self == nil || self.ErrorHandler == nil {
+		return
+	}
+	go self.ErrorHandler.OnError("", "", "", "", err)
+	return
 }
 
 func (self *Config) AllServices() []string {
@@ -51,6 +60,7 @@ func (self *Config) ReadConfig(srv string) *ServiceConfig {
 }
 
 type ServiceConfig struct {
+	ServiceName       string
 	MaxNrConns        int
 	MaxNrUsers        int
 	MaxNrConnsPerUser int
@@ -71,6 +81,35 @@ type ServiceConfig struct {
 	PushService push.Push
 }
 
+func (self *ServiceConfig) clone(srv string, dst *ServiceConfig) *ServiceConfig {
+	if self == nil {
+		return nil
+	}
+	if dst == nil {
+		dst = new(ServiceConfig)
+	}
+	dst.ServiceName = srv
+	dst.MaxNrConns = self.MaxNrConns
+	dst.MaxNrUsers = self.MaxNrUsers
+	dst.MaxNrConnsPerUser = self.MaxNrConnsPerUser
+
+	dst.MsgCache = self.MsgCache
+
+	dst.LoginHandler = self.LoginHandler
+	dst.LogoutHandler = self.LogoutHandler
+	dst.MessageHandler = self.MessageHandler
+	dst.ForwardRequestHandler = self.ForwardRequestHandler
+	dst.ErrorHandler = self.ErrorHandler
+
+	// Push related web hooks
+	dst.SubscribeHandler = self.SubscribeHandler
+	dst.UnsubscribeHandler = self.UnsubscribeHandler
+	dst.PushHandler = self.PushHandler
+
+	dst.PushService = self.PushService
+	return dst
+}
+
 func (self *ServiceConfig) Cache() msgcache.Cache {
 	if self == nil {
 		return nil
@@ -78,57 +117,64 @@ func (self *ServiceConfig) Cache() msgcache.Cache {
 	return self.MsgCache
 }
 
-func (self *ServiceConfig) ShouldPush(service, username string, info map[string]string) bool {
+func (self *ServiceConfig) ShouldPush(username string, info map[string]string) bool {
 	if self == nil || self.PushHandler == nil {
 		return false
 	}
-	return self.PushHandler.ShouldPush(service, username, info)
+	return self.PushHandler.ShouldPush(self.ServiceName, username, info)
 }
 
-func (self *ServiceConfig) Subscribe(service, username string, info map[string]string) {
+func (self *ServiceConfig) Subscribe(username string, info map[string]string) {
 	if self == nil || self.PushService == nil {
 		return
 	}
-	go self.PushService.Subscribe(service, username, info)
+	go self.PushService.Subscribe(self.ServiceName, username, info)
 	return
 }
 
-func (self *ServiceConfig) Unsubscribe(service, username string, info map[string]string) {
+func (self *ServiceConfig) Unsubscribe(username string, info map[string]string) {
 	if self == nil || self.PushService == nil {
 		return
 	}
-	go self.PushService.Unsubscribe(service, username, info)
+	go self.PushService.Unsubscribe(self.ServiceName, username, info)
 	return
 }
 
-func (self *ServiceConfig) OnError(service, username, connId, addr string, err error) {
+type connDescriptor interface {
+	RemoteAddr() net.Addr
+	Service() string
+	Username() string
+	UniqId() string
+}
+
+func (self *ServiceConfig) OnError(c connDescriptor, err error) {
 	if self == nil || self.ErrorHandler == nil {
 		return
 	}
-	go self.ErrorHandler.OnError(service, username, connId, addr, err)
+	go self.ErrorHandler.OnError(c.Service(), c.Username(), c.UniqId(), c.RemoteAddr().String(), err)
 	return
 }
 
-func (self *ServiceConfig) OnLogin(service, username, connId, addr string) {
+func (self *ServiceConfig) OnLogin(c connDescriptor) {
 	if self == nil || self.LoginHandler == nil {
 		return
 	}
-	go self.LoginHandler.OnLogin(service, username, connId, addr)
+	go self.LoginHandler.OnLogin(c.Service(), c.Username(), c.UniqId(), c.RemoteAddr().String())
 	return
 }
 
-func (self *ServiceConfig) OnLogout(service, username, connId, addr string, reason error) {
+func (self *ServiceConfig) OnLogout(c connDescriptor, reason error) {
 	if self == nil || self.LogoutHandler == nil {
 		return
 	}
-	go self.LogoutHandler.OnLogout(service, username, connId, addr, reason)
+	go self.LogoutHandler.OnLogout(c.Service(), c.Username(), c.UniqId(), c.RemoteAddr().String(), reason)
 	return
 }
 
-func (self *ServiceConfig) OnMessage(service, username, connId string, msg *proto.Message) {
+func (self *ServiceConfig) OnMessage(c connDescriptor, msg *proto.Message) {
 	if self == nil || self.MessageHandler == nil {
 		return
 	}
-	go self.MessageHandler.OnMessage(service, username, connId, msg)
+	go self.MessageHandler.OnMessage(c.Service(), c.Username(), c.UniqId(), msg)
 	return
 }
