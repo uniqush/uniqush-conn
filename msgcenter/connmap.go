@@ -28,7 +28,7 @@ type minimalConn interface {
 }
 
 type connMap interface {
-	AddConn(conn minimalConn, maxNrConnsPerUser int, maxNrUsers int) error
+	AddConn(conn minimalConn) error
 	GetConn(username string) []minimalConn
 	DelConn(conn minimalConn) bool
 }
@@ -77,7 +77,12 @@ func lessConnList(a, b interface{}) bool {
 */
 
 type treeBasedConnMap struct {
-	tree *llrb.LLRB
+	tree              *llrb.LLRB
+	maxNrConn         int
+	maxNrUsers        int
+	maxNrConnsPerUser int
+
+	nrConn int
 }
 
 func (self *treeBasedConnMap) GetConn(user string) []minimalConn {
@@ -92,20 +97,25 @@ func (self *treeBasedConnMap) GetConn(user string) []minimalConn {
 
 var ErrTooManyUsers = errors.New("too many users")
 var ErrTooManyConnForThisUser = errors.New("too many connections under this user")
+var ErrTooManyConns = errors.New("too many connections")
 
-func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, maxNrUsers int) error {
+func (self *treeBasedConnMap) AddConn(conn minimalConn) error {
 	if conn == nil {
 		return nil
+	}
+
+	if self.maxNrConn > 0 && self.nrConn >= self.maxNrConn {
+		return ErrTooManyConns
+	}
+	if self.maxNrUsers > 0 && self.tree.Len() >= self.maxNrUsers {
+		return ErrTooManyUsers
 	}
 	var cl []minimalConn
 	cl = self.GetConn(connKey(conn))
 	if cl == nil {
-		if maxNrUsers > 0 && self.tree.Len() >= maxNrUsers {
-			return ErrTooManyUsers
-		}
 		cl = make([]minimalConn, 0, 3)
 	}
-	if maxNrConnsPerUser > 0 && len(cl) >= maxNrConnsPerUser {
+	if self.maxNrConnsPerUser > 0 && len(cl) >= self.maxNrConnsPerUser {
 		return ErrTooManyConnForThisUser
 	}
 	for _, c := range cl {
@@ -114,6 +124,7 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn, maxNrConnsPerUser int, m
 		}
 	}
 	cl = append(cl, conn)
+	self.nrConn++
 	key := &connListItem{name: "", list: cl}
 	self.tree.ReplaceOrInsert(key)
 	return nil
@@ -131,6 +142,7 @@ func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
 	var c minimalConn
 	for i, c = range cl {
 		if c.UniqId() == conn.UniqId() {
+			self.nrConn--
 			break
 		}
 	}
@@ -156,8 +168,11 @@ func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
 	return true
 }
 
-func newTreeBasedConnMap() connMap {
+func newTreeBasedConnMap(maxNrConn, maxNrUsers, maxNrConnsPerUser int) connMap {
 	ret := new(treeBasedConnMap)
 	ret.tree = llrb.New()
+	ret.maxNrConn = maxNrConn
+	ret.maxNrUsers = maxNrUsers
+	ret.maxNrConnsPerUser = maxNrConnsPerUser
 	return ret
 }

@@ -47,12 +47,12 @@ func (self *connGenerator) nextConn() minimalConn {
 
 func TestInsertConnMap(t *testing.T) {
 	N := 10
-	cmap := newTreeBasedConnMap()
+	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
 	conns := make([]minimalConn, N)
 	for i, _ := range conns {
 		c := g.nextConn()
-		err := cmap.AddConn(c, 0, 0)
+		err := cmap.AddConn(c)
 		if err != nil {
 			t.Errorf("%v", err)
 		}
@@ -73,7 +73,7 @@ func TestInsertConnMap(t *testing.T) {
 func TestInsertDupConnMap(t *testing.T) {
 	N := 10
 	M := 2
-	cmap := newTreeBasedConnMap()
+	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
 	conns := make([]minimalConn, N)
 	for i, _ := range conns {
@@ -82,7 +82,7 @@ func TestInsertDupConnMap(t *testing.T) {
 		for i := 0; i < M; i++ {
 			u := c.Username()
 			fc := &fakeConn{username: u, n: i}
-			err := cmap.AddConn(fc, 0, 0)
+			err := cmap.AddConn(fc)
 			if err != nil {
 				t.Errorf("%v", err)
 			}
@@ -105,13 +105,13 @@ func TestInsertDupConnMap(t *testing.T) {
 
 func TestDeleteConnMap(t *testing.T) {
 	N := 10
-	cmap := newTreeBasedConnMap()
+	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
 	conns := make([]minimalConn, N)
 	users := make([]string, N)
 	for i, _ := range conns {
 		c := g.nextConn()
-		err := cmap.AddConn(c, 0, 0)
+		err := cmap.AddConn(c)
 		if err != nil {
 			t.Errorf("%v", err)
 		}
@@ -145,7 +145,7 @@ func TestDeleteConnMap(t *testing.T) {
 func TestDeleteDupConnMap(t *testing.T) {
 	N := 10
 	M := 2
-	cmap := newTreeBasedConnMap()
+	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
 	conns := make([]minimalConn, N)
 	for i, _ := range conns {
@@ -154,7 +154,7 @@ func TestDeleteDupConnMap(t *testing.T) {
 		for i := 0; i < M; i++ {
 			u := c.Username()
 			fc := &fakeConn{username: u, n: i}
-			err := cmap.AddConn(fc, 0, 0)
+			err := cmap.AddConn(fc)
 			if err != nil {
 				t.Errorf("%v", err)
 			}

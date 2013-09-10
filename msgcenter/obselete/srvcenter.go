@@ -94,7 +94,6 @@ type serviceCenter struct {
 	pushServiceLock sync.RWMutex
 }
 
-var ErrTooManyConns = errors.New("too many connections")
 var ErrInvalidConnType = errors.New("invalid connection type")
 
 func (self *serviceCenter) ReceiveForward(fwdreq *server.ForwardRequest) {
