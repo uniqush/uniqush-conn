@@ -112,7 +112,7 @@ func (self *serviceCenter) Send(callId string, username string, msg *rpc.Message
 	}
 
 	if n == 0 {
-		// TODO push
+		self.config.Push(username, "", "", infoForPush, mid, msg.Size())
 	}
 	return ret
 }

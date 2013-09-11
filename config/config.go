@@ -179,3 +179,10 @@ func (self *ServiceConfig) CacheMessage(username string, mc *rpc.MessageContaine
 	}
 	return self.MsgCache.CacheMessage(self.ServiceName, username, mc, ttl)
 }
+
+func (self *ServiceConfig) Push(username, senderService, senderName string, info map[string]string, msgId string, size int) {
+	if self == nil || self.PushService == nil {
+		return
+	}
+	self.PushService.Push(self.ServiceName, username, senderService, senderName, info, msgId, size)
+}

@@ -33,8 +33,7 @@ import (
 type Push interface {
 	Subscribe(service, username string, info map[string]string) error
 	Unsubscribe(service, username string, info map[string]string) error
-	Push(service, username string, info map[string]string, msgIds []string) error
-	NrDeliveryPoints(service, username string) int
+	Push(service, username, senderService, senderUsername string, info map[string]string, id string, size int) error
 }
 
 type uniqushPush struct {
@@ -148,24 +147,27 @@ func (self *uniqushPush) Unsubscribe(service, username string, info map[string]s
 	return self.subscribe(service, username, info, false)
 }
 
-func (self *uniqushPush) Push(service, username string, info map[string]string, msgIds []string) error {
+func (self *uniqushPush) Push(service, username, senderService, senderUsername string, info map[string]string, id string, size int) error {
 	data := url.Values{}
 	data.Add("service", service)
 	data.Add("subscriber", username)
 	for k, v := range info {
-		if len(k) < 7 {
+		if strings.HasPrefix(k, "uniqush.") {
 			continue
 		}
-		if k[:6] == "notif." {
-			key := k[6:]
-			if key == "service" || key == "subscriber" || key == "subscribers" {
-				continue
-			}
-			data.Add(key, v)
-		}
+		data.Set(k, v)
 	}
-	for _, id := range msgIds {
-		data.Add("uniqush.perdp.uniqush.msgid", id)
+	data.Set("uniqush.id", id)
+	data.Set("uniqush.sz", fmt.Sprintf("%v", size))
+
+	// This message is forwarded from another user.
+	if len(senderUsername) > 0 {
+		data.Set("uniqush.sr", senderUsername)
+		if len(senderService) > 0 {
+			data.Set("uniqush.ss", senderService)
+		} else {
+			data.Set("uniqush.ss", service)
+		}
 	}
 	err := self.post("push", data)
 	return err
