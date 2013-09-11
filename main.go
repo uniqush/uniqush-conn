@@ -23,7 +23,7 @@ import (
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"github.com/uniqush/uniqush-conn/configparser"
+	"github.com/uniqush/uniqush-conn/config"
 	"github.com/uniqush/uniqush-conn/msgcenter"
 	"io/ioutil"
 	"net"
@@ -63,7 +63,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Key error: %v\n", err)
 		return
 	}
-	config, err := configparser.Parse(*argvConfigFile)
+	config, err := config.Parse(*argvConfigFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
 		return
@@ -73,12 +73,7 @@ func main() {
 		return
 	}
 
-	center := msgcenter.NewMessageCenter(ln, privkey, config.ErrorHandler, config.HandshakeTimeout, config.Auth, config)
-
-	srvs := config.AllServices()
-	for _, srv := range srvs {
-		center.AddService(srv)
-	}
+	center := msgcenter.NewMessageCenter(ln, privkey, config)
 	proc := NewHttpRequestProcessor(config.HttpAddr, center)
 	go center.Start()
 	err = proc.Start()
