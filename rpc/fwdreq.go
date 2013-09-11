@@ -20,6 +20,7 @@ package rpc
 import "time"
 
 type ForwardRequest struct {
+	DontAsk         bool          `json:"dont-ask-permission,omitempty"`
 	DontPush        bool          `json:"dont-push,omitempty"`
 	Receiver        string        `json:"receiver"`
 	ReceiverService string        `json:"receiver-service"`

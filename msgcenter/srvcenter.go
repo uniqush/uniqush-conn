@@ -139,7 +139,7 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 	return ret
 }
 
-func (self *serviceCenter) Forward(req *rpc.ForwardRequest, dontAsk bool) *rpc.Result {
+func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	ret := new(rpc.Result)
 
 	if req == nil {
@@ -164,7 +164,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest, dontAsk bool) *rpc.R
 	var shouldForward bool
 	shouldPush := !req.DontPush
 
-	if !dontAsk {
+	if !req.DontAsk {
 		// We need to ask for permission to forward this message.
 		// This means the forward request is generated directly from a user,
 		// not from a uniqush-conn node in a cluster.
@@ -202,7 +202,8 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest, dontAsk bool) *rpc.R
 	// Don't ask the permission to forward (we have already got the permission)
 	// And don't push the message. We will push it on this node.
 	req.DontPush = true
-	r := self.peer.Forward(req, true)
+	req.DontAsk = true
+	r := self.peer.Forward(req)
 	n += r.NrSuccess()
 	ret.Join(r)
 

@@ -66,8 +66,8 @@ func (self *MultiPeer) Send(req *SendRequest) *Result {
 	})
 }
 
-func (self *MultiPeer) Forward(req *ForwardRequest, dontAsk bool) *Result {
+func (self *MultiPeer) Forward(req *ForwardRequest) *Result {
 	return self.do(func(p UniqushConnPeer) *Result {
-		return p.Forward(req, dontAsk)
+		return p.Forward(req)
 	})
 }
