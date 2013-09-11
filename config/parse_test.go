@@ -18,12 +18,12 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"testing"
 )
 
-func writeConfigFile(filename string) {
-	config := `
+var configFileContent string = `
 http-addr: 127.0.0.1:8088
 handshake-timeout: 10s
 auth:
@@ -70,8 +70,10 @@ default:
     addr: 127.0.0.1:6379
     name: 1
     `
+
+func writeConfigFile(filename string) {
 	file, _ := os.Create(filename)
-	file.WriteString(config)
+	file.WriteString(configFileContent)
 	file.Close()
 }
 
@@ -79,11 +81,19 @@ func deleteConfigFile(filename string) {
 	os.Remove(filename)
 }
 
-func TestParse(t *testing.T) {
+func TestParseFile(t *testing.T) {
 	filename := "config.yaml"
 	writeConfigFile(filename)
 	defer deleteConfigFile(filename)
-	_, err := Parse(filename)
+	_, err := ParseFile(filename)
+	if err != nil {
+		t.Errorf("Error: %v\n", err)
+	}
+}
+
+func TestParseReader(t *testing.T) {
+	reader := bytes.NewBufferString(configFileContent)
+	_, err := Parse(reader)
 	if err != nil {
 		t.Errorf("Error: %v\n", err)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/evthandler/webhook"
 	"github.com/uniqush/uniqush-conn/msgcache"
+	"io"
 
 	"github.com/uniqush/uniqush-conn/push"
 	"net"
@@ -358,14 +359,26 @@ func checkConfig(config *Config) error {
 	return nil
 }
 
-func Parse(filename string) (config *Config, err error) {
+func ParseFile(filename string) (config *Config, err error) {
 	file, err := yaml.ReadFile(filename)
 	if err != nil {
 		return
 	}
-	root := file.Root
-	config = new(Config)
+	config, err = parseConfigRootNode(file.Root)
 	config.filename = filename
+	return
+}
+func Parse(reader io.Reader) (config *Config, err error) {
+	root, err := yaml.Parse(reader)
+	if err != nil {
+		return
+	}
+	return parseConfigRootNode(root)
+}
+
+func parseConfigRootNode(root yaml.Node) (config *Config, err error) {
+	config = new(Config)
+	config.filename = ""
 	switch t := root.(type) {
 	case yaml.Map:
 		config.srvConfig = make(map[string]*ServiceConfig, len(t))

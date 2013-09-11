@@ -63,7 +63,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Key error: %v\n", err)
 		return
 	}
-	config, err := config.Parse(*argvConfigFile)
+	config, err := config.ParseFile(*argvConfigFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Config error: %v\n", err)
 		return
