@@ -168,7 +168,6 @@ type ForwardRequestHandler struct {
 type forwardEvent struct {
 	SenderService   string        `json:"sender-service"`
 	Sender          string        `json:"sender"`
-	ConnID          string        `json:"connId"`
 	ReceiverService string        `json:"receiver-service"`
 	Receiver        string        `json:"receiver"`
 	Message         *rpc.Message  `json:"msg"`

@@ -24,7 +24,6 @@ import (
 	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"strings"
-	"time"
 )
 
 type serviceCenter struct {
@@ -80,17 +79,31 @@ func (self *serviceCenter) NewConn(conn server.Conn) {
 	return
 }
 
-func (self *serviceCenter) Send(callId string, username string, msg *rpc.Message, ttl time.Duration, infoForPush map[string]string) *rpc.Result {
-	conns := self.conns.GetConn(username)
+func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 	ret := new(rpc.Result)
-	ret.CallID = callId
+
+	if req == nil {
+		ret.Error = fmt.Errorf("invalid request")
+		return ret
+	}
+	if req.Message == nil || req.Message.IsEmpty() {
+		ret.Error = fmt.Errorf("invalid request: empty message")
+		return ret
+	}
+	if req.Receiver == "" {
+		ret.Error = fmt.Errorf("invalid request: no receiver")
+		return ret
+	}
+
+	conns := self.conns.GetConn(req.Receiver)
 	var mid string
+	msg := req.Message
 	mc := &rpc.MessageContainer{
 		Sender:        "",
 		SenderService: "",
 		Message:       msg,
 	}
-	mid, ret.Error = self.config.CacheMessage(username, mc, ttl)
+	mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
 	if ret.Error != nil {
 		return ret
 	}
@@ -111,8 +124,73 @@ func (self *serviceCenter) Send(callId string, username string, msg *rpc.Message
 		}
 	}
 
-	if n == 0 {
-		self.config.Push(username, "", "", infoForPush, mid, msg.Size())
+	if n == 0 && !req.DontPush {
+		self.config.Push(req.Receiver, "", "", req.PushInfo, mid, msg.Size())
+	}
+	return ret
+}
+
+func (self *serviceCenter) Forward(req *rpc.ForwardRequest, dontAsk bool) *rpc.Result {
+	ret := new(rpc.Result)
+
+	if req == nil {
+		ret.Error = fmt.Errorf("invalid request")
+		return ret
+	}
+	if req.Message == nil || req.Message.IsEmpty() {
+		ret.Error = fmt.Errorf("invalid request: empty message")
+		return ret
+	}
+	if req.Receiver == "" {
+		ret.Error = fmt.Errorf("invalid request: no receiver")
+		return ret
+	}
+
+	conns := self.conns.GetConn(req.Receiver)
+	var mid string
+	msg := req.Message
+	mc := &req.MessageContainer
+
+	var pushInfo map[string]string
+	var shouldForward bool
+	shouldPush := !req.DontPush
+
+	if !dontAsk {
+		// We need to ask for permission to forward this message.
+		// This means the forward request is generated directly from a user,
+		// not from a uniqush-conn node in a cluster.
+
+		mc.Id = ""
+		shouldForward, shouldPush, pushInfo = self.config.ShouldForward(req)
+
+		if !shouldForward {
+			return nil
+		}
+	}
+
+	mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
+	if ret.Error != nil {
+		return ret
+	}
+
+	n := 0
+
+	for _, minc := range conns {
+		if conn, ok := minc.(server.Conn); ok {
+			err := conn.SendMessage(msg, mid, nil)
+			ret.Append(conn, err)
+			if err != nil {
+				conn.Close()
+			} else {
+				n++
+			}
+		} else {
+			self.conns.DelConn(minc)
+		}
+	}
+
+	if n == 0 && shouldPush {
+		self.config.Push(req.Receiver, req.SenderService, req.Sender, pushInfo, mid, msg.Size())
 	}
 	return ret
 }

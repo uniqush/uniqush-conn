@@ -20,9 +20,15 @@ package rpc
 import "net"
 
 type Result struct {
-	CallID  string        `json:"call-id"`
 	Error   error         `json:"error,omitempty"`
 	Results []*ConnResult `json:"results"`
+}
+
+func (self *Result) NrResults() int {
+	if self == nil {
+		return 0
+	}
+	return len(self.Results)
 }
 
 type connDescriptor interface {

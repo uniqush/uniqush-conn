@@ -17,12 +17,7 @@
 
 package rpc
 
-import "time"
-
-type ForwardRequest struct {
-	DontPush        bool          `json:"dont-push,omitempty"`
-	Receiver        string        `json:"receiver"`
-	ReceiverService string        `json:"receiver-service"`
-	TTL             time.Duration `json:"ttl"`
-	MessageContainer
+type UniqushConnPeer interface {
+	Send(req *SendRequest) *Result
+	Forward(req *ForwardRequest, dontAask bool) *Result
 }

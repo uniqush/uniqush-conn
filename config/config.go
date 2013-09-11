@@ -186,3 +186,10 @@ func (self *ServiceConfig) Push(username, senderService, senderName string, info
 	}
 	self.PushService.Push(self.ServiceName, username, senderService, senderName, info, msgId, size)
 }
+
+func (self *ServiceConfig) ShouldForward(fwdreq *rpc.ForwardRequest) (shouldForward, shouldPush bool, pushInfo map[string]string) {
+	if self == nil || self.ForwardRequestHandler == nil {
+		return false, false, nil
+	}
+	return self.ForwardRequestHandler.ShouldForward(fwdreq.SenderService, fwdreq.Sender, fwdreq.ReceiverService, fwdreq.Receiver, fwdreq.TTL, fwdreq.Message)
+}
