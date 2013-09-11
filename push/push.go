@@ -149,8 +149,6 @@ func (self *uniqushPush) Unsubscribe(service, username string, info map[string]s
 
 func (self *uniqushPush) Push(service, username, senderService, senderUsername string, info map[string]string, id string, size int) error {
 	data := url.Values{}
-	data.Add("service", service)
-	data.Add("subscriber", username)
 	for k, v := range info {
 		if strings.HasPrefix(k, "uniqush.") {
 			continue
@@ -159,6 +157,8 @@ func (self *uniqushPush) Push(service, username, senderService, senderUsername s
 	}
 	data.Set("uniqush.id", id)
 	data.Set("uniqush.sz", fmt.Sprintf("%v", size))
+	data.Set("service", service)
+	data.Set("subscriber", username)
 
 	// This message is forwarded from another user.
 	if len(senderUsername) > 0 {

@@ -49,7 +49,7 @@ var argvPassword = flag.String("p", "", "password")
 var argvDigestThrd = flag.Int("d", 512, "digest threshold")
 var argvCompressThrd = flag.Int("c", 1024, "compress threshold")
 
-func messagePrinter(conn client.Conn, msgChan <-chan *proto.Message, digestChan <-chan *client.Digest) {
+func messagePrinter(conn client.Conn, msgChan <-chan *rpc.Message, digestChan <-chan *client.Digest) {
 	for {
 		select {
 		case msg := <-msgChan:
@@ -81,7 +81,7 @@ func messagePrinter(conn client.Conn, msgChan <-chan *proto.Message, digestChan 
 	}
 }
 
-func messageReceiver(conn client.Conn, msgChan chan<- *proto.Message) {
+func messageReceiver(conn client.Conn, msgChan chan<- *rpc.Message) {
 	defer conn.Close()
 	for {
 		msg, err := conn.ReadMessage()
@@ -103,7 +103,7 @@ func messageSender(conn client.Conn) {
 			}
 			return
 		}
-		msg := new(proto.Message)
+		msg := new(rpc.Message)
 
 		elems := strings.SplitN(line, ":", 2)
 		if len(elems) == 2 {
@@ -157,7 +157,7 @@ func main() {
 		return
 	}
 
-	msgChan := make(chan *proto.Message)
+	msgChan := make(chan *rpc.Message)
 	digestChan := make(chan *client.Digest)
 	conn.SetDigestChannel(digestChan)
 	go messageReceiver(conn, msgChan)
