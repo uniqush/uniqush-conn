@@ -136,7 +136,11 @@ func (self *ServiceConfig) subscribe(username string, info map[string]string) {
 	if self == nil || self.PushService == nil {
 		return
 	}
-	go self.PushService.Subscribe(self.ServiceName, username, info)
+	go func() {
+		if self.shouldSubscribe(self.ServiceName, username, info) {
+			self.PushService.Subscribe(self.ServiceName, username, info)
+		}
+	}()
 	return
 }
 
@@ -206,4 +210,11 @@ func (self *ServiceConfig) ShouldForward(fwdreq *rpc.ForwardRequest) (shouldForw
 		return false, false, nil
 	}
 	return self.ForwardRequestHandler.ShouldForward(fwdreq.SenderService, fwdreq.Sender, fwdreq.ReceiverService, fwdreq.Receiver, fwdreq.TTL, fwdreq.Message)
+}
+
+func (self *ServiceConfig) shouldSubscribe(srv, usr string, info map[string]string) bool {
+	if self == nil || self.SubscribeHandler == nil {
+		return false
+	}
+	return self.SubscribeHandler.ShouldSubscribe(srv, usr, info)
 }
