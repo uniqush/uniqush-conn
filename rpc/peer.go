@@ -19,5 +19,5 @@ package rpc
 
 type UniqushConnPeer interface {
 	Send(req *SendRequest) *Result
-	Forward(req *ForwardRequest, dontAask bool) *Result
+	Forward(req *ForwardRequest, dontAsk bool) *Result
 }
