@@ -20,6 +20,7 @@ package server
 import (
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	. "github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
 	"net"
@@ -52,11 +53,11 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 		return
 	}
 	if cmd.Type != proto.CMD_AUTH {
-		err = ErrAuthFail
+		err = fmt.Errorf("invalid command type")
 		return
 	}
 	if len(cmd.Params) != 3 {
-		err = ErrAuthFail
+		err = fmt.Errorf("invalid parameters")
 		return
 	}
 	service := cmd.Params[0]
@@ -66,7 +67,7 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	// Username and service should not contain "\n"
 	if strings.Contains(service, "\n") || strings.Contains(username, "\n") ||
 		strings.Contains(service, ":") || strings.Contains(username, ":") {
-		err = ErrAuthFail
+		err = fmt.Errorf("invalid service name or username")
 		return
 	}
 

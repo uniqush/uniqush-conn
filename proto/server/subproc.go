@@ -22,16 +22,9 @@ import (
 	"github.com/uniqush/uniqush-conn/rpc"
 )
 
-type SubscribeRequest struct {
-	Subscribe bool // false: unsubscribe; true: subscribe
-	Service   string
-	Username  string
-	Params    map[string]string
-}
-
 type subscribeProcessor struct {
 	conn    *serverConn
-	subChan chan<- *SubscribeRequest
+	subChan chan<- *rpc.SubscribeRequest
 }
 
 func (self *subscribeProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Message, err error) {
@@ -58,7 +51,7 @@ func (self *subscribeProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Mes
 	} else {
 		return
 	}
-	req := new(SubscribeRequest)
+	req := new(rpc.SubscribeRequest)
 	req.Params = cmd.Message.Header
 	req.Service = self.conn.Service()
 	req.Username = self.conn.Username()

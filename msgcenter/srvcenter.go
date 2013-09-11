@@ -29,7 +29,7 @@ import (
 type serviceCenter struct {
 	config     *config.ServiceConfig
 	fwdChan    chan<- *rpc.ForwardRequest
-	subReqChan chan<- *server.SubscribeRequest
+	subReqChan chan *rpc.SubscribeRequest
 	conns      connMap
 	peer       rpc.UniqushConnPeer
 }
@@ -212,15 +212,26 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest, dontAsk bool) *rpc.R
 	return ret
 }
 
-func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, subReqChan chan<- *server.SubscribeRequest, peer rpc.UniqushConnPeer) *serviceCenter {
-	if conf == nil || fwdChan == nil || subReqChan == nil {
+func (self *serviceCenter) processSubscription() {
+	for req := range self.subReqChan {
+		if req == nil {
+			continue
+		}
+		go self.config.Subscribe(req)
+	}
+}
+
+func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, peer rpc.UniqushConnPeer) *serviceCenter {
+	if conf == nil || fwdChan == nil {
 		return nil
 	}
 	ret := new(serviceCenter)
 	ret.config = conf
 	ret.conns = newTreeBasedConnMap(conf.MaxNrConns, conf.MaxNrUsers, conf.MaxNrConnsPerUser)
 	ret.fwdChan = fwdChan
-	ret.subReqChan = subReqChan
+	ret.subReqChan = make(chan *rpc.SubscribeRequest)
 	ret.peer = peer
+
+	go ret.processSubscription()
 	return ret
 }

@@ -38,11 +38,11 @@ type Config struct {
 	defaultConfig    *ServiceConfig
 }
 
-func (self *Config) OnError(err error) {
+func (self *Config) OnError(addr net.Addr, err error) {
 	if self == nil || self.ErrorHandler == nil {
 		return
 	}
-	go self.ErrorHandler.OnError("", "", "", "", err)
+	go self.ErrorHandler.OnError("", "", "", addr.String(), err)
 	return
 }
 
@@ -59,6 +59,13 @@ func (self *Config) ReadConfig(srv string) *ServiceConfig {
 		return ret
 	}
 	return self.defaultConfig
+}
+
+func (self *Config) Authenticate(srv, usr, token, addr string) (bool, error) {
+	if self == nil || self.Auth == nil {
+		return false, nil
+	}
+	return self.Auth.Authenticate(srv, usr, token, addr)
 }
 
 type ServiceConfig struct {
@@ -117,8 +124,15 @@ func (self *ServiceConfig) Cache() msgcache.Cache {
 	}
 	return self.MsgCache
 }
+func (self *ServiceConfig) Subscribe(req *rpc.SubscribeRequest) {
+	if req.Subscribe {
+		self.subscribe(req.Username, req.Params)
+	} else {
+		self.unsubscribe(req.Username, req.Params)
+	}
+}
 
-func (self *ServiceConfig) Subscribe(username string, info map[string]string) {
+func (self *ServiceConfig) subscribe(username string, info map[string]string) {
 	if self == nil || self.PushService == nil {
 		return
 	}
@@ -126,7 +140,7 @@ func (self *ServiceConfig) Subscribe(username string, info map[string]string) {
 	return
 }
 
-func (self *ServiceConfig) Unsubscribe(username string, info map[string]string) {
+func (self *ServiceConfig) unsubscribe(username string, info map[string]string) {
 	if self == nil || self.PushService == nil {
 		return
 	}

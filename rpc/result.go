@@ -45,6 +45,12 @@ func (self *Result) NrSuccess() int {
 }
 
 func (self *Result) Join(r *Result) {
+	if self == nil {
+		return
+	}
+	if r == nil {
+		return
+	}
 	if self.Error != nil {
 		return
 	}

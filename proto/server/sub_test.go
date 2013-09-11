@@ -18,12 +18,13 @@
 package server
 
 import (
+	"github.com/uniqush/uniqush-conn/rpc"
 	"sync"
 	"testing"
 	"time"
 )
 
-func (a *SubscribeRequest) eq(b *SubscribeRequest) bool {
+func subeq(a *rpc.SubscribeRequest, b *rpc.SubscribeRequest) bool {
 	if a.Subscribe != b.Subscribe {
 		return false
 	}
@@ -57,7 +58,7 @@ func TestSubscription(t *testing.T) {
 	}
 	defer servConn.Close()
 	defer cliConn.Close()
-	subChan := make(chan *SubscribeRequest)
+	subChan := make(chan *rpc.SubscribeRequest)
 	servConn.SetSubscribeRequestChan(subChan)
 
 	params := map[string]string{
@@ -85,19 +86,19 @@ func TestSubscription(t *testing.T) {
 	go func() {
 		subreq := <-subChan
 
-		req := &SubscribeRequest{
+		req := &rpc.SubscribeRequest{
 			Subscribe: true,
 			Service:   servConn.Service(),
 			Username:  servConn.Username(),
 			Params:    params,
 		}
 
-		if !req.eq(subreq) {
+		if !subeq(req, subreq) {
 			t.Errorf("%+v is wrong", subreq)
 		}
 		subreq = <-subChan
 		req.Subscribe = false
-		if !req.eq(subreq) {
+		if !subeq(req, subreq) {
 			t.Errorf("%+v is wrong", subreq)
 		}
 		wg.Done()
