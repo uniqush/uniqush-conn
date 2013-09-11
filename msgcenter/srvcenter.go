@@ -97,18 +97,25 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 	}
 
 	conns := self.conns.GetConn(req.Receiver)
-	var mid string
+	mid := req.Id
 	msg := req.Message
-	mc := &rpc.MessageContainer{
-		Sender:        "",
-		SenderService: "",
-		Message:       msg,
-	}
-	mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
-	if ret.Error != nil {
-		return ret
+
+	if !req.DontCache {
+		mc := &rpc.MessageContainer{
+			Sender:        "",
+			SenderService: "",
+			Message:       msg,
+		}
+		mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
+		if ret.Error != nil {
+			return ret
+		}
 	}
 
+	if len(mid) == 0 {
+		ret.Error = fmt.Errorf("undefined message Id")
+		return ret
+	}
 	n := 0
 
 	for _, minc := range conns {
@@ -116,6 +123,7 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 			err := conn.SendMessage(msg, mid, nil)
 			ret.Append(conn, err)
 			if err != nil {
+				self.conns.DelConn(minc)
 				conn.Close()
 			} else {
 				n++
@@ -129,6 +137,9 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 
 	// Don't push the message. We will push it on this node.
 	req.DontPush = true
+	// Don't cache the message. We have already cached it.
+	req.DontCache = true
+	req.Id = mid
 	r := self.peer.Send(req)
 	n += r.NrSuccess()
 	ret.Join(r)
@@ -156,7 +167,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	}
 
 	conns := self.conns.GetConn(req.Receiver)
-	var mid string
+	mid := req.Id
 	msg := req.Message
 	mc := &req.MessageContainer
 
@@ -177,18 +188,25 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		}
 	}
 
-	mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
-	if ret.Error != nil {
-		return ret
+	if !req.DontCache {
+		mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
+		if ret.Error != nil {
+			return ret
+		}
 	}
 
+	if len(mid) == 0 {
+		ret.Error = fmt.Errorf("undefined message Id")
+		return ret
+	}
 	n := 0
 
 	for _, minc := range conns {
 		if conn, ok := minc.(server.Conn); ok {
-			err := conn.SendMessage(msg, mid, nil)
+			err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid)
 			ret.Append(conn, err)
 			if err != nil {
+				self.conns.DelConn(minc)
 				conn.Close()
 			} else {
 				n++
@@ -200,9 +218,12 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 
 	// forward the message if possible,
 	// Don't ask the permission to forward (we have already got the permission)
+	req.DontAsk = true
 	// And don't push the message. We will push it on this node.
 	req.DontPush = true
-	req.DontAsk = true
+	// Dont' cache it
+	req.DontCache = true
+	req.Id = mid
 	r := self.peer.Forward(req)
 	n += r.NrSuccess()
 	ret.Join(r)

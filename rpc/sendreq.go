@@ -20,10 +20,14 @@ package rpc
 import "time"
 
 type SendRequest struct {
-	DontPush        bool              `json:"dont-push,omitempty"`
+	DontCache bool `json:"dont-cache,omitempty"`
+	DontPush  bool `json:"dont-push,omitempty"`
+
 	Receiver        string            `json:"receiver"`
 	ReceiverService string            `json:"receiver-service"`
 	TTL             time.Duration     `json:"ttl"`
 	PushInfo        map[string]string `json:"extra-push-info,omitempty"`
-	Message         *Message          `json:"msg"`
+	Id              string            `json:"id,omitempty"`
+
+	Message *Message `json:"msg"`
 }

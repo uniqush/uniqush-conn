@@ -22,6 +22,7 @@ import "time"
 type ForwardRequest struct {
 	DontAsk         bool          `json:"dont-ask-permission,omitempty"`
 	DontPush        bool          `json:"dont-push,omitempty"`
+	DontCache       bool          `json:"dont-cache,omitempty"`
 	Receiver        string        `json:"receiver"`
 	ReceiverService string        `json:"receiver-service"`
 	TTL             time.Duration `json:"ttl"`
