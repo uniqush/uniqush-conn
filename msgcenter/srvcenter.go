@@ -31,6 +31,7 @@ type serviceCenter struct {
 	fwdChan    chan<- *rpc.ForwardRequest
 	subReqChan chan<- *server.SubscribeRequest
 	conns      connMap
+	peer       rpc.UniqushConnPeer
 }
 
 func (self *serviceCenter) serveConn(conn server.Conn) {
@@ -124,7 +125,15 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 		}
 	}
 
-	if n == 0 && !req.DontPush {
+	shouldPush := !req.DontPush
+
+	// Don't push the message. We will push it on this node.
+	req.DontPush = true
+	r := self.peer.Send(req)
+	n += r.NrSuccess()
+	ret.Join(r)
+
+	if n == 0 && shouldPush {
 		self.config.Push(req.Receiver, "", "", req.PushInfo, mid, msg.Size())
 	}
 	return ret
@@ -189,13 +198,21 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest, dontAsk bool) *rpc.R
 		}
 	}
 
+	// forward the message if possible,
+	// Don't ask the permission to forward (we have already got the permission)
+	// And don't push the message. We will push it on this node.
+	req.DontPush = true
+	r := self.peer.Forward(req, true)
+	n += r.NrSuccess()
+	ret.Join(r)
+
 	if n == 0 && shouldPush {
 		self.config.Push(req.Receiver, req.SenderService, req.Sender, pushInfo, mid, msg.Size())
 	}
 	return ret
 }
 
-func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, subReqChan chan<- *server.SubscribeRequest) *serviceCenter {
+func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, subReqChan chan<- *server.SubscribeRequest, peer rpc.UniqushConnPeer) *serviceCenter {
 	if conf == nil || fwdChan == nil || subReqChan == nil {
 		return nil
 	}
@@ -204,5 +221,6 @@ func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardReq
 	ret.conns = newTreeBasedConnMap(conf.MaxNrConns, conf.MaxNrUsers, conf.MaxNrConnsPerUser)
 	ret.fwdChan = fwdChan
 	ret.subReqChan = subReqChan
+	ret.peer = peer
 	return ret
 }

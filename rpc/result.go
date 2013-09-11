@@ -31,6 +31,30 @@ func (self *Result) NrResults() int {
 	return len(self.Results)
 }
 
+func (self *Result) NrSuccess() int {
+	if self == nil {
+		return 0
+	}
+	ret := 0
+	for _, r := range self.Results {
+		if r.Error == nil {
+			ret++
+		}
+	}
+	return ret
+}
+
+func (self *Result) Join(r *Result) {
+	if self.Error != nil {
+		return
+	}
+	if r.Error != nil {
+		self.Error = r.Error
+		return
+	}
+	self.Results = append(self.Results, r.Results...)
+}
+
 type connDescriptor interface {
 	RemoteAddr() net.Addr
 	Service() string
