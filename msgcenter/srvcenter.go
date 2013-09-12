@@ -42,13 +42,14 @@ func (self *serviceCenter) Stop() {
 func (self *serviceCenter) serveConn(conn server.Conn) {
 	var reason error
 	defer func() {
-		self.conns.DelConn(conn)
 		self.config.OnLogout(conn, reason)
+		self.conns.DelConn(conn)
 		conn.Close()
 	}()
 	for {
 		msg, err := conn.ReceiveMessage()
 		if err != nil {
+			fmt.Printf("%v got %v\n", conn.Username(), err)
 			if err != io.EOF {
 				self.config.OnError(conn, err)
 				reason = err

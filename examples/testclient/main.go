@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"github.com/uniqush/uniqush-conn/proto"
+	"github.com/uniqush/uniqush-conn/rpc"
+
 	"github.com/uniqush/uniqush-conn/proto/client"
 	"io"
 	"io/ioutil"
@@ -49,44 +51,39 @@ var argvPassword = flag.String("p", "", "password")
 var argvDigestThrd = flag.Int("d", 512, "digest threshold")
 var argvCompressThrd = flag.Int("c", 1024, "compress threshold")
 
-func messagePrinter(conn client.Conn, msgChan <-chan *rpc.Message, digestChan <-chan *client.Digest) {
+func messagePrinter(conn client.Conn, msgChan <-chan *rpc.MessageContainer, digestChan <-chan *client.Digest) {
+	encoder := json.NewEncoder(os.Stdout)
 	for {
 		select {
 		case msg := <-msgChan:
 			if msg == nil {
 				return
 			}
-			fmt.Printf("- [Service=%v][Sender=%v][Id=%v]", msg.SenderService, msg.Sender, msg.Id)
-			for k, v := range msg.Header {
-				fmt.Printf("[%v=%v]", k, v)
-			}
-			if msg.Body != nil {
-				fmt.Printf("%v", string(msg.Body))
+			encoder.Encode(msg)
+			if msg.Message.Body != nil {
+				fmt.Printf("\n%v: %v", msg.Sender, string(msg.Message.Body))
+			} else {
+				fmt.Printf("\n")
 			}
 		case digest := <-digestChan:
 			if digest == nil {
 				return
 			}
-			fmt.Printf("- Digest:[size=%v]", digest.Size)
-			if len(digest.Sender) > 0 {
-				fmt.Printf("[sender=%v]", digest.Sender)
-			}
-			fmt.Printf("[id=%v]", digest.MsgId)
-			for k, v := range digest.Info {
-				fmt.Printf("[%v=%v]", k, v)
-			}
-			fmt.Printf("; I will retrieve it now\n")
+			encoder.Encode(digest)
+			fmt.Printf("\n")
 			conn.RequestMessage(digest.MsgId)
 		}
 	}
 }
 
-func messageReceiver(conn client.Conn, msgChan chan<- *rpc.Message) {
+func messageReceiver(conn client.Conn, msgChan chan<- *rpc.MessageContainer) {
 	defer conn.Close()
 	for {
-		msg, err := conn.ReadMessage()
+		msg, err := conn.ReceiveMessage()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
+			if err != io.EOF {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
 			return
 		}
 		msgChan <- msg
@@ -103,17 +100,17 @@ func messageSender(conn client.Conn) {
 			}
 			return
 		}
-		msg := new(rpc.Message)
+		msg := &rpc.Message{}
 
 		elems := strings.SplitN(line, ":", 2)
 		if len(elems) == 2 {
 			msg.Body = []byte(elems[1])
-			msg.Header = make(map[string]string, 1)
-			msg.Header["title"] = strings.TrimSpace(elems[1])
-			err = conn.ForwardRequest(elems[0], conn.Service(), msg, 1*time.Hour)
+
+			recvers := strings.Split(elems[0], ",")
+			err = conn.SendMessageToUsers(msg, 1*time.Hour, conn.Service(), recvers...)
 		} else {
 			msg.Body = []byte(line)
-			err = conn.SendMessage(msg)
+			err = conn.SendMessageToServer(msg)
 		}
 		if err != nil {
 			if err != io.EOF {
@@ -131,7 +128,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
-	addr := "127.0.0.1:8989"
+	addr := "127.0.0.1:8964"
 	if flag.NArg() > 0 {
 		addr = flag.Arg(0)
 		_, err := net.ResolveTCPAddr("tcp", addr)
@@ -151,13 +148,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Login Error: %v\n", err)
 		return
 	}
-	err = conn.Config(*argvDigestThrd, *argvCompressThrd, nil)
+	err = conn.Config(*argvDigestThrd, *argvCompressThrd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Config Error: %v\n", err)
 		return
 	}
 
-	msgChan := make(chan *rpc.Message)
+	msgChan := make(chan *rpc.MessageContainer)
 	digestChan := make(chan *client.Digest)
 	conn.SetDigestChannel(digestChan)
 	go messageReceiver(conn, msgChan)

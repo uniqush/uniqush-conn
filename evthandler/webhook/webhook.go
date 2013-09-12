@@ -112,7 +112,7 @@ type logoutEvent struct {
 	Username string `json:"username"`
 	ConnID   string `json:"connId"`
 	Addr     string `json:"addr"`
-	Reason   string `json:"reason"`
+	Reason   string `json:"reason,omitempty"`
 }
 
 type LogoutHandler struct {
@@ -120,7 +120,17 @@ type LogoutHandler struct {
 }
 
 func (self *LogoutHandler) OnLogout(service, username, connId, addr string, reason error) {
-	self.post(&logoutEvent{service, username, connId, addr, reason.Error()}, nil)
+	evt := &logoutEvent{
+		Service:  service,
+		Username: username,
+		ConnID:   connId,
+		Addr:     addr,
+	}
+
+	if reason != nil {
+		evt.Reason = reason.Error()
+	}
+	self.post(evt, nil)
 }
 
 type messageEvent struct {
