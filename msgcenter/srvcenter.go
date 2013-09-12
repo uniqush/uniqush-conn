@@ -96,7 +96,6 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 		return ret
 	}
 
-	conns := self.conns.GetConn(req.Receiver)
 	mid := req.Id
 	msg := req.Message
 
@@ -118,20 +117,23 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 	}
 	n := 0
 
-	for _, minc := range conns {
-		if conn, ok := minc.(server.Conn); ok {
-			err := conn.SendMessage(msg, mid, nil)
-			ret.Append(conn, err)
-			if err != nil {
-				self.conns.DelConn(minc)
-				conn.Close()
-			} else {
-				n++
-			}
+	conns := self.conns.GetConn(req.Receiver)
+
+	conns.Traverse(func(conn server.Conn) error {
+		err := conn.SendMessage(msg, mid, nil)
+		ret.Append(conn, err)
+		if err != nil {
+			conn.Close()
+			// We won't delete this connection here.
+			// Instead, we close it and let the reader
+			// goroutine detect the error and close it.
 		} else {
-			self.conns.DelConn(minc)
+			n++
 		}
-	}
+		// Instead of returning an error,
+		// we wourld rather let the Traverse() move forward.
+		return nil
+	})
 
 	shouldPush := !req.DontPush
 
@@ -166,7 +168,6 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		return ret
 	}
 
-	conns := self.conns.GetConn(req.Receiver)
 	mid := req.Id
 	msg := req.Message
 	mc := &req.MessageContainer
@@ -201,20 +202,22 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	}
 	n := 0
 
-	for _, minc := range conns {
-		if conn, ok := minc.(server.Conn); ok {
-			err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid)
-			ret.Append(conn, err)
-			if err != nil {
-				self.conns.DelConn(minc)
-				conn.Close()
-			} else {
-				n++
-			}
+	conns := self.conns.GetConn(req.Receiver)
+	conns.Traverse(func(conn server.Conn) error {
+		err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid)
+		ret.Append(conn, err)
+		if err != nil {
+			conn.Close()
+			// We won't delete this connection here.
+			// Instead, we close it and let the reader
+			// goroutine detect the error and close it.
 		} else {
-			self.conns.DelConn(minc)
+			n++
 		}
-	}
+		// Instead of returning an error,
+		// we wourld rather let the Traverse() move forward.
+		return nil
+	})
 
 	// forward the message if possible,
 	// Don't ask the permission to forward (we have already got the permission)

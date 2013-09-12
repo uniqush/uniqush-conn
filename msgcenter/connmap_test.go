@@ -19,6 +19,10 @@ package msgcenter
 
 import (
 	"fmt"
+	"github.com/uniqush/uniqush-conn/msgcache"
+	"github.com/uniqush/uniqush-conn/proto/server"
+	"github.com/uniqush/uniqush-conn/rpc"
+	"net"
 	"testing"
 )
 
@@ -35,11 +39,42 @@ func (self *fakeConn) UniqId() string {
 	return fmt.Sprintf("%v-%v", self.username, self.n)
 }
 
+func (self *fakeConn) RemoteAddr() net.Addr {
+	return nil
+}
+
+func (self *fakeConn) Service() string {
+	return "fakeservice"
+}
+
+func (self *fakeConn) Close() error {
+	return nil
+}
+
 type connGenerator struct {
 	nextId int
 }
 
-func (self *connGenerator) nextConn() minimalConn {
+func (self *fakeConn) SendMessage(msg *rpc.Message, id string, extra map[string]string) error {
+	return nil
+}
+func (self *fakeConn) ForwardMessage(sender, senderService string, msg *rpc.Message, id string) error {
+	return nil
+}
+func (self *fakeConn) ReceiveMessage() (msg *rpc.Message, err error) {
+	return nil, nil
+}
+func (self *fakeConn) SetMessageCache(cache msgcache.Cache) {
+}
+func (self *fakeConn) SetForwardRequestChannel(fwdChan chan<- *rpc.ForwardRequest) {
+}
+func (self *fakeConn) SetSubscribeRequestChan(subChan chan<- *rpc.SubscribeRequest) {
+}
+func (self *fakeConn) Visible() bool {
+	return true
+}
+
+func (self *connGenerator) nextConn() server.Conn {
 	usr := fmt.Sprintf("user-%v", self.nextId)
 	self.nextId++
 	return &fakeConn{username: usr}
@@ -49,7 +84,7 @@ func TestInsertConnMap(t *testing.T) {
 	N := 10
 	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
-	conns := make([]minimalConn, N)
+	conns := make([]server.Conn, N)
 	for i, _ := range conns {
 		c := g.nextConn()
 		err := cmap.AddConn(c)
@@ -60,12 +95,19 @@ func TestInsertConnMap(t *testing.T) {
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if len(cs) != 1 {
-			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), len(cs))
+		if cs.NrConn() != 1 {
+			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), cs.NrConn())
 			continue
 		}
-		if cs[0].Username() != c.Username() {
-			t.Errorf("Bad for user %v", c.Username())
+
+		err := cs.Traverse(func(c1 server.Conn) error {
+			if c1.Username() != c.Username() {
+				return fmt.Errorf("Bad for user %v", c.Username())
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("%v", err)
 		}
 	}
 }
@@ -75,7 +117,7 @@ func TestInsertDupConnMap(t *testing.T) {
 	M := 2
 	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
-	conns := make([]minimalConn, N)
+	conns := make([]server.Conn, N)
 	for i, _ := range conns {
 		c := g.nextConn()
 
@@ -91,14 +133,18 @@ func TestInsertDupConnMap(t *testing.T) {
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if len(cs) != M {
-			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), len(cs))
+		if cs.NrConn() != M {
+			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), cs.NrConn())
 			continue
 		}
-		for _, conn := range cs {
-			if conn.Username() != c.Username() {
-				t.Errorf("Bad for user %v", c.Username())
+		err := cs.Traverse(func(c1 server.Conn) error {
+			if c1.Username() != c.Username() {
+				return fmt.Errorf("Bad for user %v", c.Username())
 			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("%v", err)
 		}
 	}
 }
@@ -107,7 +153,7 @@ func TestDeleteConnMap(t *testing.T) {
 	N := 10
 	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
-	conns := make([]minimalConn, N)
+	conns := make([]server.Conn, N)
 	users := make([]string, N)
 	for i, _ := range conns {
 		c := g.nextConn()
@@ -120,24 +166,31 @@ func TestDeleteConnMap(t *testing.T) {
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if len(cs) != 1 {
-			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), len(cs))
+		if cs.NrConn() != 1 {
+			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), cs.NrConn())
 			continue
 		}
-		if cs[0].Username() != c.Username() {
-			t.Errorf("Bad for user %v", c.Username())
+
+		err := cs.Traverse(func(c1 server.Conn) error {
+			if c1.Username() != c.Username() {
+				return fmt.Errorf("Bad for user %v", c.Username())
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("%v", err)
 		}
 	}
 	for _, c := range conns {
 		deleted := cmap.DelConn(c)
-		if !deleted {
+		if deleted == nil {
 			t.Errorf("should delete a connection")
 		}
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if cs != nil {
-			t.Errorf("deletion failed")
+		if cs.NrConn() != 0 {
+			t.Errorf("deletion failed. nr conn: %v", cs.NrConn())
 		}
 	}
 }
@@ -147,8 +200,8 @@ func TestDeleteDupConnMap(t *testing.T) {
 	M := 2
 	cmap := newTreeBasedConnMap(0, 0, 0)
 	g := new(connGenerator)
-	conns := make([]minimalConn, N)
-	for i, _ := range conns {
+	conns := make([]server.Conn, N)
+	for j, _ := range conns {
 		c := g.nextConn()
 
 		for i := 0; i < M; i++ {
@@ -159,27 +212,39 @@ func TestDeleteDupConnMap(t *testing.T) {
 				t.Errorf("%v", err)
 			}
 		}
-		conns[i] = c
+		conns[j] = c
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if len(cs) != M {
-			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), len(cs))
+		if cs.NrConn() != M {
+			t.Errorf("Bad for user %v: nr conns=%v", c.Username(), cs.NrConn())
 			continue
 		}
-		for i, conn := range cs {
-			if conn.Username() != c.Username() {
-				t.Errorf("Bad for user %v", c.Username())
-			}
+
+		i := 0
+		var delConn server.Conn
+		err := cs.Traverse(func(c1 server.Conn) error {
 			if i == 0 {
-				cmap.DelConn(conn)
+				delConn = c1
 			}
+			i++
+			if c1.Username() != c.Username() {
+				return fmt.Errorf("Bad for user %v", c.Username())
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+
+		if delConn != nil {
+			cmap.DelConn(delConn)
 		}
 	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
-		if len(cs) != M-1 {
-			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), len(cs))
+		if cs.NrConn() != M-1 {
+			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), cs.NrConn())
 		}
 	}
 }

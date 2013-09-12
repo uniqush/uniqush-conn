@@ -20,63 +20,15 @@ package msgcenter
 import (
 	"errors"
 	"github.com/petar/GoLLRB/llrb"
+	"github.com/uniqush/uniqush-conn/proto/server"
 	"sync"
 )
 
-type minimalConn interface {
-	Username() string
-	UniqId() string
-}
-
 type connMap interface {
-	AddConn(conn minimalConn) error
-	GetConn(username string) []minimalConn
-	DelConn(conn minimalConn) bool
+	AddConn(conn server.Conn) error
+	GetConn(username string) ConnSet
+	DelConn(conn server.Conn) server.Conn
 }
-
-type connListItem struct {
-	name string
-	list []minimalConn
-}
-
-func (self *connListItem) key() string {
-	if len(self.list) == 0 {
-		return self.name
-	}
-	return connKey(self.list[0])
-}
-
-func (self *connListItem) Less(than llrb.Item) bool {
-	selfKey := llrb.String(self.key())
-	thanKey := llrb.String(than.(*connListItem).key())
-	return selfKey.Less(thanKey)
-}
-
-func connKey(conn minimalConn) string {
-	return conn.Username()
-}
-
-/*
-func getKey(a interface{}) string {
-	switch t := a.(type) {
-	case string:
-		return t
-	case []minimalConn:
-		if len(t) > 0 {
-			return connKey(t[0])
-		}
-	}
-	return ""
-}
-
-func lessConnList(a, b interface{}) bool {
-	akey := getKey(a)
-	bkey := getKey(b)
-	cmp := bytes.Compare([]byte(akey), []byte(bkey))
-	return cmp < 0
-}
-*/
-
 type treeBasedConnMap struct {
 	tree              *llrb.LLRB
 	maxNrConn         int
@@ -87,27 +39,31 @@ type treeBasedConnMap struct {
 	lock   sync.Mutex
 }
 
-func (self *treeBasedConnMap) GetConn(user string) []minimalConn {
+func (self *treeBasedConnMap) GetConn(user string) ConnSet {
 	self.lock.Lock()
 	defer self.lock.Unlock()
-	return self.getConn(user)
+	cset := self.getConn(user)
+	return cset
 }
 
-func (self *treeBasedConnMap) getConn(user string) []minimalConn {
-	key := &connListItem{name: user, list: nil}
+func (self *treeBasedConnMap) getConn(user string) *connSet {
+	key := &connSet{name: user, list: nil}
 	clif := self.tree.Get(key)
-	cl, ok := clif.(*connListItem)
+	if clif == nil {
+		return nil
+	}
+	cl, ok := clif.(*connSet)
 	if !ok || cl == nil {
 		return nil
 	}
-	return cl.list
+	return cl
 }
 
 var ErrTooManyUsers = errors.New("too many users")
 var ErrTooManyConnForThisUser = errors.New("too many connections under this user")
 var ErrTooManyConns = errors.New("too many connections")
 
-func (self *treeBasedConnMap) AddConn(conn minimalConn) error {
+func (self *treeBasedConnMap) AddConn(conn server.Conn) error {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	if conn == nil {
@@ -120,64 +76,52 @@ func (self *treeBasedConnMap) AddConn(conn minimalConn) error {
 	if self.maxNrUsers > 0 && self.tree.Len() >= self.maxNrUsers {
 		return ErrTooManyUsers
 	}
-	var cl []minimalConn
-	cl = self.getConn(connKey(conn))
-	if cl == nil {
-		cl = make([]minimalConn, 0, 3)
+	cset := self.getConn(connKey(conn))
+
+	if cset == nil {
+		cset = &connSet{name: connKey(conn), list: make([]server.Conn, 0, 3)}
 	}
-	if self.maxNrConnsPerUser > 0 && len(cl) >= self.maxNrConnsPerUser {
-		return ErrTooManyConnForThisUser
+
+	cset.lock()
+	defer cset.unlock()
+
+	err := cset.add(conn, self.maxNrConnsPerUser)
+	if err != nil {
+		return err
 	}
-	for _, c := range cl {
-		if c.UniqId() == conn.UniqId() {
-			return nil
-		}
-	}
-	cl = append(cl, conn)
+
 	self.nrConn++
-	key := &connListItem{name: "", list: cl}
-	self.tree.ReplaceOrInsert(key)
+	self.tree.ReplaceOrInsert(cset)
 	return nil
 }
 
-func (self *treeBasedConnMap) DelConn(conn minimalConn) bool {
+func (self *treeBasedConnMap) DelConn(conn server.Conn) server.Conn {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	if conn == nil {
-		return false
+		return nil
 	}
-	cl := self.getConn(connKey(conn))
-	if cl == nil {
-		return false
+	cset := self.getConn(connKey(conn))
+	if cset == nil {
+		return nil
 	}
-	i := -1
-	var c minimalConn
-	for i, c = range cl {
-		if c.UniqId() == conn.UniqId() {
-			self.nrConn--
-			break
-		}
+
+	cset.lock()
+	defer cset.unlock()
+
+	ret := cset.del(conn.UniqId())
+
+	if ret == nil {
+		return ret
 	}
-	if i < 0 {
-		return false
-	}
-	if len(cl) == 1 {
-		key := &connListItem{name: connKey(conn), list: cl}
-		c := self.tree.Delete(key)
-		if c == nil {
-			return false
-		}
-		return true
-	}
-	cl[i] = cl[len(cl)-1]
-	cl = cl[:len(cl)-1]
-	key := &connListItem{name: connKey(conn), list: cl}
-	if len(cl) == 0 {
-		self.tree.Delete(key)
+	self.nrConn--
+	if cset.nrConn() == 0 {
+		self.tree.Delete(cset)
 	} else {
-		self.tree.ReplaceOrInsert(key)
+		self.tree.ReplaceOrInsert(cset)
 	}
-	return true
+
+	return ret
 }
 
 func newTreeBasedConnMap(maxNrConn, maxNrUsers, maxNrConnsPerUser int) connMap {
