@@ -103,11 +103,13 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 	}
 
 	shouldPush := !req.DontPush
+	shouldCache := !req.DontCache
+
 	for _, recver := range req.Receivers {
 		mid := req.Id
 		msg := req.Message
 
-		if !req.DontCache {
+		if shouldCache {
 			mc := &rpc.MessageContainer{
 				Sender:        "",
 				SenderService: "",
@@ -182,6 +184,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	var pushInfo map[string]string
 	var shouldForward bool
 	shouldPush := !req.DontPush
+	shouldCache := !req.DontCache
 
 	if !req.DontAsk {
 		// We need to ask for permission to forward this message.
@@ -197,7 +200,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	}
 
 	for _, recver := range req.Receivers {
-		if !req.DontCache {
+		if shouldCache {
 			mid, ret.Error = self.config.CacheMessage(recver, mc, req.TTL)
 			if ret.Error != nil {
 				return ret
