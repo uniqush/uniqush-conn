@@ -49,7 +49,6 @@ func (self *serviceCenter) serveConn(conn server.Conn) {
 	for {
 		msg, err := conn.ReceiveMessage()
 		if err != nil {
-			fmt.Printf("%v got %v\n", conn.Username(), err)
 			if err != io.EOF {
 				self.config.OnError(conn, err)
 				reason = err
