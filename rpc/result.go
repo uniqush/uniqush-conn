@@ -80,11 +80,15 @@ func (self *Result) Append(c connDescriptor, err error) {
 	r.ConnId = c.UniqId()
 	r.Error = err
 	r.Visible = c.Visible()
+	r.Username = c.Username()
+	r.Service = c.Service()
 	self.Results = append(self.Results, r)
 }
 
 type ConnResult struct {
-	ConnId  string `json:"conn-id"`
-	Error   error  `json:"error,omitempty"`
-	Visible bool   `json:"visible"`
+	ConnId   string `json:"conn-id"`
+	Error    error  `json:"error,omitempty"`
+	Visible  bool   `json:"visible"`
+	Username string `josn:"username"`
+	Service  string `json:"service"`
 }
