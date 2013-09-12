@@ -154,19 +154,21 @@ func (self *clientMessageVerifier) addClient(c client.Conn) {
 }
 
 func verifySingle(conn client.Conn, mcs ...*rpc.MessageContainer) error {
-	for i, mc := range mcs {
+	for i := 0; i < len(mcs); i++ {
 		rmc, err := conn.ReceiveMessage()
 		if err != nil {
 			return err
 		}
-		if !rmc.Message.Eq(mc.Message) {
-			return fmt.Errorf("%vth message is corrupted for user %v", i, conn.Username())
+
+		found := false
+		for _, mc := range mcs {
+			if rmc.Message.Eq(mc.Message) && rmc.Sender == mc.Sender && rmc.SenderService == mc.SenderService {
+				found = true
+				break
+			}
 		}
-		if rmc.Sender != mc.Sender {
-			return fmt.Errorf("%vth message is corrupted for user %v: sender is %v; should be %v", i, conn.Username(), rmc.Sender, mc.Sender)
-		}
-		if rmc.SenderService != mc.SenderService {
-			return fmt.Errorf("%vth message is corrupted for user %v: sender service is %v; should be %v", i, conn.Username(), rmc.SenderService, mc.SenderService)
+		if !found {
+			return fmt.Errorf("%vth message is corrupted for user %v; %+v. sender: %v; sender's service: %v", i, conn.Username(), rmc.Message, rmc.Sender, rmc.SenderService)
 		}
 	}
 	return nil
@@ -199,6 +201,8 @@ func randomMessage() *rpc.Message {
 }
 
 func TestSendMessageFromServerToClients(t *testing.T) {
+	clearCache()
+	defer clearCache()
 	si := newServerInfo(9891)
 
 	center, err := si.getMessageCenter()
@@ -208,6 +212,7 @@ func TestSendMessageFromServerToClients(t *testing.T) {
 	}
 
 	go center.Start()
+	defer center.Stop()
 
 	nrClients := 100
 	clients := &clientMessageVerifier{}
@@ -246,6 +251,64 @@ func TestSendMessageFromServerToClients(t *testing.T) {
 					}
 				}
 			}()
+		}
+	}()
+
+	errs := clients.RunAndVerify(mcs...)
+	for _, err := range errs {
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+	}
+}
+
+func TestForwardMessagesBetweenClients(t *testing.T) {
+	clearCache()
+	defer clearCache()
+	si := newServerInfo(9891)
+
+	center, err := si.getMessageCenter()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	go center.Start()
+	defer center.Stop()
+
+	nrReceivers := 10
+	clients := &clientMessageVerifier{}
+	usrs, err := clients.genClient(nrReceivers, si)
+	if err != nil {
+		t.Errorf("Error: %v\n", err)
+		return
+	}
+
+	sender, err := si.connClient("sender")
+	if err != nil {
+		t.Errorf("Error: %v\n", err)
+		return
+	}
+	N := 10
+	mcs := make([]*rpc.MessageContainer, N)
+	for i := 0; i < N; i++ {
+		mcs[i] = &rpc.MessageContainer{
+			Message:       randomMessage(),
+			Id:            fmt.Sprintf("%v", i),
+			Sender:        sender.Username(),
+			SenderService: sender.Service(),
+		}
+	}
+
+	go func() {
+		for _, username := range usrs {
+			usr := username
+			for _, mc := range mcs {
+				err := sender.SendMessageToUser(si.defaultService, usr, mc.Message, 1*time.Hour)
+				if err != nil {
+					t.Errorf("Error on sending: %v", err)
+				}
+			}
 		}
 	}()
 

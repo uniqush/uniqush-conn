@@ -19,6 +19,7 @@ package msgcenter
 
 import (
 	"errors"
+
 	"github.com/petar/GoLLRB/llrb"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"sync"
@@ -28,6 +29,7 @@ type connMap interface {
 	AddConn(conn server.Conn) error
 	GetConn(username string) ConnSet
 	DelConn(conn server.Conn) server.Conn
+	CloseAll()
 }
 type treeBasedConnMap struct {
 	tree              *llrb.LLRB
@@ -62,6 +64,19 @@ func (self *treeBasedConnMap) getConn(user string) *connSet {
 var ErrTooManyUsers = errors.New("too many users")
 var ErrTooManyConnForThisUser = errors.New("too many connections under this user")
 var ErrTooManyConns = errors.New("too many connections")
+
+// There's no way back!
+func (self *treeBasedConnMap) CloseAll() {
+	self.lock.Lock()
+	var nilcs *connSet
+	self.tree.AscendGreaterOrEqual(nilcs, func(i llrb.Item) bool {
+		if cs, ok := i.(*connSet); ok {
+			cs.CloseAll()
+		}
+		return true
+	})
+	self.tree = llrb.New()
+}
 
 func (self *treeBasedConnMap) AddConn(conn server.Conn) error {
 	self.lock.Lock()

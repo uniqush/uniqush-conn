@@ -34,6 +34,11 @@ type serviceCenter struct {
 	peer       rpc.UniqushConnPeer
 }
 
+func (self *serviceCenter) Stop() {
+	self.conns.CloseAll()
+	close(self.subReqChan)
+}
+
 func (self *serviceCenter) serveConn(conn server.Conn) {
 	var reason error
 	defer func() {
@@ -48,6 +53,7 @@ func (self *serviceCenter) serveConn(conn server.Conn) {
 				self.config.OnError(conn, err)
 				reason = err
 			}
+			return
 		}
 		if msg != nil {
 			self.config.OnMessage(conn, msg)
@@ -240,7 +246,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 func (self *serviceCenter) processSubscription() {
 	for req := range self.subReqChan {
 		if req == nil {
-			continue
+			return
 		}
 		go self.config.Subscribe(req)
 	}
