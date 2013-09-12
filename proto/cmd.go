@@ -87,7 +87,7 @@ const (
 	//
 	// Params:
 	// 0. TTL
-	// 1. Receiver's name
+	// 1. Receivers' name, comma separated
 	// 2. [optional] Receiver's service name.
 	//    If empty, then same service as the client
 	CMD_FWD_REQ

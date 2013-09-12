@@ -32,7 +32,8 @@ var ErrBadServiceOrUserName = errors.New("service name or user name should not c
 // The conn will be closed if any error occur
 func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string, timeout time.Duration) (c Conn, err error) {
 	if strings.Contains(service, "\n") || strings.Contains(username, "\n") ||
-		strings.Contains(service, ":") || strings.Contains(username, ":") {
+		strings.Contains(service, ":") || strings.Contains(username, ":") ||
+		strings.Contains(service, ",") || strings.Contains(username, ",") {
 		err = ErrBadServiceOrUserName
 		return
 	}

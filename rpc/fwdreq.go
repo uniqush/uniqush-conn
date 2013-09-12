@@ -23,7 +23,7 @@ type ForwardRequest struct {
 	DontAsk         bool          `json:"dont-ask-permission,omitempty"`
 	DontPush        bool          `json:"dont-push,omitempty"`
 	DontCache       bool          `json:"dont-cache,omitempty"`
-	Receiver        string        `json:"receiver"`
+	Receivers       []string      `json:"receivers"`
 	ReceiverService string        `json:"receiver-service"`
 	TTL             time.Duration `json:"ttl"`
 	MessageContainer

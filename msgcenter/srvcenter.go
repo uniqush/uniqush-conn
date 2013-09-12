@@ -97,63 +97,64 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 		ret.Error = fmt.Errorf("invalid request: empty message")
 		return ret
 	}
-	if req.Receiver == "" {
+	if len(req.Receivers) == 0 {
 		ret.Error = fmt.Errorf("invalid request: no receiver")
 		return ret
 	}
 
-	mid := req.Id
-	msg := req.Message
+	shouldPush := !req.DontPush
+	for _, recver := range req.Receivers {
+		mid := req.Id
+		msg := req.Message
 
-	if !req.DontCache {
-		mc := &rpc.MessageContainer{
-			Sender:        "",
-			SenderService: "",
-			Message:       msg,
+		if !req.DontCache {
+			mc := &rpc.MessageContainer{
+				Sender:        "",
+				SenderService: "",
+				Message:       msg,
+			}
+			mid, ret.Error = self.config.CacheMessage(recver, mc, req.TTL)
+			if ret.Error != nil {
+				return ret
+			}
 		}
-		mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
-		if ret.Error != nil {
+
+		if len(mid) == 0 {
+			ret.Error = fmt.Errorf("undefined message Id")
 			return ret
 		}
-	}
 
-	if len(mid) == 0 {
-		ret.Error = fmt.Errorf("undefined message Id")
-		return ret
-	}
-	n := 0
+		n := 0
 
-	conns := self.conns.GetConn(req.Receiver)
+		conns := self.conns.GetConn(recver)
+		conns.Traverse(func(conn server.Conn) error {
+			err := conn.SendMessage(msg, mid, nil)
+			ret.Append(conn, err)
+			if err != nil {
+				conn.Close()
+				// We won't delete this connection here.
+				// Instead, we close it and let the reader
+				// goroutine detect the error and close it.
+			} else {
+				n++
+			}
+			// Instead of returning an error,
+			// we wourld rather let the Traverse() move forward.
+			return nil
+		})
 
-	conns.Traverse(func(conn server.Conn) error {
-		err := conn.SendMessage(msg, mid, nil)
-		ret.Append(conn, err)
-		if err != nil {
-			conn.Close()
-			// We won't delete this connection here.
-			// Instead, we close it and let the reader
-			// goroutine detect the error and close it.
-		} else {
-			n++
+		// Don't push the message. We will push it on this node.
+		req.DontPush = true
+		// Don't cache the message. We have already cached it.
+		req.DontCache = true
+		req.Id = mid
+		r := self.peer.Send(req)
+		n += r.NrSuccess()
+		ret.Join(r)
+
+		if n == 0 && shouldPush {
+			self.config.Push(recver, "", "", req.PushInfo, mid, msg.Size())
 		}
-		// Instead of returning an error,
-		// we wourld rather let the Traverse() move forward.
-		return nil
-	})
-
-	shouldPush := !req.DontPush
-
-	// Don't push the message. We will push it on this node.
-	req.DontPush = true
-	// Don't cache the message. We have already cached it.
-	req.DontCache = true
-	req.Id = mid
-	r := self.peer.Send(req)
-	n += r.NrSuccess()
-	ret.Join(r)
-
-	if n == 0 && shouldPush {
-		self.config.Push(req.Receiver, "", "", req.PushInfo, mid, msg.Size())
 	}
 	return ret
 }
@@ -169,7 +170,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		ret.Error = fmt.Errorf("invalid request: empty message")
 		return ret
 	}
-	if req.Receiver == "" {
+	if len(req.Receivers) == 0 {
 		ret.Error = fmt.Errorf("invalid request: no receiver")
 		return ret
 	}
@@ -195,50 +196,53 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		}
 	}
 
-	if !req.DontCache {
-		mid, ret.Error = self.config.CacheMessage(req.Receiver, mc, req.TTL)
-		if ret.Error != nil {
+	for _, recver := range req.Receivers {
+		if !req.DontCache {
+			mid, ret.Error = self.config.CacheMessage(recver, mc, req.TTL)
+			if ret.Error != nil {
+				return ret
+			}
+		}
+
+		if len(mid) == 0 {
+			ret.Error = fmt.Errorf("undefined message Id")
 			return ret
 		}
-	}
 
-	if len(mid) == 0 {
-		ret.Error = fmt.Errorf("undefined message Id")
-		return ret
-	}
-	n := 0
+		n := 0
 
-	conns := self.conns.GetConn(req.Receiver)
-	conns.Traverse(func(conn server.Conn) error {
-		err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid)
-		ret.Append(conn, err)
-		if err != nil {
-			conn.Close()
-			// We won't delete this connection here.
-			// Instead, we close it and let the reader
-			// goroutine detect the error and close it.
-		} else {
-			n++
+		conns := self.conns.GetConn(recver)
+		conns.Traverse(func(conn server.Conn) error {
+			err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid)
+			ret.Append(conn, err)
+			if err != nil {
+				conn.Close()
+				// We won't delete this connection here.
+				// Instead, we close it and let the reader
+				// goroutine detect the error and close it.
+			} else {
+				n++
+			}
+			// Instead of returning an error,
+			// we wourld rather let the Traverse() move forward.
+			return nil
+		})
+
+		// forward the message if possible,
+		// Don't ask the permission to forward (we have already got the permission)
+		req.DontAsk = true
+		// And don't push the message. We will push it on this node.
+		req.DontPush = true
+		// Dont' cache it
+		req.DontCache = true
+		req.Id = mid
+		r := self.peer.Forward(req)
+		n += r.NrSuccess()
+		ret.Join(r)
+
+		if n == 0 && shouldPush {
+			self.config.Push(recver, req.SenderService, req.Sender, pushInfo, mid, msg.Size())
 		}
-		// Instead of returning an error,
-		// we wourld rather let the Traverse() move forward.
-		return nil
-	})
-
-	// forward the message if possible,
-	// Don't ask the permission to forward (we have already got the permission)
-	req.DontAsk = true
-	// And don't push the message. We will push it on this node.
-	req.DontPush = true
-	// Dont' cache it
-	req.DontCache = true
-	req.Id = mid
-	r := self.peer.Forward(req)
-	n += r.NrSuccess()
-	ret.Join(r)
-
-	if n == 0 && shouldPush {
-		self.config.Push(req.Receiver, req.SenderService, req.Sender, pushInfo, mid, msg.Size())
 	}
 	return ret
 }

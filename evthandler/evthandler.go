@@ -39,7 +39,7 @@ type MessageHandler interface {
 }
 
 type ForwardRequestHandler interface {
-	ShouldForward(senderService, sender, receiverService, receiver string, ttl time.Duration, msg *rpc.Message) (shouldForward bool, shouldPush bool, pushInfo map[string]string)
+	ShouldForward(senderService, sender, receiverService string, receivers []string, ttl time.Duration, msg *rpc.Message) (shouldForward bool, shouldPush bool, pushInfo map[string]string)
 	MaxTTL() time.Duration
 }
 

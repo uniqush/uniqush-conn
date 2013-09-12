@@ -23,7 +23,7 @@ type SendRequest struct {
 	DontCache bool `json:"dont-cache,omitempty"`
 	DontPush  bool `json:"dont-push,omitempty"`
 
-	Receiver        string        `json:"receiver"`
+	Receivers       []string      `json:"receivers"`
 	ReceiverService string        `json:"receiver-service"`
 	TTL             time.Duration `json:"ttl"`
 	Id              string        `json:"id,omitempty"`

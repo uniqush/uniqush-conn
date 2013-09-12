@@ -222,7 +222,7 @@ func TestSendMessageFromServerToClients(t *testing.T) {
 		return
 	}
 
-	N := 10
+	N := 3
 	mcs := make([]*rpc.MessageContainer, N)
 	for i := 0; i < N; i++ {
 		mcs[i] = &rpc.MessageContainer{
@@ -238,7 +238,7 @@ func TestSendMessageFromServerToClients(t *testing.T) {
 				for _, mc := range mcs {
 					req := &rpc.SendRequest{
 						ReceiverService: si.defaultService,
-						Receiver:        usr,
+						Receivers:       []string{usr},
 						TTL:             1 * time.Hour,
 						Message:         mc.Message,
 					}
@@ -304,10 +304,67 @@ func TestForwardMessagesBetweenClients(t *testing.T) {
 		for _, username := range usrs {
 			usr := username
 			for _, mc := range mcs {
-				err := sender.SendMessageToUser(si.defaultService, usr, mc.Message, 1*time.Hour)
+				err := sender.SendMessageToUsers(mc.Message, 1*time.Hour, si.defaultService, usr)
 				if err != nil {
 					t.Errorf("Error on sending: %v", err)
 				}
+			}
+		}
+	}()
+
+	errs := clients.RunAndVerify(mcs...)
+	for _, err := range errs {
+		if err != nil {
+			t.Errorf("Error: %v", err)
+		}
+	}
+}
+
+func TestSendMessageFromServerToClientsWithSingleRequest(t *testing.T) {
+	clearCache()
+	defer clearCache()
+	si := newServerInfo(9891)
+
+	center, err := si.getMessageCenter()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	go center.Start()
+	defer center.Stop()
+
+	nrClients := 100
+	clients := &clientMessageVerifier{}
+	usrs, err := clients.genClient(nrClients, si)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	N := 10
+	mcs := make([]*rpc.MessageContainer, N)
+	for i := 0; i < N; i++ {
+		mcs[i] = &rpc.MessageContainer{
+			Message: randomMessage(),
+			Id:      fmt.Sprintf("%v", i),
+		}
+	}
+
+	go func() {
+		for _, mc := range mcs {
+			req := &rpc.SendRequest{
+				ReceiverService: si.defaultService,
+				Receivers:       usrs,
+				TTL:             1 * time.Hour,
+				Message:         mc.Message,
+			}
+			result := center.Send(req)
+			if result.Error != nil {
+				t.Errorf("Error on sending: %v", result.Error)
+			}
+			if result.NrSuccess() != len(usrs) {
+				t.Errorf("We got %v success", result.NrSuccess())
 			}
 		}
 	}()

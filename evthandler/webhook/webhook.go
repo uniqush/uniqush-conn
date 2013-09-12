@@ -169,7 +169,7 @@ type forwardEvent struct {
 	SenderService   string        `json:"sender-service"`
 	Sender          string        `json:"sender"`
 	ReceiverService string        `json:"receiver-service"`
-	Receiver        string        `json:"receiver"`
+	Receivers       []string      `json:"receivers"`
 	Message         *rpc.Message  `json:"msg"`
 	TTL             time.Duration `json:"ttl"`
 }
@@ -180,12 +180,12 @@ type forwardDecision struct {
 	PushInfo      map[string]string `json:"push-info"`
 }
 
-func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService, receiver string,
+func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiverService string, receivers []string,
 	ttl time.Duration, msg *rpc.Message) (shouldForward, shouldPush bool, pushInfo map[string]string) {
 	fwd := &forwardEvent{
 		Sender:          sender,
 		SenderService:   senderService,
-		Receiver:        receiver,
+		Receivers:       receivers,
 		ReceiverService: receiverService,
 		TTL:             ttl,
 		Message:         msg,

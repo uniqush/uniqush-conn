@@ -20,6 +20,7 @@ package server
 import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"strings"
 	"time"
 )
 
@@ -50,7 +51,7 @@ func (self *forwardProcessor) ProcessCommand(cmd *proto.Command) (msg *rpc.Messa
 		err = nil
 		fwdreq.TTL = 72 * time.Hour
 	}
-	fwdreq.Receiver = cmd.Params[1]
+	fwdreq.Receivers = strings.Split(cmd.Params[1], ",")
 	if len(cmd.Params) > 2 {
 		fwdreq.ReceiverService = cmd.Params[2]
 	} else {

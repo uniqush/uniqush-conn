@@ -64,9 +64,10 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	username := cmd.Params[1]
 	token := cmd.Params[2]
 
-	// Username and service should not contain "\n"
+	// Username and service should not contain "\n", ":", ","
 	if strings.Contains(service, "\n") || strings.Contains(username, "\n") ||
-		strings.Contains(service, ":") || strings.Contains(username, ":") {
+		strings.Contains(service, ":") || strings.Contains(username, ":") ||
+		strings.Contains(service, ",") || strings.Contains(username, ",") {
 		err = fmt.Errorf("invalid service name or username")
 		return
 	}

@@ -66,7 +66,7 @@ type clientForwarder struct {
 }
 
 func (self *clientForwarder) ProcessMessageContainer(mc *rpc.MessageContainer) error {
-	err := self.conn.SendMessageToUser(mc.SenderService, mc.Sender, mc.Message, 1*time.Hour)
+	err := self.conn.SendMessageToUsers(mc.Message, 1*time.Hour, mc.SenderService, mc.Sender)
 	if err != nil {
 		return err
 	}
@@ -116,8 +116,11 @@ func TestForwardRequestFromClientToServer(t *testing.T) {
 			if !mc.Message.Eq(fwdreq.Message) {
 				t.Errorf("corrupted data")
 			}
-			if fwdreq.Receiver != receiver {
-				t.Errorf("receiver is %v, not %v", fwdreq.Receiver, receiver)
+			if len(fwdreq.Receivers) != 1 {
+				t.Errorf("receivers: %v", fwdreq.Receivers)
+			}
+			if fwdreq.Receivers[0] != receiver {
+				t.Errorf("receiver is %v, not %v", fwdreq.Receivers, receiver)
 			}
 			if fwdreq.ReceiverService != receiverService {
 				t.Errorf("receiver's service is %v, not %v", fwdreq.ReceiverService, receiverService)

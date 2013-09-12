@@ -24,6 +24,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -34,7 +35,7 @@ type Conn interface {
 	Username() string
 	UniqId() string
 
-	SendMessageToUser(service, receiver string, msg *rpc.Message, ttl time.Duration) error
+	SendMessageToUsers(msg *rpc.Message, ttl time.Duration, service string, receiver ...string) error
 	SendMessageToServer(msg *rpc.Message) error
 	ReceiveMessage() (mc *rpc.MessageContainer, err error)
 
@@ -89,19 +90,22 @@ func (self *clientConn) shouldCompress(size int) bool {
 func (self *clientConn) SendMessageToServer(msg *rpc.Message) error {
 	compress := self.shouldCompress(msg.Size())
 
-	cmd := new(proto.Command)
+	cmd := &proto.Command{}
 	cmd.Message = msg
 	cmd.Type = proto.CMD_DATA
 	err := self.cmdio.WriteCommand(cmd, compress)
 	return err
 }
 
-func (self *clientConn) SendMessageToUser(service, receiver string, msg *rpc.Message, ttl time.Duration) error {
-	cmd := new(proto.Command)
+func (self *clientConn) SendMessageToUsers(msg *rpc.Message, ttl time.Duration, service string, receiver ...string) error {
+	if len(receiver) == 0 {
+		return nil
+	}
+	cmd := &proto.Command{}
 	cmd.Type = proto.CMD_FWD_REQ
 	cmd.Params = make([]string, 2, 3)
 	cmd.Params[0] = fmt.Sprintf("%v", ttl)
-	cmd.Params[1] = receiver
+	cmd.Params[1] = strings.Join(receiver, ",")
 	if len(service) > 0 && service != self.Service() {
 		cmd.Params = append(cmd.Params, service)
 	}
@@ -182,7 +186,7 @@ func (self *clientConn) setCommandProcessor(cmdType uint8, proc CommandProcessor
 }
 
 func (self *clientConn) SetDigestChannel(digestChan chan<- *Digest) {
-	proc := new(digestProcessor)
+	proc := &digestProcessor{}
 	proc.digestChan = digestChan
 	proc.service = self.Service()
 	self.setCommandProcessor(proto.CMD_DIGEST, proc)
@@ -191,7 +195,7 @@ func (self *clientConn) SetDigestChannel(digestChan chan<- *Digest) {
 func (self *clientConn) Config(digestThreshold, compressThreshold int, digestFields ...string) error {
 	self.digestThreshold = int32(digestThreshold)
 	self.compressThreshold = int32(compressThreshold)
-	cmd := new(proto.Command)
+	cmd := &proto.Command{}
 	cmd.Type = proto.CMD_SETTING
 	cmd.Params = make([]string, 2, 2+len(digestFields))
 	cmd.Params[0] = fmt.Sprintf("%v", self.digestThreshold)
@@ -224,14 +228,14 @@ func (self *clientConn) SetVisibility(v bool) error {
 }
 
 func (self *clientConn) subscribe(params map[string]string, sub bool) error {
-	cmd := new(proto.Command)
+	cmd := &proto.Command{}
 	cmd.Type = proto.CMD_SUBSCRIPTION
 	if sub {
 		cmd.Params = []string{"1"}
 	} else {
 		cmd.Params = []string{"0"}
 	}
-	cmd.Message = new(rpc.Message)
+	cmd.Message = &rpc.Message{}
 	cmd.Message.Header = params
 	return self.cmdio.WriteCommand(cmd, false)
 }
@@ -248,7 +252,7 @@ func (self *clientConn) RequestAllCachedMessages(excludes ...string) error {
 	cmd := &proto.Command{}
 	cmd.Type = proto.CMD_REQ_ALL_CACHED
 	if len(excludes) > 0 {
-		msg := new(rpc.Message)
+		msg := &rpc.Message{}
 		data := make([]byte, 0, len(excludes)*90)
 		for _, i := range excludes {
 			data = append(data, []byte(i)...)
