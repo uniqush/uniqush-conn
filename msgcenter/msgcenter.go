@@ -86,6 +86,9 @@ func (self *MessageCenter) getServiceCenter(srv string) *serviceCenter {
 }
 
 func (self *MessageCenter) serveConn(c net.Conn) {
+	if tcpConn, ok := c.(*net.TCPConn); ok {
+		tcpConn.SetKeepAlive(true)
+	}
 	conn, err := server.AuthConn(c, self.privkey, self.config, self.config.HandshakeTimeout)
 	if err != nil {
 		if err != server.ErrAuthFail {
