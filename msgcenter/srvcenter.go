@@ -104,6 +104,7 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 
 	shouldPush := !req.DontPush
 	shouldCache := !req.DontCache
+	shouldPropagate := !req.DontPropagate
 	receivers := req.Receivers
 
 	for _, recver := range receivers {
@@ -155,9 +156,11 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 		req.Id = mid
 		req.Receivers = []string{recver}
 
-		r := self.peer.Send(req)
-		n += r.NrSuccess()
-		ret.Join(r)
+		if shouldPropagate {
+			r := self.peer.Send(req)
+			n += r.NrSuccess()
+			ret.Join(r)
+		}
 
 		if n == 0 && shouldPush {
 			self.config.Push(recver, "", "", req.PushInfo, mid, msg.Size())
@@ -190,6 +193,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	var shouldForward bool
 	shouldPush := !req.DontPush
 	shouldCache := !req.DontCache
+	shouldPropagate := !req.DontPropagate
 
 	if !req.DontAsk {
 		// We need to ask for permission to forward this message.
@@ -250,9 +254,11 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		req.Id = mid
 		req.Receivers = []string{recver}
 
-		r := self.peer.Forward(req)
-		n += r.NrSuccess()
-		ret.Join(r)
+		if shouldPropagate {
+			r := self.peer.Forward(req)
+			n += r.NrSuccess()
+			ret.Join(r)
+		}
 
 		if n == 0 && shouldPush {
 			self.config.Push(recver, req.SenderService, req.Sender, pushInfo, mid, msg.Size())
