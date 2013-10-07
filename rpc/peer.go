@@ -38,8 +38,8 @@ type UniqushConnPeer interface {
 }
 
 type UniqushConnInstance struct {
-	addr    string
-	timeout time.Duration
+	Addr    string        `json:"addr"`
+	Timeout time.Duration `json:"timeout,omitempty"`
 }
 
 func NewUniqushConnInstance(u *url.URL, timeout time.Duration) (instance *UniqushConnInstance, err error) {
@@ -47,8 +47,11 @@ func NewUniqushConnInstance(u *url.URL, timeout time.Duration) (instance *Uniqus
 		return nil, fmt.Errorf("%v is not supported", u.Scheme)
 	}
 	instance = new(UniqushConnInstance)
-	instance.timeout = timeout
-	instance.addr = u.String()
+	if timeout < 3*time.Second {
+		timeout = 3 * time.Second
+	}
+	instance.Timeout = timeout
+	instance.Addr = u.String()
 	return
 }
 
@@ -75,7 +78,7 @@ func (self *UniqushConnInstance) post(url string, data interface{}, out interfac
 	}
 	c := http.Client{
 		Transport: &http.Transport{
-			Dial: timeoutDialler(self.timeout),
+			Dial: timeoutDialler(self.Timeout),
 		},
 	}
 	resp, err := c.Post(url, "application/json", bytes.NewReader(jdata))
@@ -96,7 +99,7 @@ func (self *UniqushConnInstance) post(url string, data interface{}, out interfac
 
 func (self *UniqushConnInstance) requestThenResult(path string, req interface{}) *Result {
 	result := new(Result)
-	status := self.post(self.addr+path, req, result)
+	status := self.post(self.Addr+path, req, result)
 	if status != 200 {
 		return nil
 	}

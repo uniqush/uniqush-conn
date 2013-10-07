@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/msgcenter"
+	"net/url"
 
 	"github.com/uniqush/uniqush-conn/rpc"
 
@@ -62,6 +63,23 @@ func forward(center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
 	return &rpc.Result{Error: fmt.Errorf("invalid req type")}
 }
 
+func addInstance(center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
+	if r, ok := req.(*rpc.UniqushConnInstance); ok {
+		u, err := url.Parse(r.Addr)
+		if err != nil {
+			return &rpc.Result{Error: err}
+		}
+		instance, err := rpc.NewUniqushConnInstance(u, r.Timeout)
+		if err != nil {
+			return &rpc.Result{Error: err}
+		}
+
+		center.AddPeer(instance)
+		return &rpc.Result{}
+	}
+	return &rpc.Result{Error: fmt.Errorf("invalid req type")}
+}
+
 type HttpRequestProcessor struct {
 	center *msgcenter.MessageCenter
 	addr   string
@@ -77,6 +95,9 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	case rpc.FORWARD_MESSAGE_PATH:
 		fwdReq := &rpc.ForwardRequest{}
 		processJsonRequest(w, r, fwdReq, self.center, forward)
+	case "/join.json":
+		instance := &rpc.UniqushConnInstance{}
+		processJsonRequest(w, r, instance, self.center, addInstance)
 	}
 }
 
