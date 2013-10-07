@@ -50,6 +50,9 @@ func (self *MultiPeer) do(f func(p UniqushConnPeer) *Result) *Result {
 
 	for _, p := range self.peers {
 		r := f(p)
+		if r == nil {
+			continue
+		}
 		if r.Error != nil {
 			ret.Error = r.Error
 			return ret
@@ -61,12 +64,18 @@ func (self *MultiPeer) do(f func(p UniqushConnPeer) *Result) *Result {
 }
 
 func (self *MultiPeer) Send(req *SendRequest) *Result {
+	if req.DontPropagate {
+		return nil
+	}
 	return self.do(func(p UniqushConnPeer) *Result {
 		return p.Send(req)
 	})
 }
 
 func (self *MultiPeer) Forward(req *ForwardRequest) *Result {
+	if req.DontPropagate {
+		return nil
+	}
 	return self.do(func(p UniqushConnPeer) *Result {
 		return p.Forward(req)
 	})

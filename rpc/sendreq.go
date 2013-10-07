@@ -20,8 +20,9 @@ package rpc
 import "time"
 
 type SendRequest struct {
-	DontCache bool `json:"dont-cache,omitempty"`
-	DontPush  bool `json:"dont-push,omitempty"`
+	DontPropagate bool `json:"dont-propagate,omitempty"`
+	DontCache     bool `json:"dont-cache,omitempty"`
+	DontPush      bool `json:"dont-push,omitempty"`
 
 	Receivers       []string      `json:"receivers"`
 	ReceiverService string        `json:"receiver-service"`

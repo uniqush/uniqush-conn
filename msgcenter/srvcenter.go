@@ -104,8 +104,9 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 
 	shouldPush := !req.DontPush
 	shouldCache := !req.DontCache
+	receivers := req.Receivers
 
-	for _, recver := range req.Receivers {
+	for _, recver := range receivers {
 		mid := req.Id
 		msg := req.Message
 
@@ -145,11 +146,15 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 			return nil
 		})
 
+		// Don't propagate this request to other instances in the cluster.
+		req.DontPropagate = true
 		// Don't push the message. We will push it on this node.
 		req.DontPush = true
 		// Don't cache the message. We have already cached it.
 		req.DontCache = true
 		req.Id = mid
+		req.Receivers = []string{recver}
+
 		r := self.peer.Send(req)
 		n += r.NrSuccess()
 		ret.Join(r)
@@ -199,7 +204,9 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		}
 	}
 
-	for _, recver := range req.Receivers {
+	receivers := req.Receivers
+
+	for _, recver := range receivers {
 		if shouldCache {
 			mid, ret.Error = self.config.CacheMessage(recver, mc, req.TTL)
 			if ret.Error != nil {
@@ -232,6 +239,8 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		})
 
 		// forward the message if possible,
+		// Don't propagate this request to other instances in the cluster.
+		req.DontPropagate = true
 		// Don't ask the permission to forward (we have already got the permission)
 		req.DontAsk = true
 		// And don't push the message. We will push it on this node.
@@ -239,6 +248,8 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 		// Dont' cache it
 		req.DontCache = true
 		req.Id = mid
+		req.Receivers = []string{recver}
+
 		r := self.peer.Forward(req)
 		n += r.NrSuccess()
 		ret.Join(r)
