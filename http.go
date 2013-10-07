@@ -71,10 +71,10 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	defer r.Body.Close()
 
 	switch r.URL.Path {
-	case "/send.json":
+	case rpc.SEND_MESSAGE_PATH:
 		sendReq := &rpc.SendRequest{}
 		processJsonRequest(w, r, sendReq, self.center, send)
-	case "/fwd.json":
+	case rpc.FORWARD_MESSAGE_PATH:
 		fwdReq := &rpc.ForwardRequest{}
 		processJsonRequest(w, r, fwdReq, self.center, forward)
 	}
