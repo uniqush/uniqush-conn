@@ -35,6 +35,7 @@ const (
 type UniqushConnPeer interface {
 	Send(req *SendRequest) *Result
 	Forward(req *ForwardRequest) *Result
+	Id() string
 }
 
 type UniqushConnInstance struct {
@@ -53,6 +54,10 @@ func NewUniqushConnInstance(u *url.URL, timeout time.Duration) (instance *Uniqus
 	instance.Timeout = timeout
 	instance.Addr = u.String()
 	return
+}
+
+func (self *UniqushConnInstance) Id() string {
+	return self.Addr
 }
 
 func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err error) {

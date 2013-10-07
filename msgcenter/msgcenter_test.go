@@ -243,7 +243,7 @@ func TestSendMessageFromServerToClients(t *testing.T) {
 						Message:         mc.Message,
 					}
 					result := center.Send(req)
-					if result.Error != nil {
+					if result.Error != "" {
 						t.Errorf("Error on sending: %v", result.Error)
 					}
 					if result.NrSuccess() != 1 {
@@ -360,7 +360,7 @@ func TestSendMessageFromServerToClientsWithSingleRequest(t *testing.T) {
 				Message:         mc.Message,
 			}
 			result := center.Send(req)
-			if result.Error != nil {
+			if result.Error != "" {
 				t.Errorf("Error on sending: %v", result.Error)
 			}
 			if result.NrSuccess() != len(usrs) {

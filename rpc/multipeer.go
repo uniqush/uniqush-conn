@@ -17,17 +17,28 @@
 
 package rpc
 
-import "sync"
+import (
+	"fmt"
+	"math/rand"
+	"sync"
+	"time"
+)
 
 type MultiPeer struct {
 	peers []UniqushConnPeer
 	lock  sync.Mutex
+	id    string
 }
 
 func NewMultiPeer(peers ...UniqushConnPeer) *MultiPeer {
 	ret := new(MultiPeer)
 	ret.peers = peers
+	ret.id = fmt.Sprintf("%v-%v", time.Now().UnixNano(), rand.Int63())
 	return ret
+}
+
+func (self *MultiPeer) Id() string {
+	return self.id
 }
 
 func (self *MultiPeer) AddPeer(p UniqushConnPeer) {
@@ -37,6 +48,14 @@ func (self *MultiPeer) AddPeer(p UniqushConnPeer) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
+	peerId := p.Id()
+
+	// We don't want to add same peer twice
+	for _, i := range self.peers {
+		if i.Id() == peerId {
+			return
+		}
+	}
 	self.peers = append(self.peers, p)
 }
 
@@ -53,7 +72,7 @@ func (self *MultiPeer) do(f func(p UniqushConnPeer) *Result) *Result {
 		if r == nil {
 			continue
 		}
-		if r.Error != nil {
+		if r.Error != "" {
 			ret.Error = r.Error
 			return ret
 		}

@@ -90,15 +90,15 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 	ret := new(rpc.Result)
 
 	if req == nil {
-		ret.Error = fmt.Errorf("invalid request")
+		ret.SetError(fmt.Errorf("invalid request"))
 		return ret
 	}
 	if req.Message == nil || req.Message.IsEmpty() {
-		ret.Error = fmt.Errorf("invalid request: empty message")
+		ret.SetError(fmt.Errorf("invalid request: empty message"))
 		return ret
 	}
 	if len(req.Receivers) == 0 {
-		ret.Error = fmt.Errorf("invalid request: no receiver")
+		ret.SetError(fmt.Errorf("invalid request: no receiver"))
 		return ret
 	}
 
@@ -117,14 +117,16 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 				SenderService: "",
 				Message:       msg,
 			}
-			mid, ret.Error = self.config.CacheMessage(recver, mc, req.TTL)
-			if ret.Error != nil {
+			var err error
+			mid, err = self.config.CacheMessage(recver, mc, req.TTL)
+			if err != nil {
+				ret.SetError(err)
 				return ret
 			}
 		}
 
 		if len(mid) == 0 {
-			ret.Error = fmt.Errorf("undefined message Id")
+			ret.SetError(fmt.Errorf("undefined message Id"))
 			return ret
 		}
 
@@ -173,15 +175,15 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	ret := new(rpc.Result)
 
 	if req == nil {
-		ret.Error = fmt.Errorf("invalid request")
+		ret.SetError(fmt.Errorf("invalid request"))
 		return ret
 	}
 	if req.Message == nil || req.Message.IsEmpty() {
-		ret.Error = fmt.Errorf("invalid request: empty message")
+		ret.SetError(fmt.Errorf("invalid request: empty message"))
 		return ret
 	}
 	if len(req.Receivers) == 0 {
-		ret.Error = fmt.Errorf("invalid request: no receiver")
+		ret.SetError(fmt.Errorf("invalid request: no receiver"))
 		return ret
 	}
 
@@ -212,14 +214,16 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 
 	for _, recver := range receivers {
 		if shouldCache {
-			mid, ret.Error = self.config.CacheMessage(recver, mc, req.TTL)
-			if ret.Error != nil {
+			var err error
+			mid, err = self.config.CacheMessage(recver, mc, req.TTL)
+			if err != nil {
+				ret.SetError(err)
 				return ret
 			}
 		}
 
 		if len(mid) == 0 {
-			ret.Error = fmt.Errorf("undefined message Id")
+			ret.SetError(fmt.Errorf("undefined message Id"))
 			return ret
 		}
 

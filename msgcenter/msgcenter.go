@@ -141,7 +141,7 @@ func (self *MessageCenter) do(srv string, f func(center *serviceCenter) *rpc.Res
 	center := self.getServiceCenter(srv)
 	if center == nil {
 		ret := new(rpc.Result)
-		ret.Error = fmt.Errorf("unknown service: %v", srv)
+		ret.SetError(fmt.Errorf("unknown service: %v", srv))
 		return ret
 	}
 	return f(center)

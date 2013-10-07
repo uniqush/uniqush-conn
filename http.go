@@ -21,14 +21,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/msgcenter"
+	"io/ioutil"
+	"math/rand"
 	"net/url"
+	"time"
 
 	"github.com/uniqush/uniqush-conn/rpc"
 
 	"net/http"
 )
 
-func processJsonRequest(w http.ResponseWriter, r *http.Request, req interface{}, center *msgcenter.MessageCenter, proc func(center *msgcenter.MessageCenter, req interface{}) *rpc.Result) {
+func (self *HttpRequestProcessor) processJsonRequest(w http.ResponseWriter,
+	r *http.Request, req interface{},
+	center *msgcenter.MessageCenter,
+	proc func(p *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result) {
 	if center == nil || req == nil {
 		return
 	}
@@ -38,51 +44,79 @@ func processJsonRequest(w http.ResponseWriter, r *http.Request, req interface{},
 
 	if err != nil {
 		res := &rpc.Result{
-			Error: err,
+			Error: err.Error(),
 		}
 		encoder.Encode(res)
 		return
 	}
 
-	res := proc(center, req)
+	res := proc(self, center, req)
 	encoder.Encode(res)
 	return
 }
 
-func send(center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
+func send(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
 	if r, ok := req.(*rpc.SendRequest); ok {
 		return center.Send(r)
 	}
-	return &rpc.Result{Error: fmt.Errorf("invalid req type")}
+	return &rpc.Result{Error: "invalid req type"}
 }
 
-func forward(center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
+func forward(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
 	if r, ok := req.(*rpc.ForwardRequest); ok {
 		return center.Forward(r)
 	}
-	return &rpc.Result{Error: fmt.Errorf("invalid req type")}
+	return &rpc.Result{Error: "invalid req type"}
 }
 
-func addInstance(center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
+func addInstance(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
 	if r, ok := req.(*rpc.UniqushConnInstance); ok {
 		u, err := url.Parse(r.Addr)
 		if err != nil {
-			return &rpc.Result{Error: err}
+			return &rpc.Result{Error: err.Error()}
+		}
+
+		isme, err := proc.isMyself(u.String())
+		if err != nil {
+			return &rpc.Result{Error: err.Error()}
+		}
+		if isme {
+			return &rpc.Result{Error: "This is me"}
 		}
 		instance, err := rpc.NewUniqushConnInstance(u, r.Timeout)
 		if err != nil {
-			return &rpc.Result{Error: err}
+			return &rpc.Result{Error: err.Error()}
 		}
 
 		center.AddPeer(instance)
-		return &rpc.Result{}
+		return &rpc.Result{Error: "Success"}
 	}
-	return &rpc.Result{Error: fmt.Errorf("invalid req type")}
+	return &rpc.Result{Error: "invalid req type"}
 }
 
 type HttpRequestProcessor struct {
 	center *msgcenter.MessageCenter
 	addr   string
+	myId   string
+}
+
+func (self *HttpRequestProcessor) isMyself(addr string) (bool, error) {
+	resp, err := http.Get(addr + "/id")
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	peerId := string(body)
+
+	if peerId == self.myId {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -91,13 +125,15 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	switch r.URL.Path {
 	case rpc.SEND_MESSAGE_PATH:
 		sendReq := &rpc.SendRequest{}
-		processJsonRequest(w, r, sendReq, self.center, send)
+		self.processJsonRequest(w, r, sendReq, self.center, send)
 	case rpc.FORWARD_MESSAGE_PATH:
 		fwdReq := &rpc.ForwardRequest{}
-		processJsonRequest(w, r, fwdReq, self.center, forward)
+		self.processJsonRequest(w, r, fwdReq, self.center, forward)
 	case "/join.json":
 		instance := &rpc.UniqushConnInstance{}
-		processJsonRequest(w, r, instance, self.center, addInstance)
+		self.processJsonRequest(w, r, instance, self.center, addInstance)
+	case "/id":
+		fmt.Fprintf(w, "%v", self.myId)
 	}
 }
 
@@ -111,5 +147,6 @@ func NewHttpRequestProcessor(addr string, center *msgcenter.MessageCenter) *Http
 	ret := new(HttpRequestProcessor)
 	ret.addr = addr
 	ret.center = center
+	ret.myId = fmt.Sprintf("%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
 	return ret
 }

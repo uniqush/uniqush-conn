@@ -20,8 +20,15 @@ package rpc
 import "net"
 
 type Result struct {
-	Error   error         `json:"error,omitempty"`
+	Error   string        `json:"error,omitempty"`
 	Results []*ConnResult `json:"results"`
+}
+
+func (self *Result) SetError(err error) {
+	if self == nil {
+		return
+	}
+	self.Error = err.Error()
 }
 
 func (self *Result) NrResults() int {
@@ -37,7 +44,7 @@ func (self *Result) NrSuccess() int {
 	}
 	ret := 0
 	for _, r := range self.Results {
-		if r.Error == nil {
+		if r.Error == "" {
 			ret++
 		}
 	}
@@ -51,10 +58,10 @@ func (self *Result) Join(r *Result) {
 	if r == nil {
 		return
 	}
-	if self.Error != nil {
+	if self.Error != "" {
 		return
 	}
-	if r.Error != nil {
+	if r.Error != "" {
 		self.Error = r.Error
 		return
 	}
@@ -78,7 +85,7 @@ func (self *Result) Append(c connDescriptor, err error) {
 	}
 	r := new(ConnResult)
 	r.ConnId = c.UniqId()
-	r.Error = err
+	r.Error = err.Error()
 	r.Visible = c.Visible()
 	r.Username = c.Username()
 	r.Service = c.Service()
@@ -87,7 +94,7 @@ func (self *Result) Append(c connDescriptor, err error) {
 
 type ConnResult struct {
 	ConnId   string `json:"conn-id"`
-	Error    error  `json:"error,omitempty"`
+	Error    string `json:"error,omitempty"`
 	Visible  bool   `json:"visible"`
 	Username string `josn:"username"`
 	Service  string `json:"service"`
