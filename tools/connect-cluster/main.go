@@ -48,8 +48,14 @@ func main() {
 	}
 	req := &rpc.UniqushConnInstance{}
 
-	for _, target := range list {
-		for _, peer := range list {
+	for i, target := range list {
+		fmt.Printf("Adding peers for %v...\n", target)
+		for j, peer := range list {
+			if i == j {
+				// uniqush-conn can perfectly handle this situation.
+				// But why should we bother it? We can skip this condition easily
+				continue
+			}
 			req.Addr = peer
 			req.Timeout = *flagTimeout
 			data, err := json.Marshal(req)
@@ -57,7 +63,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				continue
 			}
-			resp, err := http.Post(target, "application/json", bytes.NewReader(data))
+			resp, err := http.Post(target+"/join.json", "application/json", bytes.NewReader(data))
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				continue
@@ -68,7 +74,7 @@ func main() {
 				continue
 			}
 
-			fmt.Printf("%v\n", string(body))
+			fmt.Printf("\t%v: %v", peer, string(body))
 		}
 	}
 }

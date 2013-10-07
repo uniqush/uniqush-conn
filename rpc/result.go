@@ -25,7 +25,7 @@ type Result struct {
 }
 
 func (self *Result) SetError(err error) {
-	if self == nil {
+	if self == nil || err == nil {
 		return
 	}
 	self.Error = err.Error()
@@ -85,7 +85,9 @@ func (self *Result) Append(c connDescriptor, err error) {
 	}
 	r := new(ConnResult)
 	r.ConnId = c.UniqId()
-	r.Error = err.Error()
+	if err != nil {
+		r.Error = err.Error()
+	}
 	r.Visible = c.Visible()
 	r.Username = c.Username()
 	r.Service = c.Service()
