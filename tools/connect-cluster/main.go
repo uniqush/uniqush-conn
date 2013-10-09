@@ -50,7 +50,13 @@ func main() {
 
 	for i, target := range list {
 		fmt.Printf("Adding peers for %v...\n", target)
+		if target == "" {
+			continue
+		}
 		for j, peer := range list {
+			if peer == "" {
+				continue
+			}
 			if i == j {
 				// uniqush-conn can perfectly handle this situation.
 				// But why should we bother it? We can skip this condition easily
