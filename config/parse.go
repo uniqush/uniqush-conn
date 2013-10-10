@@ -251,13 +251,16 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 		password := ""
 		username := ""
 		database := "0"
+		port := 0
 
 		for k, v := range fields {
 			switch k {
 			case "engine":
 				engine, err = parseString(v)
-			case "addr":
+			case "host":
 				addr, err = parseString(v)
+			case "port":
+				port, err = parseInt(v)
 			case "username":
 				username, err = parseString(v)
 			case "password":
@@ -270,7 +273,7 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 				return
 			}
 		}
-		cache, err = msgcache.GetCache(engine, addr, username, password, database)
+		cache, err = msgcache.GetCache(engine, addr, username, password, database, port)
 	} else {
 		err = fmt.Errorf("database info should be a map")
 	}

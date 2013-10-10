@@ -38,7 +38,7 @@ func (self *redisTestCacheManager) ClearCache(c Cache) {
 }
 
 func (self *redisTestCacheManager) GetCache() (Cache, error) {
-	return GetCache("redis", "", "", "", fmt.Sprintf("%v", self.db))
+	return GetCache("redis", "", "", "", fmt.Sprintf("%v", self.db), 0)
 }
 
 func TestRedisCache(t *testing.T) {

@@ -41,8 +41,7 @@ type Cache interface {
 }
 
 type CacheManager interface {
-	Init(addr, username, password, database string) error
-	GetCache(addr, username, password, database string) (Cache, error)
+	GetCache(host, username, password, database string, port int) (Cache, error)
 	Engine() string
 }
 
@@ -58,15 +57,11 @@ func Register(cm CacheManager) {
 	cacheEngineMap[cm.Engine()] = cm
 }
 
-func GetCache(engine, addr, username, password, database string) (Cache, error) {
+func GetCache(engine, host, username, password, database string, port int) (Cache, error) {
 	cacheEngineMapLock.Lock()
 	defer cacheEngineMapLock.Unlock()
 	if c, ok := cacheEngineMap[engine]; ok {
-		err := c.Init(addr, username, password, database)
-		if err != nil {
-			return nil, err
-		}
-		return c.GetCache(addr, username, password, database)
+		return c.GetCache(host, username, password, database, port)
 	}
 	return nil, fmt.Errorf("%v is not supported", engine)
 }

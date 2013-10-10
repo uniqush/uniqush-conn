@@ -23,6 +23,7 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"net"
 	"time"
 )
 
@@ -39,9 +40,25 @@ func (self *mysqlCacheManager) Engine() string {
 	return "mysql"
 }
 
-func (self *mysqlCacheManager) Init(addr, username, password, database string) error {
-	dsn := fmt.Sprintf("%v:%v@tcp(%v)/%v", username, password, addr, database)
-	db, err := sql.Open("mysql", dsn)
+func (self *mysqlCacheManager) GetCache(host, username, password, database string, port int) (Cache, error) {
+	if len(host) == 0 {
+		host = "127.0.0.1"
+	}
+	if port <= 0 {
+		port = 3306
+	}
+	addr := net.JoinHostPort(host, fmt.Sprintf("%v", port))
+	return NewMySQLMessageCache(username, password, addr, database)
+}
+
+type mysqlMessageCache struct {
+	db               *sql.DB
+	cacheStmt        *sql.Stmt
+	getMultiMsgStmt  *sql.Stmt
+	getSingleMsgStmt *sql.Stmt
+}
+
+func (self *mysqlMessageCache) init() error {
 	createTblStmt := `CREATE TABLE IF NOT EXISTS messages
 	(
 		mid CHAR(255) NOT NULL PRIMARY KEY,
@@ -58,7 +75,7 @@ func (self *mysqlCacheManager) Init(addr, username, password, database string) e
 	);`
 	createIdxStmt := `CREATE INDEX idx_owner_time ON messages (owner_service, owner_name, create_time, deadline);`
 
-	tx, err := db.Begin()
+	tx, err := self.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -77,17 +94,6 @@ func (self *mysqlCacheManager) Init(addr, username, password, database string) e
 		return err
 	}
 	return nil
-}
-
-func (self *mysqlCacheManager) GetCache(addr, username, password, database string) (Cache, error) {
-	return NewMySQLMessageCache(username, password, addr, database)
-}
-
-type mysqlMessageCache struct {
-	db               *sql.DB
-	cacheStmt        *sql.Stmt
-	getMultiMsgStmt  *sql.Stmt
-	getSingleMsgStmt *sql.Stmt
 }
 
 func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
@@ -129,6 +135,7 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 		return
 	}
 	c.getSingleMsgStmt = stmt
+	c.init()
 	return
 }
 

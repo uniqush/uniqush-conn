@@ -67,7 +67,8 @@ default:
   max-conns-per-user: 10
   db:
     engine: redis
-    addr: 127.0.0.1:6379
+    host: 127.0.0.1
+    port: 6379
     database: 1
     `
 

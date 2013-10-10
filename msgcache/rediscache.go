@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"net"
 
 	"strconv"
 	"time"
@@ -30,11 +31,7 @@ import (
 type redisCacheManager struct {
 }
 
-func (self *redisCacheManager) Init(addr, username, password, database string) error {
-	return nil
-}
-
-func (self *redisCacheManager) GetCache(addr, username, password, database string) (Cache, error) {
+func (self *redisCacheManager) GetCache(host, username, password, database string, port int) (Cache, error) {
 	db := 0
 	if len(database) > 0 {
 		var err error
@@ -44,7 +41,7 @@ func (self *redisCacheManager) GetCache(addr, username, password, database strin
 		}
 	}
 
-	return NewRedisMessageCache(addr, password, db), nil
+	return NewRedisMessageCache(host, password, port, db), nil
 }
 
 func (self *redisCacheManager) Engine() string {
@@ -55,14 +52,18 @@ type redisMessageCache struct {
 	pool *redis.Pool
 }
 
-func NewRedisMessageCache(addr, password string, db int) Cache {
-	if len(addr) == 0 {
-		addr = "localhost:6379"
+func NewRedisMessageCache(host, password string, port, db int) Cache {
+	if len(host) == 0 {
+		host = "localhost"
+	}
+	if port <= 0 {
+		port = 6379
 	}
 	if db < 0 {
 		db = 0
 	}
 
+	addr := net.JoinHostPort(host, fmt.Sprintf("%v", port))
 	dial := func() (redis.Conn, error) {
 		c, err := redis.Dial("tcp", addr)
 		if err != nil {
