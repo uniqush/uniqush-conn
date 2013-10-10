@@ -17,7 +17,10 @@
 
 package msgcache
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 type redisTestCacheManager struct {
 	db int
@@ -35,7 +38,7 @@ func (self *redisTestCacheManager) ClearCache(c Cache) {
 }
 
 func (self *redisTestCacheManager) GetCache() (Cache, error) {
-	return NewRedisMessageCache("", "", self.db), nil
+	return GetCache("redis", "", "", "", fmt.Sprintf("%v", self.db))
 }
 
 func TestRedisCache(t *testing.T) {

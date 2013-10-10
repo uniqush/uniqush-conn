@@ -113,7 +113,7 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 	c.cacheStmt = stmt
 	c.db = db
 
-	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, content
+	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
 		FROM messages
 		WHERE owner_service=? AND owner_name=? AND create_time>=? AND (deadline>=? OR deadline<=0) ORDER BY create_time;
 		`)
@@ -121,7 +121,7 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 		return
 	}
 	c.getMultiMsgStmt = stmt
-	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, content
+	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
 		FROM messages
 		WHERE mid=? AND (deadline>? OR deadline<=0);
 		`)
@@ -163,6 +163,7 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 	mc.Id = id
 
 	now := time.Now()
+	mc.Birthday = now
 	deadline := now.Add(ttl)
 	if ttl < 1*time.Second {
 		// max possible value for int64
@@ -192,7 +193,8 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 
 	mc = new(rpc.MessageContainer)
 	var data []byte
-	err = row.Scan(&mc.Id, &mc.SenderService, &mc.Sender, &data)
+	var createTime int64
+	err = row.Scan(&mc.Id, &mc.SenderService, &mc.Sender, &createTime, &data)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			err = nil
@@ -206,6 +208,7 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 	if err != nil {
 		return
 	}
+	mc.Birthday = time.Unix(createTime, 0)
 	return
 }
 
@@ -220,7 +223,8 @@ func (self *mysqlMessageCache) RetrieveAllSince(service, username string, since 
 	for rows.Next() {
 		mc := new(rpc.MessageContainer)
 		var data []byte
-		err = rows.Scan(&mc.Id, &mc.SenderService, &mc.Sender, &data)
+		var createTime int64
+		err = rows.Scan(&mc.Id, &mc.SenderService, &mc.Sender, &createTime, &data)
 		if err != nil {
 			return
 		}
@@ -229,6 +233,7 @@ func (self *mysqlMessageCache) RetrieveAllSince(service, username string, since 
 		if err != nil {
 			return
 		}
+		mc.Birthday = time.Unix(createTime, 0)
 		msgs = append(msgs, mc)
 	}
 	return

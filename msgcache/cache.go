@@ -20,6 +20,7 @@ package msgcache
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -65,4 +66,8 @@ func GetCache(engine, addr, username, password, database string) (Cache, error) 
 		return c.GetCache(addr, username, password, database)
 	}
 	return nil, fmt.Errorf("%v is not supported", engine)
+}
+
+func randomId() string {
+	return fmt.Sprintf("%x-%x", time.Now().Unix(), rand.Int63())
 }

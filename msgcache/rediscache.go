@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/rpc"
-	"math/rand"
+
 	"strconv"
 	"time"
 )
@@ -95,10 +95,6 @@ func NewRedisMessageCache(addr, password string, db int) Cache {
 	ret := new(redisMessageCache)
 	ret.pool = pool
 	return ret
-}
-
-func randomId() string {
-	return fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
 }
 
 func (self *redisMessageCache) CacheMessage(service, username string, msg *rpc.MessageContainer, ttl time.Duration) (id string, err error) {
