@@ -30,6 +30,10 @@ import (
 type redisCacheManager struct {
 }
 
+func (self *redisCacheManager) Init(addr, username, password, database string) error {
+	return nil
+}
+
 func (self *redisCacheManager) GetCache(addr, username, password, database string) (Cache, error) {
 	db := 0
 	if len(database) > 0 {

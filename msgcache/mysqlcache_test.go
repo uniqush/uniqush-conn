@@ -27,7 +27,8 @@ func (self *mysqlTestCacheManager) Name() string {
 }
 
 func (self *mysqlTestCacheManager) GetCache() (Cache, error) {
-	return NewMySQLMessageCache("uniqush", "uniqush-pass", "127.0.0.1:3306", "uniqush")
+	//return NewMySQLMessageCache("uniqush", "uniqush-pass", "127.0.0.1:3306", "uniqush")
+	return GetCache("mysql", "127.0.0.1:3306", "uniqush", "uniqush-pass", "uniqush")
 }
 
 func (self *mysqlTestCacheManager) ClearCache(c Cache) {

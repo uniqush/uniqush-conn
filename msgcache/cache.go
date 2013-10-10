@@ -37,6 +37,7 @@ type Cache interface {
 }
 
 type CacheManager interface {
+	Init(addr, username, password, database string) error
 	GetCache(addr, username, password, database string) (Cache, error)
 	Engine() string
 }
@@ -57,6 +58,10 @@ func GetCache(engine, addr, username, password, database string) (Cache, error) 
 	cacheEngineMapLock.Lock()
 	defer cacheEngineMapLock.Unlock()
 	if c, ok := cacheEngineMap[engine]; ok {
+		err := c.Init(addr, username, password, database)
+		if err != nil {
+			return nil, err
+		}
 		return c.GetCache(addr, username, password, database)
 	}
 	return nil, fmt.Errorf("%v is not supported", engine)

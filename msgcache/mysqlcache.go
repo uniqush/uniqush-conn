@@ -39,6 +39,46 @@ func (self *mysqlCacheManager) Engine() string {
 	return "mysql"
 }
 
+func (self *mysqlCacheManager) Init(addr, username, password, database string) error {
+	dsn := fmt.Sprintf("%v:%v@tcp(%v)/%v", username, password, addr, database)
+	db, err := sql.Open("mysql", dsn)
+	createTblStmt := `CREATE TABLE IF NOT EXISTS messages
+	(
+		mid CHAR(255) NOT NULL PRIMARY KEY,
+
+		owner_service CHAR(255) NOT NULL,
+		owner_name CHAR(255) NOT NULL,
+
+		sender_service CHAR(255),
+		sender_name CHAR(255),
+
+		create_time BIGINT,
+		deadline BIGINT,
+		content BLOB
+	);`
+	createIdxStmt := `CREATE INDEX idx_owner_time ON messages (owner_service, owner_name, create_time, deadline);`
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(createTblStmt)
+	if err != nil {
+		return err
+	}
+	// XXX we will ignore the error.
+	// Because it will always be an error if there exists
+	// an index with same name.
+	// Is there any way to only create index if it does not exist?
+	tx.Exec(createIdxStmt)
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (self *mysqlCacheManager) GetCache(addr, username, password, database string) (Cache, error) {
 	return NewMySQLMessageCache(username, password, addr, database)
 }
