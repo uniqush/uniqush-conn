@@ -18,9 +18,12 @@
 package msgcache
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+
 	"fmt"
 	"github.com/uniqush/uniqush-conn/rpc"
-	"math/rand"
+	"io"
 	"sync"
 	"time"
 )
@@ -69,5 +72,7 @@ func GetCache(engine, addr, username, password, database string) (Cache, error) 
 }
 
 func randomId() string {
-	return fmt.Sprintf("%x-%x", time.Now().Unix(), rand.Int63())
+	var d [8]byte
+	io.ReadFull(rand.Reader, d[:])
+	return fmt.Sprintf("%x-%v", time.Now().Unix(), base64.URLEncoding.EncodeToString(d[:]))
 }
