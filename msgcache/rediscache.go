@@ -127,6 +127,7 @@ func msgUnmarshal(data []byte) (msg *rpc.MessageContainer, err error) {
 
 func (self *redisMessageCache) set(service, username, id string, msg *rpc.MessageContainer, ttl time.Duration) error {
 	msg.Id = id
+	msg.Birthday = time.Now()
 	key := msgKey(service, username, id)
 	conn := self.pool.Get()
 	defer conn.Close()
