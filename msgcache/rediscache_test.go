@@ -19,27 +19,27 @@ package msgcache
 
 import "testing"
 
-type redisCacheManager struct {
+type redisTestCacheManager struct {
 	db int
 }
 
-func (self *redisCacheManager) Name() string {
+func (self *redisTestCacheManager) Name() string {
 	return "redis"
 }
 
-func (self *redisCacheManager) ClearCache(c Cache) {
+func (self *redisTestCacheManager) ClearCache(c Cache) {
 	if cache, ok := c.(*redisMessageCache); ok {
 		cache.pool.Get().Do("SELECT", self.db)
 		cache.pool.Get().Do("FLUSHDB")
 	}
 }
 
-func (self *redisCacheManager) GetCache() (Cache, error) {
+func (self *redisTestCacheManager) GetCache() (Cache, error) {
 	return NewRedisMessageCache("", "", self.db), nil
 }
 
 func TestRedisCache(t *testing.T) {
-	testCacheImpl(&redisCacheManager{1}, t)
+	testCacheImpl(&redisTestCacheManager{1}, t)
 }
 
 /*

@@ -19,23 +19,23 @@ package msgcache
 
 import "testing"
 
-type mysqlCachManager struct {
+type mysqlTestCacheManager struct {
 }
 
-func (self *mysqlCachManager) Name() string {
+func (self *mysqlTestCacheManager) Name() string {
 	return "mysql"
 }
 
-func (self *mysqlCachManager) GetCache() (Cache, error) {
-	return NewSQLMessageCache("uniqush", "uniqush-pass", "127.0.0.1:3306", "uniqush")
+func (self *mysqlTestCacheManager) GetCache() (Cache, error) {
+	return NewMySQLMessageCache("uniqush", "uniqush-pass", "127.0.0.1:3306", "uniqush")
 }
 
-func (self *mysqlCachManager) ClearCache(c Cache) {
+func (self *mysqlTestCacheManager) ClearCache(c Cache) {
 	if cache, ok := c.(*mysqlMessageCache); ok {
 		cache.db.Exec("DELETE FROM messages")
 	}
 }
 
 func TestMysqlCache(t *testing.T) {
-	testCacheImpl(&mysqlCachManager{}, t)
+	testCacheImpl(&mysqlTestCacheManager{}, t)
 }

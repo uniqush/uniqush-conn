@@ -69,7 +69,7 @@ func TestRequestAllCachedMessages(t *testing.T) {
 	wg.Add(1)
 
 	go func() {
-		cliConn.RequestAllCachedMessages()
+		cliConn.RequestAllCachedMessages(time.Time{})
 		for _, mc := range mcs {
 			rmc, err := cliConn.ReceiveMessage()
 			if err != nil {

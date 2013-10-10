@@ -32,6 +32,17 @@ const (
 	maxServicenameLength = 255
 )
 
+type mysqlCacheManager struct {
+}
+
+func (self *mysqlCacheManager) Engine() string {
+	return "mysql"
+}
+
+func (self *mysqlCacheManager) GetCache(addr, username, password, database string) (Cache, error) {
+	return NewMySQLMessageCache(username, password, addr, database)
+}
+
 type mysqlMessageCache struct {
 	db               *sql.DB
 	cacheStmt        *sql.Stmt
@@ -39,7 +50,10 @@ type mysqlMessageCache struct {
 	getSingleMsgStmt *sql.Stmt
 }
 
-func NewSQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
+func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
+	if len(address) == 0 {
+		address = "127.0.0.1:3306"
+	}
 	dsn := fmt.Sprintf("%v:%v@tcp(%v)/%v", username, password, address, dbname)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

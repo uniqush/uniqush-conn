@@ -21,6 +21,8 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"strconv"
+	"time"
 )
 
 type retriaveAllMessages struct {
@@ -46,8 +48,8 @@ func cutString(data []byte) (str, rest []byte, err error) {
 	return
 }
 
-func (self *retriaveAllMessages) sendAllCachedMessage(excludes ...string) error {
-	mcs, err := self.cache.GetCachedMessages(self.conn.Service(), self.conn.Username(), excludes...)
+func (self *retriaveAllMessages) sendAllCachedMessage(since time.Time) error {
+	mcs, err := self.cache.RetrieveAllSince(self.conn.Service(), self.conn.Username(), since)
 	if err != nil {
 		return err
 	}
@@ -71,22 +73,14 @@ func (self *retriaveAllMessages) ProcessCommand(cmd *proto.Command) (msg *rpc.Me
 	if cmd == nil || cmd.Type != proto.CMD_REQ_ALL_CACHED || self.conn == nil || self.cache == nil {
 		return
 	}
-	excludes := make([]string, 0, 10)
-	if cmd.Message != nil {
-		msg := cmd.Message
-		if len(msg.Body) > 0 {
-			data := msg.Body
-			for len(data) > 0 {
-				var id []byte
-				var err error
-				id, data, err = cutString(data)
-				if err != nil {
-					break
-				}
-				excludes = append(excludes, string(id))
-			}
+	since := time.Time{}
+	if len(cmd.Params) > 0 {
+		unix, err := strconv.ParseInt(cmd.Params[0], 10, 64)
+		if err != nil {
+			return nil, proto.ErrBadPeerImpl
 		}
+		since = time.Unix(unix, 0)
 	}
-	err = self.sendAllCachedMessage(excludes...)
+	err = self.sendAllCachedMessage(since)
 	return
 }

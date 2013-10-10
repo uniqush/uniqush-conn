@@ -68,7 +68,7 @@ default:
   db:
     engine: redis
     addr: 127.0.0.1:6379
-    name: 1
+    database: 1
     `
 
 func writeConfigFile(filename string) {

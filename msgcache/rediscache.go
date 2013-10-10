@@ -23,8 +23,29 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"math/rand"
+	"strconv"
 	"time"
 )
+
+type redisCacheManager struct {
+}
+
+func (self *redisCacheManager) GetCache(addr, username, password, database string) (Cache, error) {
+	db := 0
+	if len(database) > 0 {
+		var err error
+		db, err = strconv.Atoi(database)
+		if err != nil {
+			return nil, fmt.Errorf("bad database %v: %v", database, err)
+		}
+	}
+
+	return NewRedisMessageCache(addr, password, db), nil
+}
+
+func (self *redisCacheManager) Engine() string {
+	return "redis"
+}
 
 type redisMessageCache struct {
 	pool *redis.Pool

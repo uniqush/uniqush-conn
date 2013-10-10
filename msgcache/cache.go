@@ -18,13 +18,46 @@
 package msgcache
 
 import (
+	"fmt"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"sync"
 	"time"
 )
+
+func init() {
+	Register(&mysqlCacheManager{})
+	Register(&redisCacheManager{})
+}
 
 type Cache interface {
 	CacheMessage(service, username string, msg *rpc.MessageContainer, ttl time.Duration) (id string, err error)
 	// XXX Is there any better way to support retrieve all feature?
 	Get(service, username, id string) (msg *rpc.MessageContainer, err error)
 	RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error)
+}
+
+type CacheManager interface {
+	GetCache(addr, username, password, database string) (Cache, error)
+	Engine() string
+}
+
+var cacheEngineMapLock sync.Mutex
+var cacheEngineMap map[string]CacheManager
+
+func Register(cm CacheManager) {
+	cacheEngineMapLock.Lock()
+	defer cacheEngineMapLock.Unlock()
+	if cacheEngineMap == nil {
+		cacheEngineMap = make(map[string]CacheManager, 10)
+	}
+	cacheEngineMap[cm.Engine()] = cm
+}
+
+func GetCache(engine, addr, username, password, database string) (Cache, error) {
+	cacheEngineMapLock.Lock()
+	defer cacheEngineMapLock.Unlock()
+	if c, ok := cacheEngineMap[engine]; ok {
+		return c.GetCache(addr, username, password, database)
+	}
+	return nil, fmt.Errorf("%v is not supported", engine)
 }

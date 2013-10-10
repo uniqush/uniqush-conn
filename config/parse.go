@@ -249,7 +249,8 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 		engine := "redis"
 		addr := ""
 		password := ""
-		name := "0"
+		username := ""
+		database := "0"
 
 		for k, v := range fields {
 			switch k {
@@ -257,27 +258,19 @@ func parseCache(node yaml.Node) (cache msgcache.Cache, err error) {
 				engine, err = parseString(v)
 			case "addr":
 				addr, err = parseString(v)
+			case "username":
+				username, err = parseString(v)
 			case "password":
 				password, err = parseString(v)
-			case "name":
-				name, err = parseString(v)
+			case "database":
+				database, err = parseString(v)
 			}
 			if err != nil {
 				err = fmt.Errorf("[field=%v] %v", k, err)
 				return
 			}
 		}
-		if engine != "redis" {
-			err = fmt.Errorf("database %v is not supported", engine)
-			return
-		}
-		db := 0
-		db, err = strconv.Atoi(name)
-		if err != nil || db < 0 {
-			err = fmt.Errorf("invalid database name: %v", name)
-			return
-		}
-		cache = msgcache.NewRedisMessageCache(addr, password, db)
+		cache, err = msgcache.GetCache(engine, addr, username, password, database)
 	} else {
 		err = fmt.Errorf("database info should be a map")
 	}

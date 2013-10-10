@@ -139,8 +139,16 @@ const (
 
 	// Sent from client.
 	//
-	// This command will let the server to re-send all cached message.
-	// The message will be treated as normal message, i.e. if it is too large,
+	// Params:
+	//   0. An string representing an integer (base 10). This integer represents
+	//      a time point. The server should retrieve all valid messages sent to the
+	//      user since the specified time point. The representation of the time point
+	//      is in UNIX time: the number of seconds elapsed since January 1, 1970 UTC.
+	//
+	// This command will let the server to re-send all cached message since a
+	// specified time point.
+	//
+	// Each message will be treated as normal message, i.e. if it is too large,
 	// a digest will be sent instead.
 	//
 	// Normally, when the client got a "good" connection with server, it should first
