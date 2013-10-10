@@ -61,7 +61,7 @@ func NewSQLMessageCache(username, password, address, dbname string) (c *mysqlMes
 
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, content
 		FROM messages
-		WHERE owner_service=? AND owner_name=? AND create_time>? AND (deadline>? OR deadline<=0);
+		WHERE owner_service=? AND owner_name=? AND create_time>? AND (deadline>? OR deadline<=0) ORDER BY create_time;
 		`)
 	if err != nil {
 		return

@@ -17,51 +17,32 @@
 
 package msgcache
 
-import (
-	"crypto/rand"
-	"github.com/garyburd/redigo/redis"
-	"github.com/uniqush/uniqush-conn/rpc"
-	"io"
-	"testing"
-	"time"
-)
+import "testing"
 
-func randomMessage() *rpc.Message {
-	msg := new(rpc.Message)
-	msg.Body = make([]byte, 10)
-	io.ReadFull(rand.Reader, msg.Body)
-	msg.Header = make(map[string]string, 2)
-	msg.Header["aaa"] = "hello"
-	msg.Header["aa"] = "hell"
-	return msg
+type redisCacheManager struct {
+	db int
 }
 
-func multiRandomMessage(N int) []*rpc.MessageContainer {
-	msgs := make([]*rpc.MessageContainer, N)
-	for i := 0; i < N; i++ {
-		msgs[i] = new(rpc.MessageContainer)
-		msgs[i].Message = randomMessage()
+func (self *redisCacheManager) Name() string {
+	return "redis"
+}
+
+func (self *redisCacheManager) ClearCache(c Cache) {
+	if cache, ok := c.(*redisMessageCache); ok {
+		cache.pool.Get().Do("SELECT", self.db)
+		cache.pool.Get().Do("FLUSHDB")
 	}
-	return msgs
 }
 
-func clearDb() {
-	db := 1
-	c, _ := redis.Dial("tcp", "localhost:6379")
-	c.Do("SELECT", db)
-	c.Do("FLUSHDB")
-	c.Close()
+func (self *redisCacheManager) GetCache() (Cache, error) {
+	return NewRedisMessageCache("", "", self.db), nil
 }
 
-func getCache() Cache {
-	db := 1
-	c, _ := redis.Dial("tcp", "localhost:6379")
-	c.Do("SELECT", db)
-	c.Do("FLUSHDB")
-	c.Close()
-	return NewRedisMessageCache("", "", db)
+func TestRedisCache(t *testing.T) {
+	testCacheImpl(&redisCacheManager{1}, t)
 }
 
+/*
 func TestGetSetMessage(t *testing.T) {
 	N := 10
 	msgs := multiRandomMessage(N)
@@ -212,3 +193,4 @@ func TestCacheThenRetrieveAllWithTTL(t *testing.T) {
 		}
 	}
 }
+*/

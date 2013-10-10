@@ -17,14 +17,17 @@
 
 package rpc
 
+import "time"
+
 // MessageContainer is used to represent a message inside
 // the program. It has meta-data about a message like:
 // the message id, the sender and the service of the sender.
 type MessageContainer struct {
-	Message       *Message `json:"msg"`
-	Id            string   `json:"id,omitempty"`
-	Sender        string   `json:"sender,omitempty"`
-	SenderService string   `json:"sender-service,omitempty"`
+	Message       *Message  `json:"msg"`
+	Id            string    `json:"id,omitempty"`
+	Sender        string    `json:"s,omitempty"`
+	SenderService string    `json:"ss,omitempty"`
+	Birthday      time.Time `json:"b,omitempty"`
 }
 
 func (self *MessageContainer) FromServer() bool {

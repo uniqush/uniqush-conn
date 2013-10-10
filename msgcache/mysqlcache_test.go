@@ -17,98 +17,25 @@
 
 package msgcache
 
-import (
-	"time"
+import "testing"
 
-	"testing"
-)
+type mysqlCachManager struct {
+}
 
-func getMysqlCache() (*mysqlMessageCache, error) {
+func (self *mysqlCachManager) Name() string {
+	return "mysql"
+}
+
+func (self *mysqlCachManager) GetCache() (Cache, error) {
 	return NewSQLMessageCache("uniqush", "uniqush-pass", "127.0.0.1:3306", "uniqush")
 }
 
-func TestGetSetMessagesToMysql(t *testing.T) {
-	N := 10
-	msgs := multiRandomMessage(N)
-	cache, err := getMysqlCache()
-	if err != nil {
-		t.Errorf("%v", err)
-		return
-	}
-	srv := "myservice"
-	usr := "user2"
-
-	ids := make([]string, N, N)
-	for i, msg := range msgs {
-		id, err := cache.CacheMessage(srv, usr, msg, 0*time.Second)
-		if err != nil {
-			t.Errorf("set error: %v", err)
-			return
-		}
-		ids[i] = id
-	}
-	for i, msg := range msgs {
-		m, err := cache.Get(srv, usr, ids[i])
-		if err != nil {
-			t.Errorf("Del error: %v", err)
-			return
-		}
-		if !m.Message.Eq(msg.Message) {
-			t.Errorf("%vth message does not same", i)
-		}
+func (self *mysqlCachManager) ClearCache(c Cache) {
+	if cache, ok := c.(*mysqlMessageCache); ok {
+		cache.db.Exec("DELETE FROM messages")
 	}
 }
 
-func TestGetSetMessageTTLMysql(t *testing.T) {
-	N := 10
-	msgs := multiRandomMessage(N)
-	cache, err := getMysqlCache()
-	if err != nil {
-		t.Errorf("%v", err)
-		return
-	}
-	srv := "srv"
-	usr := "usr"
-
-	ids := make([]string, N)
-
-	for i, msg := range msgs {
-		id, err := cache.CacheMessage(srv, usr, msg, 1*time.Second)
-		if err != nil {
-			t.Errorf("Set error: %v", err)
-			return
-		}
-		ids[i] = id
-	}
-	time.Sleep(2 * time.Second)
-	for i, id := range ids {
-		m, err := cache.Get(srv, usr, id)
-		if err != nil {
-			t.Errorf("Get error: %v", err)
-			return
-		}
-		if m != nil {
-			t.Errorf("%vth message should be deleted", i)
-		}
-	}
-}
-
-func TestGetNonExistMsgMysql(t *testing.T) {
-	cache, err := getMysqlCache()
-	if err != nil {
-		t.Errorf("%v", err)
-		return
-	}
-	srv := "srv"
-	usr := "usr"
-
-	msg, err := cache.Get(srv, usr, "wont-be-a-good-message-id")
-	if err != nil {
-		t.Errorf("%v", err)
-		return
-	}
-	if msg != nil {
-		t.Errorf("should be nil message")
-		return
-	}
+func TestMysqlCache(t *testing.T) {
+	testCacheImpl(&mysqlCachManager{}, t)
 }

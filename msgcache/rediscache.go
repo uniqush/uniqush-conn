@@ -136,15 +136,18 @@ func (self *redisMessageCache) set(service, username, id string, msg *rpc.Messag
 		return err
 	}
 
-	reply, err := conn.Do("INCR", counterKey(service, username))
-	if err != nil {
-		return err
-	}
+	/*
+		reply, err := conn.Do("INCR", counterKey(service, username))
+		if err != nil {
+			return err
+		}
 
-	weight, err := redis.Int64(reply, err)
-	if err != nil {
-		return err
-	}
+		weight, err := redis.Int64(reply, err)
+		if err != nil {
+			return err
+		}
+	*/
+	weight := time.Now().Unix()
 	wkey := msgWeightKey(service, username, id)
 
 	err = conn.Send("MULTI")
@@ -300,7 +303,7 @@ func (self *redisMessageCache) GetThenDel(service, username, id string) (msg *pr
 }
 */
 
-func (self *redisMessageCache) GetCachedMessages(service, username string, excludes ...string) (msgs []*rpc.MessageContainer, err error) {
+func (self *redisMessageCache) RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error) {
 	msgQK := msgQueueKey(service, username)
 	conn := self.pool.Get()
 	defer conn.Close()
@@ -376,14 +379,8 @@ func (self *redisMessageCache) GetCachedMessages(service, username string, exclu
 			continue
 		}
 		msg, err = msgUnmarshal(data)
-		skip := false
-		for _, d := range excludes {
-			if d == msg.Id {
-				skip = true
-				break
-			}
-		}
-		if !skip {
+
+		if since.Before(msg.Birthday) {
 			msgShadow = append(msgShadow, msg)
 		}
 	}

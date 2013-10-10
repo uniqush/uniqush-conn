@@ -26,5 +26,5 @@ type Cache interface {
 	CacheMessage(service, username string, msg *rpc.MessageContainer, ttl time.Duration) (id string, err error)
 	// XXX Is there any better way to support retrieve all feature?
 	Get(service, username, id string) (msg *rpc.MessageContainer, err error)
-	GetCachedMessages(service, username string, excludes ...string) (msgs []*rpc.MessageContainer, err error)
+	RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error)
 }
