@@ -83,7 +83,7 @@ func TestGetSetMessage(t *testing.T) {
 	for i, msg := range msgs {
 		m, err := cache.Get(srv, usr, ids[i])
 		if err != nil {
-			t.Errorf("Del error: %v", err)
+			t.Errorf("Get error: %v", err)
 			return
 		}
 		if !m.Message.Eq(msg.Message) {
