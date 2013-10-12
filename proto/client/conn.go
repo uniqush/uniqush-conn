@@ -41,6 +41,7 @@ type Conn interface {
 
 	Config(digestThreshold, compressThreshold int, digestFields ...string) error
 	SetDigestChannel(digestChan chan<- *Digest)
+	SetRedirectChannel(redirChan chan<- *RedirectRequest)
 	RequestMessage(id string) error
 	SetVisibility(v bool) error
 	Subscribe(params map[string]string) error
@@ -185,7 +186,22 @@ func (self *clientConn) setCommandProcessor(cmdType uint8, proc CommandProcessor
 	self.cmdProcs[cmdType] = proc
 }
 
+func (self *clientConn) SetRedirectChannel(redirChan chan<- *RedirectRequest) {
+	if redirChan == nil {
+		return
+	}
+
+	proc := &redirectProcessor{
+		redirChan: redirChan,
+	}
+
+	self.setCommandProcessor(proto.CMD_REDIRECT, proc)
+}
+
 func (self *clientConn) SetDigestChannel(digestChan chan<- *Digest) {
+	if digestChan == nil {
+		return
+	}
 	proc := &digestProcessor{}
 	proc.digestChan = digestChan
 	proc.service = self.Service()
