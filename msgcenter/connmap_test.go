@@ -66,6 +66,10 @@ func (self *fakeConn) ReceiveMessage() (msg *rpc.Message, err error) {
 }
 func (self *fakeConn) SetMessageCache(cache msgcache.Cache) {
 }
+
+func (self *fakeConn) Redirect(addrs ...string) error {
+	return nil
+}
 func (self *fakeConn) SetForwardRequestChannel(fwdChan chan<- *rpc.ForwardRequest) {
 }
 func (self *fakeConn) SetSubscribeRequestChan(subChan chan<- *rpc.SubscribeRequest) {
