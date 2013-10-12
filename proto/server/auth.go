@@ -84,6 +84,7 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	cmd.Type = proto.CMD_AUTHOK
 	cmd.Params = nil
 	cmd.Message = nil
+	cmd.Randomize()
 	err = cmdio.WriteCommand(cmd, false)
 	if err != nil {
 		return
