@@ -159,6 +159,16 @@ const (
 	// network, like home wifi.)
 	CMD_REQ_ALL_CACHED
 
+	// Sent from server.
+	//
+	// Params:
+	//  0 - N. All possible addresses that the client can connect to.
+	//
+	// If a client received this command, it should disconnect with the server immediately.
+	// The server provides several alternative servers which are all uniqush-conn
+	// instances. The client could choose any one of them to connect with.
+	CMD_REDIRECT
+
 	CMD_NR_CMDS
 )
 
