@@ -70,13 +70,23 @@ func TestRequestAllCachedMessages(t *testing.T) {
 
 	go func() {
 		cliConn.RequestAllCachedMessages(time.Time{})
-		for _, mc := range mcs {
+		for _, _ = range mcs {
 			rmc, err := cliConn.ReceiveMessage()
 			if err != nil {
 				t.Errorf("Error: %v", err)
 			}
-			if !rmc.Eq(mc) {
-				t.Errorf("corrupted data")
+
+			found := false
+			for _, m := range mcs {
+				if rmc.Id == m.Id {
+					if !rmc.Eq(m) {
+						t.Errorf("corrupted data: %+v != %+v", rmc, m)
+					}
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("not found")
 			}
 		}
 		wg.Done()

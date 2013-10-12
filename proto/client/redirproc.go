@@ -23,7 +23,7 @@ import (
 )
 
 type RedirectRequest struct {
-	addresses []string
+	Addresses []string
 }
 
 type redirectProcessor struct {
@@ -40,7 +40,7 @@ func (self *redirectProcessor) ProcessCommand(cmd *proto.Command) (mc *rpc.Messa
 	}
 
 	req := new(RedirectRequest)
-	req.addresses = cmd.Params
+	req.Addresses = cmd.Params
 	self.redirChan <- req
 	return
 }

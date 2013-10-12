@@ -43,7 +43,7 @@ func clearCache() {
 func getCache() msgcache.Cache {
 	db := 1
 	clearCache()
-	return msgcache.NewRedisMessageCache("", "", db)
+	return msgcache.NewRedisMessageCache("", "", 0, db)
 }
 
 type messageContainerProcessor interface {
