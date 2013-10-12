@@ -53,6 +53,11 @@ type Conn interface {
 	// until it receives a Command with type CMD_DATA.
 	ReceiveMessage() (msg *rpc.Message, err error)
 
+	// Ask the client to connect to other servers.
+	// Redirect() will not close the connection. The user should call Close()
+	// seprately to close the connection.
+	Redirect(addrs ...string) error
+
 	SetMessageCache(cache msgcache.Cache)
 	SetForwardRequestChannel(fwdChan chan<- *rpc.ForwardRequest)
 	SetSubscribeRequestChan(subChan chan<- *rpc.SubscribeRequest)
@@ -169,6 +174,17 @@ func (self *serverConn) writeDigest(mc *rpc.MessageContainer, extra map[string]s
 
 	compress := self.shouldCompress(digest.Message.Size())
 	return self.cmdio.WriteCommand(digest, compress)
+}
+
+func (self *serverConn) Redirect(addrs ...string) error {
+	if len(addrs) == 0 {
+		return nil
+	}
+	cmd := &proto.Command{
+		Type:   proto.CMD_REDIRECT,
+		Params: addrs,
+	}
+	return self.cmdio.WriteCommand(cmd, false)
 }
 
 func (self *serverConn) SendMessage(msg *rpc.Message, id string, extra map[string]string) error {
