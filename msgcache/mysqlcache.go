@@ -61,7 +61,8 @@ type mysqlMessageCache struct {
 func (self *mysqlMessageCache) init() error {
 	createTblStmt := `CREATE TABLE IF NOT EXISTS messages
 	(
-		mid CHAR(255) NOT NULL PRIMARY KEY,
+		id CHAR(255) NOT NULL PRIMARY KEY,
+		mid CHAR(255),
 
 		owner_service CHAR(255) NOT NULL,
 		owner_name CHAR(255) NOT NULL,
@@ -105,19 +106,23 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 	if err != nil {
 		return
 	}
+	c = new(mysqlMessageCache)
+	c.db = db
+	err = c.init()
+	if err != nil {
+		return
+	}
 
 	stmt, err := db.Prepare(`INSERT INTO messages
-		(mid, owner_service, owner_name, sender_service, sender_name, create_time, deadline, content)
+		(id, mid, owner_service, owner_name, sender_service, sender_name, create_time, deadline, content)
 		VALUES
-		(?, ?, ?, ?, ?, ?, ?, ?)
+		(?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 	if err != nil {
 		return
 	}
 
-	c = new(mysqlMessageCache)
 	c.cacheStmt = stmt
-	c.db = db
 
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
 		FROM messages
@@ -129,14 +134,17 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 	c.getMultiMsgStmt = stmt
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
 		FROM messages
-		WHERE mid=? AND (deadline>? OR deadline<=0);
+		WHERE id=? AND (deadline>? OR deadline<=0);
 		`)
 	if err != nil {
 		return
 	}
 	c.getSingleMsgStmt = stmt
-	c.init()
 	return
+}
+
+func getUniqMessageId(service, username, id string) string {
+	return fmt.Sprintf("%v,%v,%v", service, username, id)
 }
 
 func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.MessageContainer, ttl time.Duration) (id string, err error) {
@@ -146,7 +154,9 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 	}
 
 	id = randomId()
-	if len(id) > maxMessageIdLength {
+
+	uniqid := getUniqMessageId(service, username, id)
+	if len(uniqid) > maxMessageIdLength {
 		err = fmt.Errorf("message id length is greater than %v characters", maxMessageIdLength)
 		return
 	}
@@ -177,7 +187,7 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 		deadline = time.Unix(0, 0)
 	}
 
-	result, err := self.cacheStmt.Exec(id, service, username, mc.SenderService, mc.Sender, now.Unix(), deadline.Unix(), data)
+	result, err := self.cacheStmt.Exec(uniqid, id, service, username, mc.SenderService, mc.Sender, now.Unix(), deadline.Unix(), data)
 	if err != nil {
 		return
 	}
@@ -193,7 +203,8 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 }
 
 func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.MessageContainer, err error) {
-	row := self.getSingleMsgStmt.QueryRow(id, time.Now().Unix())
+	uniqid := getUniqMessageId(service, username, id)
+	row := self.getSingleMsgStmt.QueryRow(uniqid, time.Now().Unix())
 	if err != nil {
 		return
 	}

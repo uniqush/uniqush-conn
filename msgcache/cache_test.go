@@ -78,6 +78,9 @@ func testGetSetMessages(m cacheManager, t *testing.T) {
 			t.Errorf("Del error: %v", err)
 			return
 		}
+		if m.Id != ids[i] {
+			t.Errorf("ask id %v; but get %v", ids[i], m.Id)
+		}
 		if !m.Message.Eq(msg.Message) {
 			t.Errorf("%vth message does not same", i)
 		}
