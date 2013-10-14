@@ -69,6 +69,20 @@ func forward(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req in
 	return &rpc.Result{Error: "invalid req type"}
 }
 
+func redirect(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
+	if r, ok := req.(*rpc.RedirectRequest); ok {
+		return center.Redirect(r)
+	}
+	return &rpc.Result{Error: "invalid req type"}
+}
+
+func checkUserStatus(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
+	if r, ok := req.(*rpc.UserStatusQuery); ok {
+		return center.CheckUserStatus(r)
+	}
+	return &rpc.Result{Error: "invalid req type"}
+}
+
 func addInstance(proc *HttpRequestProcessor, center *msgcenter.MessageCenter, req interface{}) *rpc.Result {
 	if r, ok := req.(*rpc.UniqushConnInstance); ok {
 		u, err := url.Parse(r.Addr)
@@ -129,6 +143,12 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	case rpc.FORWARD_MESSAGE_PATH:
 		fwdReq := &rpc.ForwardRequest{}
 		self.processJsonRequest(w, r, fwdReq, self.center, forward)
+	case rpc.USER_STATUS_QUERY_PATH:
+		usrStatusQuery := &rpc.UserStatusQuery{}
+		self.processJsonRequest(w, r, usrStatusQuery, self.center, checkUserStatus)
+	case rpc.REDIRECT_CLIENT_PATH:
+		redirReq := &rpc.RedirectRequest{}
+		self.processJsonRequest(w, r, redirReq, self.center, redirect)
 	case "/join.json":
 		instance := &rpc.UniqushConnInstance{}
 		self.processJsonRequest(w, r, instance, self.center, addInstance)

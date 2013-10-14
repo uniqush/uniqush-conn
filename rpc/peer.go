@@ -123,6 +123,10 @@ func (self *UniqushConnInstance) Forward(req *ForwardRequest) *Result {
 	return self.requestThenResult(FORWARD_MESSAGE_PATH, req)
 }
 
+func (self *UniqushConnInstance) Redirect(req *RedirectRequest) *Result {
+	return self.requestThenResult(REDIRECT_CLIENT_PATH, req)
+}
+
 func (self *UniqushConnInstance) CheckUserStatus(req *UserStatusQuery) *Result {
 	return self.requestThenResult(USER_STATUS_QUERY_PATH, req)
 }
