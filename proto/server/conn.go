@@ -23,6 +23,7 @@ import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
+	"strings"
 
 	"net"
 	"sync"
@@ -269,7 +270,7 @@ func isEOFlikeError(err error) bool {
 	}
 
 	// XXX any better idea?
-	if err.Error() == "use of closed network connection" {
+	if strings.HasSuffix(err.Error(), "use of closed network connection") {
 		return true
 	}
 	return false
