@@ -61,11 +61,11 @@ func (self *Config) ReadConfig(srv string) *ServiceConfig {
 	return self.defaultConfig
 }
 
-func (self *Config) Authenticate(srv, usr, token, addr string) (bool, error) {
+func (self *Config) Authenticate(srv, usr, connId, token, addr string) (bool, error) {
 	if self == nil || self.Auth == nil {
 		return false, nil
 	}
-	return self.Auth.Authenticate(srv, usr, token, addr)
+	return self.Auth.Authenticate(srv, usr, connId, token, addr)
 }
 
 type ServiceConfig struct {
