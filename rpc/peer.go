@@ -28,15 +28,17 @@ import (
 )
 
 const (
-	SEND_MESSAGE_PATH    = "/send.json"
-	FORWARD_MESSAGE_PATH = "/fwd.json"
-	REDIRECT_CLIENT_PATH = "/redir.json"
+	SEND_MESSAGE_PATH      = "/send.json"
+	FORWARD_MESSAGE_PATH   = "/fwd.json"
+	REDIRECT_CLIENT_PATH   = "/redir.json"
+	USER_STATUS_QUERY_PATH = "/usrstatus.json"
 )
 
 type UniqushConnPeer interface {
 	Send(req *SendRequest) *Result
 	Forward(req *ForwardRequest) *Result
 	Redirect(req *RedirectRequest) *Result
+	CheckUserStatus(req *UserStatusQuery) *Result
 	Id() string
 }
 
@@ -121,6 +123,6 @@ func (self *UniqushConnInstance) Forward(req *ForwardRequest) *Result {
 	return self.requestThenResult(FORWARD_MESSAGE_PATH, req)
 }
 
-func (self *UniqushConnInstance) Redirect(req *RedirectRequest) *Result {
-	return self.requestThenResult(REDIRECT_CLIENT_PATH, req)
+func (self *UniqushConnInstance) CheckUserStatus(req *UserStatusQuery) *Result {
+	return self.requestThenResult(USER_STATUS_QUERY_PATH, req)
 }

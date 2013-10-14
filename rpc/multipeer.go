@@ -99,3 +99,9 @@ func (self *MultiPeer) Redirect(req *RedirectRequest) *Result {
 		return p.Redirect(req)
 	})
 }
+
+func (self *MultiPeer) CheckUserStatus(req *UserStatusQuery) *Result {
+	return self.do(func(p UniqushConnPeer) *Result {
+		return p.CheckUserStatus(req)
+	})
+}

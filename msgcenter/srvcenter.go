@@ -76,7 +76,6 @@ func (self *serviceCenter) NewConn(conn server.Conn) {
 	conn.SetMessageCache(self.config.Cache())
 	conn.SetForwardRequestChannel(self.fwdChan)
 	conn.SetSubscribeRequestChan(self.subReqChan)
-	fmt.Printf("new conn: %v: %v\n", conn.Username(), conn.UniqId())
 	err := self.conns.AddConn(conn)
 	if err != nil {
 		self.config.OnError(conn, err)
@@ -274,15 +273,11 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 }
 
 func (self *serviceCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
-	fmt.Printf("Received redirect request: %+v\n", req)
 	conns := self.conns.GetConn(req.Receiver)
-	fmt.Printf("got %v connections for user %v\n", conns.NrConn(), req.Receiver)
 	var sc server.Conn
 	result := new(rpc.Result)
 	conns.Traverse(func(conn server.Conn) error {
-		fmt.Printf("conn: %v; %v; %v\n", conn.UniqId(), req.ConnId, req.ConnId == conn.UniqId())
 		if conn.UniqId() == req.ConnId {
-			fmt.Printf("found the conn: %v\n", req.ConnId)
 			sc = conn
 			result.Append(sc, nil)
 			return errors.New("done")
@@ -299,6 +294,21 @@ func (self *serviceCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
 		return result
 	}
 	return self.peer.Redirect(req)
+}
+
+func (self *serviceCenter) CheckUserStatus(req *rpc.UserStatusQuery) *rpc.Result {
+	conns := self.conns.GetConn(req.Username)
+	result := new(rpc.Result)
+	conns.Traverse(func(conn server.Conn) error {
+		result.Append(conn, nil)
+		return nil
+	})
+	if !req.DontPropagate {
+		return result
+	}
+	r := self.peer.CheckUserStatus(req)
+	result.Join(r)
+	return result
 }
 
 func (self *serviceCenter) processSubscription() {

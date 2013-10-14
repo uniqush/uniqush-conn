@@ -91,10 +91,12 @@ func (self *Result) Append(c connDescriptor, err error) {
 	r.Visible = c.Visible()
 	r.Username = c.Username()
 	r.Service = c.Service()
+	r.Address = c.RemoteAddr().String()
 	self.Results = append(self.Results, r)
 }
 
 type ConnResult struct {
+	Address  string `json:"address"`
 	ConnId   string `json:"conn-id"`
 	Error    string `json:"error,omitempty"`
 	Visible  bool   `json:"visible"`

@@ -128,7 +128,6 @@ func (self *serverInfo) connClient(username string) (conn client.Conn, err error
 		return
 	}
 	conn, err = client.Dial(c, &self.privkey.PublicKey, self.defaultService, username, "token", 10*time.Second)
-	fmt.Printf("new client: %v: %v\n", conn.Username(), conn.UniqId())
 	return
 }
 
@@ -181,11 +180,10 @@ func (self *clientMessageVerifier) RunAndVerify(mc ...*rpc.MessageContainer) []e
 
 	for i, conn := range self.conns {
 		wg.Add(1)
-		c := conn
-		go func() {
+		go func(c client.Conn, i int) {
 			ret[i] = verifySingle(c, mc...)
 			wg.Done()
-		}()
+		}(conn, i)
 	}
 	wg.Wait()
 	return ret
@@ -378,7 +376,6 @@ func TestSendMessageFromServerToClientsWithSingleRequest(t *testing.T) {
 	}
 }
 
-/*
 func TestRedirectClients(t *testing.T) {
 	clearCache()
 	defer clearCache()
@@ -403,9 +400,17 @@ func TestRedirectClients(t *testing.T) {
 
 	connIds := make(map[string]string, nrReceivers)
 
-	for _, c := range clients.conns {
-		fmt.Printf("%v: %v\n", c.Username(), c.UniqId())
-		connIds[c.Username()] = c.UniqId()
+	for _, usr := range usrs {
+		checkReq := &rpc.UserStatusQuery{
+			Service:  si.defaultService,
+			Username: usr,
+		}
+		checkResults := center.CheckUserStatus(checkReq)
+		if len(checkResults.Results) != 1 {
+			t.Errorf("User %v has %v connections\n", usr, len(checkResults.Results))
+			return
+		}
+		connIds[usr] = checkResults.Results[0].ConnId
 	}
 
 	redirChan := make(chan *client.RedirectRequest)
@@ -433,7 +438,6 @@ func TestRedirectClients(t *testing.T) {
 
 	go func() {
 		for _, usr := range usrs {
-			fmt.Printf("Sending redirect message to %v\n", usr)
 			req := &rpc.RedirectRequest{
 				Receiver:         usr,
 				ReceiverService:  si.defaultService,
@@ -443,7 +447,6 @@ func TestRedirectClients(t *testing.T) {
 			result := center.Redirect(req)
 			if len(result.Results) != 1 {
 				t.Errorf("For user %v, got %v results", usr, len(result.Results))
-				fmt.Printf("For user %v, conn %v, got %v results\n", usr, connIds[usr], len(result.Results))
 				return
 			}
 			if result.Results[0].Username != usr || result.Results[0].ConnId != connIds[usr] {
@@ -459,4 +462,3 @@ func TestRedirectClients(t *testing.T) {
 		}
 	}
 }
-*/

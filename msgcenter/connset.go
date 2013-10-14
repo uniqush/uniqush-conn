@@ -18,7 +18,6 @@
 package msgcenter
 
 import (
-	"fmt"
 	"github.com/petar/GoLLRB/llrb"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"sync"
@@ -121,7 +120,6 @@ func (self *connSet) add(conn server.Conn, max int) error {
 	if max > 0 && len(self.list) >= max {
 		return ErrTooManyConnForThisUser
 	}
-	fmt.Printf("new conn in set: %v: %v\n", conn.Username(), conn.UniqId())
 	self.list = append(self.list, conn)
 	return nil
 }

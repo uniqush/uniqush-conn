@@ -165,6 +165,12 @@ func (self *MessageCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
 	})
 }
 
+func (self *MessageCenter) CheckUserStatus(req *rpc.UserStatusQuery) *rpc.Result {
+	return self.do(req.Service, func(center *serviceCenter) *rpc.Result {
+		return center.CheckUserStatus(req)
+	})
+}
+
 func (self *MessageCenter) AddPeer(peer rpc.UniqushConnPeer) {
 	self.peers.AddPeer(peer)
 }
