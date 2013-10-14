@@ -23,11 +23,10 @@ import (
 	"github.com/uniqush/uniqush-conn/proto"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
-	"math/rand"
+
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // SendMessage() and ForwardMessage() are goroutine-safe.
@@ -330,13 +329,13 @@ func (self *serverConn) setCommandProcessor(cmdType uint8, proc CommandProcessor
 	self.cmdProcs[cmdType] = proc
 }
 
-func NewConn(cmdio *proto.CommandIO, service, username string, conn net.Conn) Conn {
+func NewConn(cmdio *proto.CommandIO, service, username, connId string, conn net.Conn) Conn {
 	ret := new(serverConn)
 	ret.conn = conn
 	ret.cmdio = cmdio
 	ret.service = service
 	ret.username = username
-	ret.connId = fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
+	ret.connId = connId //fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
 	ret.digestThreshold = 1024
 	ret.compressThreshold = 1024
 

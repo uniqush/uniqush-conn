@@ -31,7 +31,7 @@ const (
 	SEND_MESSAGE_PATH      = "/send.json"
 	FORWARD_MESSAGE_PATH   = "/fwd.json"
 	REDIRECT_CLIENT_PATH   = "/redir.json"
-	USER_STATUS_QUERY_PATH = "/usrstatus.json"
+	USER_STATUS_QUERY_PATH = "/user-status.json"
 )
 
 type UniqushConnPeer interface {

@@ -23,6 +23,7 @@ import (
 	"fmt"
 	. "github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
+	"math/rand"
 	"net"
 	"strings"
 	"time"
@@ -72,7 +73,8 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 		return
 	}
 
-	ok, err := auth.Authenticate(service, username, token, conn.RemoteAddr().String())
+	connId := fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
+	ok, err := auth.Authenticate(service, username, connId, token, conn.RemoteAddr().String())
 	if err != nil {
 		return
 	}
@@ -89,7 +91,7 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	if err != nil {
 		return
 	}
-	c = NewConn(cmdio, service, username, conn)
+	c = NewConn(cmdio, service, username, connId, conn)
 	err = nil
 	return
 }

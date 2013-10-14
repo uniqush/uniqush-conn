@@ -32,7 +32,7 @@ type singleUserAuth struct {
 	service, username, token string
 }
 
-func (self *singleUserAuth) Authenticate(srv, usr, token, addr string) (bool, error) {
+func (self *singleUserAuth) Authenticate(srv, usr, connId, token, addr string) (bool, error) {
 	if self.service == srv && self.username == usr && self.token == token {
 		return true, nil
 	}

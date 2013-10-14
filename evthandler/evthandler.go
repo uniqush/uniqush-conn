@@ -23,7 +23,7 @@ import (
 )
 
 type Authenticator interface {
-	Authenticate(srv, usr, token, addr string) (bool, error)
+	Authenticate(srv, usr, connId, token, addr string) (bool, error)
 }
 
 type LoginHandler interface {

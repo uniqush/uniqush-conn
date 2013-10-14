@@ -226,6 +226,7 @@ func (self *ForwardRequestHandler) MaxTTL() time.Duration {
 type authEvent struct {
 	Service  string `json:"service"`
 	Username string `json:"username"`
+	ConnId   string `json:"conn-id"`
 	Token    string `json:"token"`
 	Addr     string `json:"addr"`
 }
@@ -234,10 +235,11 @@ type AuthHandler struct {
 	webHook
 }
 
-func (self *AuthHandler) Authenticate(srv, usr, token, addr string) (pass bool, err error) {
+func (self *AuthHandler) Authenticate(srv, usr, connId, token, addr string) (pass bool, err error) {
 	evt := new(authEvent)
 	evt.Service = srv
 	evt.Username = usr
+	evt.ConnId = connId
 	evt.Token = token
 	evt.Addr = addr
 	pass = self.post(evt, nil) == 200
