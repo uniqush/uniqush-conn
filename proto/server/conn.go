@@ -94,6 +94,11 @@ func (self *serverConn) Close() error {
 	if self == nil {
 		return nil
 	}
+	cmd := &proto.Command{
+		Type: proto.CMD_BYE,
+	}
+	cmd.Randomize()
+	self.cmdio.WriteCommand(cmd, false)
 	return self.conn.Close()
 }
 
@@ -258,12 +263,24 @@ func (self *serverConn) processCommand(cmd *proto.Command) (msg *rpc.Message, er
 	return
 }
 
+func isEOFlikeError(err error) bool {
+	if err == io.ErrUnexpectedEOF || err == io.EOF {
+		return true
+	}
+
+	// XXX any better idea?
+	if err.Error() == "use of closed network connection" {
+		return true
+	}
+	return false
+}
+
 func (self *serverConn) ReceiveMessage() (msg *rpc.Message, err error) {
 	var cmd *proto.Command
 	for {
 		cmd, err = self.cmdio.ReadCommand()
 		if err != nil {
-			if err == io.ErrUnexpectedEOF || err == io.EOF {
+			if isEOFlikeError(err) {
 				err = io.EOF
 			}
 			return
