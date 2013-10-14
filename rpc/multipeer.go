@@ -93,3 +93,9 @@ func (self *MultiPeer) Forward(req *ForwardRequest) *Result {
 		return p.Forward(req)
 	})
 }
+
+func (self *MultiPeer) Redirect(req *RedirectRequest) *Result {
+	return self.do(func(p UniqushConnPeer) *Result {
+		return p.Redirect(req)
+	})
+}

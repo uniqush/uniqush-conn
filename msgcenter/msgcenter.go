@@ -159,6 +159,12 @@ func (self *MessageCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 	})
 }
 
+func (self *MessageCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
+	return self.do(req.ReceiverService, func(center *serviceCenter) *rpc.Result {
+		return center.Redirect(req)
+	})
+}
+
 func (self *MessageCenter) AddPeer(peer rpc.UniqushConnPeer) {
 	self.peers.AddPeer(peer)
 }

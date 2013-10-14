@@ -128,6 +128,7 @@ func (self *serverInfo) connClient(username string) (conn client.Conn, err error
 		return
 	}
 	conn, err = client.Dial(c, &self.privkey.PublicKey, self.defaultService, username, "token", 10*time.Second)
+	fmt.Printf("new client: %v: %v\n", conn.Username(), conn.UniqId())
 	return
 }
 
@@ -376,3 +377,86 @@ func TestSendMessageFromServerToClientsWithSingleRequest(t *testing.T) {
 		}
 	}
 }
+
+/*
+func TestRedirectClients(t *testing.T) {
+	clearCache()
+	defer clearCache()
+	si := newServerInfo(9891)
+
+	center, err := si.getMessageCenter()
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+
+	go center.Start()
+	defer center.Stop()
+
+	nrReceivers := 10
+	clients := &clientMessageVerifier{}
+	usrs, err := clients.genClient(nrReceivers, si)
+	if err != nil {
+		t.Errorf("Error: %v\n", err)
+		return
+	}
+
+	connIds := make(map[string]string, nrReceivers)
+
+	for _, c := range clients.conns {
+		fmt.Printf("%v: %v\n", c.Username(), c.UniqId())
+		connIds[c.Username()] = c.UniqId()
+	}
+
+	redirChan := make(chan *client.RedirectRequest)
+
+	redirServers := []string{"server1:100", "server2:200"}
+
+	for _, c := range clients.conns {
+		c.SetRedirectChannel(redirChan)
+	}
+
+	// This message will never be sent
+	msg := &rpc.MessageContainer{
+		Message: randomMessage(),
+	}
+
+	go func() {
+		for req := range redirChan {
+			for i, srv := range req.Addresses {
+				if redirServers[i] != srv {
+					t.Errorf("Received a redirect message to %v", srv)
+				}
+			}
+		}
+	}()
+
+	go func() {
+		for _, usr := range usrs {
+			fmt.Printf("Sending redirect message to %v\n", usr)
+			req := &rpc.RedirectRequest{
+				Receiver:         usr,
+				ReceiverService:  si.defaultService,
+				ConnId:           connIds[usr],
+				CandidateSersers: redirServers,
+			}
+			result := center.Redirect(req)
+			if len(result.Results) != 1 {
+				t.Errorf("For user %v, got %v results", usr, len(result.Results))
+				fmt.Printf("For user %v, conn %v, got %v results\n", usr, connIds[usr], len(result.Results))
+				return
+			}
+			if result.Results[0].Username != usr || result.Results[0].ConnId != connIds[usr] {
+				t.Errorf("wrong result: %+v; %+v", result, result.Results[0])
+			}
+		}
+	}()
+
+	errs := clients.RunAndVerify(msg)
+	for _, err := range errs {
+		if err != io.EOF {
+			t.Errorf("Received error not EOF: %v", err)
+		}
+	}
+}
+*/
