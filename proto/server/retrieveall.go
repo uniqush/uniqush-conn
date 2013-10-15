@@ -61,9 +61,9 @@ func (self *retriaveAllMessages) sendAllCachedMessage(since time.Time) error {
 			continue
 		}
 		if mc.FromServer() {
-			err = self.conn.SendMessage(mc.Message, mc.Id, nil)
+			err = self.conn.SendMessage(mc.Message, mc.Id, nil, true)
 		} else {
-			err = self.conn.ForwardMessage(mc.Sender, mc.SenderService, mc.Message, mc.Id)
+			err = self.conn.ForwardMessage(mc.Sender, mc.SenderService, mc.Message, mc.Id, true)
 		}
 	}
 	return nil

@@ -55,10 +55,10 @@ type connGenerator struct {
 	nextId int
 }
 
-func (self *fakeConn) SendMessage(msg *rpc.Message, id string, extra map[string]string) error {
+func (self *fakeConn) SendMessage(msg *rpc.Message, id string, extra map[string]string, tryDigest bool) error {
 	return nil
 }
-func (self *fakeConn) ForwardMessage(sender, senderService string, msg *rpc.Message, id string) error {
+func (self *fakeConn) ForwardMessage(sender, senderService string, msg *rpc.Message, id string, tryDigest bool) error {
 	return nil
 }
 func (self *fakeConn) ReceiveMessage() (msg *rpc.Message, err error) {

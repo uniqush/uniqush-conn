@@ -43,11 +43,11 @@ type Conn interface {
 
 	// If the message is generated from the server, then use SendMessage()
 	// to send it to the client.
-	SendMessage(msg *rpc.Message, id string, extra map[string]string) error
+	SendMessage(msg *rpc.Message, id string, extra map[string]string, tryDigest bool) error
 
 	// If the message is generated from another client, then
 	// use ForwardMessage() to send it to the client.
-	ForwardMessage(sender, senderService string, msg *rpc.Message, id string) error
+	ForwardMessage(sender, senderService string, msg *rpc.Message, id string, tryDigest bool) error
 
 	// ReceiveMessage() will keep receiving Commands from the client
 	// until it receives a Command with type CMD_DATA.
@@ -192,11 +192,7 @@ func (self *serverConn) Redirect(addrs ...string) error {
 	return self.cmdio.WriteCommand(cmd, false)
 }
 
-func (self *serverConn) SendMessage(msg *rpc.Message, id string, extra map[string]string) error {
-	return self.send(msg, id, extra, true)
-}
-
-func (self *serverConn) send(msg *rpc.Message, id string, extra map[string]string, tryDigest bool) error {
+func (self *serverConn) SendMessage(msg *rpc.Message, id string, extra map[string]string, tryDigest bool) error {
 	if msg == nil {
 		cmd := &proto.Command{
 			Type: proto.CMD_EMPTY,
@@ -222,11 +218,7 @@ func (self *serverConn) send(msg *rpc.Message, id string, extra map[string]strin
 	return self.cmdio.WriteCommand(cmd, self.shouldCompress(sz))
 }
 
-func (self *serverConn) ForwardMessage(sender, senderService string, msg *rpc.Message, id string) error {
-	return self.forward(sender, senderService, msg, id, true)
-}
-
-func (self *serverConn) forward(sender, senderService string, msg *rpc.Message, id string, tryDigest bool) error {
+func (self *serverConn) ForwardMessage(sender, senderService string, msg *rpc.Message, id string, tryDigest bool) error {
 	sz := msg.Size()
 	if sz == 0 {
 		return nil

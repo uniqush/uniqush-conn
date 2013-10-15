@@ -135,7 +135,7 @@ func (self *serviceCenter) Send(req *rpc.SendRequest) *rpc.Result {
 
 		conns := self.conns.GetConn(recver)
 		conns.Traverse(func(conn server.Conn) error {
-			err := conn.SendMessage(msg, mid, nil)
+			err := conn.SendMessage(msg, mid, nil, !req.NeverDigest)
 			ret.Append(conn, err)
 			if err != nil {
 				conn.Close()
@@ -232,7 +232,7 @@ func (self *serviceCenter) Forward(req *rpc.ForwardRequest) *rpc.Result {
 
 		conns := self.conns.GetConn(recver)
 		conns.Traverse(func(conn server.Conn) error {
-			err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid)
+			err := conn.ForwardMessage(req.Sender, req.SenderService, msg, mid, !req.NeverDigest)
 			ret.Append(conn, err)
 			if err != nil {
 				conn.Close()

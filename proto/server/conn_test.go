@@ -97,9 +97,9 @@ type serverSender struct {
 
 func (self *serverSender) ProcessMessageContainer(mc *rpc.MessageContainer) error {
 	if mc.FromUser() {
-		return self.conn.ForwardMessage(mc.Sender, mc.SenderService, mc.Message, mc.Id)
+		return self.conn.ForwardMessage(mc.Sender, mc.SenderService, mc.Message, mc.Id, true)
 	}
-	return self.conn.SendMessage(mc.Message, mc.Id, self.extra)
+	return self.conn.SendMessage(mc.Message, mc.Id, self.extra, true)
 }
 
 type serverReceiver struct {

@@ -42,13 +42,13 @@ func (self *messageRetriever) ProcessCommand(cmd *proto.Command) (msg *rpc.Messa
 		return
 	}
 	if mc == nil || mc.Message == nil {
-		err = self.conn.send(nil, id, nil, false)
+		err = self.conn.SendMessage(nil, id, nil, false)
 		return
 	}
 	if mc.FromServer() {
-		err = self.conn.send(mc.Message, id, nil, false)
+		err = self.conn.SendMessage(mc.Message, id, nil, false)
 	} else {
-		err = self.conn.forward(mc.Sender, mc.SenderService, mc.Message, id, false)
+		err = self.conn.ForwardMessage(mc.Sender, mc.SenderService, mc.Message, id, false)
 	}
 	return
 }
