@@ -201,6 +201,10 @@ func (self *CommandIO) ReadCommand() (cmd *Command, err error) {
 		return
 	}
 	cmd, err = self.decodeCommand(data)
+	if cmd.Type == CMD_BYE {
+		err = io.EOF
+		return
+	}
 	return
 }
 

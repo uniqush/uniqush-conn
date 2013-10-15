@@ -20,6 +20,7 @@ package rpc
 import "time"
 
 type SendRequest struct {
+	NeverDigest   bool `json:"never-digest,omitempty"`
 	DontPropagate bool `json:"dont-propagate,omitempty"`
 	DontCache     bool `json:"dont-cache,omitempty"`
 	DontPush      bool `json:"dont-push,omitempty"`
