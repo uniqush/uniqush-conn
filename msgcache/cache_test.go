@@ -19,6 +19,7 @@ package msgcache
 
 import (
 	"crypto/rand"
+	"fmt"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"io"
 	"testing"
@@ -48,6 +49,49 @@ type cacheManager interface {
 	GetCache() (cache Cache, err error)
 	ClearCache(cache Cache)
 	Name() string
+}
+
+func testGetSetMessageWithId(m cacheManager, t *testing.T) {
+	N := 10
+	msgs := multiRandomMessage(N)
+	cache, err := m.GetCache()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+
+	defer m.ClearCache(cache)
+	srv := "myservice"
+	usr := "user2"
+
+	ids := make([]string, N, N)
+	for i, msg := range msgs {
+		id := fmt.Sprintf("%v", i)
+		msg.Id = id
+		rid, err := cache.CacheMessage(srv, usr, msg, 0*time.Second)
+		if err != nil {
+			t.Errorf("set error: %v", err)
+			return
+		}
+		if rid != id {
+			t.Errorf("got a different id: %v", rid)
+			return
+		}
+		ids[i] = id
+	}
+	for i, msg := range msgs {
+		m, err := cache.Get(srv, usr, ids[i])
+		if err != nil {
+			t.Errorf("Del error: %v", err)
+			return
+		}
+		if m.Id != ids[i] {
+			t.Errorf("ask id %v; but get %v", ids[i], m.Id)
+		}
+		if !m.Message.Eq(msg.Message) {
+			t.Errorf("%vth message does not same", i)
+		}
+	}
 }
 
 func testGetSetMessages(m cacheManager, t *testing.T) {
@@ -336,6 +380,7 @@ func testRetrieveAllReserveOrder(m cacheManager, t *testing.T) {
 }
 
 func testCacheImpl(m cacheManager, t *testing.T) {
+	testGetSetMessageWithId(m, t)
 	testGetSetMessages(m, t)
 	testGetNonExistMessage(m, t)
 	testGetSetMessagesTTL(m, t)

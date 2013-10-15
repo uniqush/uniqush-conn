@@ -153,7 +153,12 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 		return
 	}
 
-	id = randomId()
+	if mc.Id == "" {
+		id = randomId()
+		mc.Id = id
+	} else {
+		id = mc.Id
+	}
 
 	uniqid := getUniqMessageId(service, username, id)
 	if len(uniqid) > maxMessageIdLength {
@@ -177,7 +182,6 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 		err = fmt.Errorf("service %v's name is too long", mc.SenderService)
 		return
 	}
-	mc.Id = id
 
 	now := time.Now()
 	mc.Birthday = now

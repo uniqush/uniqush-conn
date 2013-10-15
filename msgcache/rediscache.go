@@ -99,7 +99,11 @@ func NewRedisMessageCache(host, password string, port, db int) Cache {
 }
 
 func (self *redisMessageCache) CacheMessage(service, username string, msg *rpc.MessageContainer, ttl time.Duration) (id string, err error) {
-	id = randomId()
+	if msg.Id == "" {
+		id = randomId()
+	} else {
+		id = msg.Id
+	}
 	err = self.set(service, username, id, msg, ttl)
 	if err != nil {
 		id = ""
