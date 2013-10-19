@@ -21,7 +21,7 @@ import "net"
 
 type Result struct {
 	Error   string        `json:"error,omitempty"`
-	Results []*ConnResult `json:"results"`
+	Results []*ConnResult `json:"results,omitempty"`
 }
 
 func (self *Result) SetError(err error) {
