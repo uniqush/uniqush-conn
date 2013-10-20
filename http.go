@@ -171,7 +171,6 @@ func NewHttpRequestProcessor(addr string, center *msgcenter.MessageCenter) *Http
 	ret.center = center
 	var d [16]byte
 	io.ReadFull(rand.Reader, d[:])
-	//ret.myId = fmt.Sprintf("%v-%v", time.Now().UnixNano(), randid)
 	ret.myId = fmt.Sprintf("%x-%v", time.Now().Unix(), base64.URLEncoding.EncodeToString(d[:]))
 	return ret
 }

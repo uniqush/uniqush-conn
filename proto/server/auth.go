@@ -18,12 +18,14 @@
 package server
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	. "github.com/uniqush/uniqush-conn/evthandler"
 	"github.com/uniqush/uniqush-conn/proto"
-	"math/rand"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -73,7 +75,9 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 		return
 	}
 
-	connId := fmt.Sprintf("%x-%x", time.Now().UnixNano(), rand.Int63())
+	var d [16]byte
+	io.ReadFull(rand.Reader, d[:])
+	connId := fmt.Sprintf("%x-%v", time.Now().Unix(), base64.URLEncoding.EncodeToString(d[:]))
 	ok, err := auth.Authenticate(service, username, connId, token, conn.RemoteAddr().String())
 	if err != nil {
 		return
