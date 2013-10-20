@@ -18,11 +18,13 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/uniqush/uniqush-conn/msgcenter"
+	"io"
 	"io/ioutil"
-	"math/rand"
 	"net/url"
 	"time"
 
@@ -167,6 +169,9 @@ func NewHttpRequestProcessor(addr string, center *msgcenter.MessageCenter) *Http
 	ret := new(HttpRequestProcessor)
 	ret.addr = addr
 	ret.center = center
-	ret.myId = fmt.Sprintf("%v-%v-%v", time.Now().UnixNano(), rand.Int63(), rand.Int63())
+	var d [16]byte
+	io.ReadFull(rand.Reader, d[:])
+	//ret.myId = fmt.Sprintf("%v-%v", time.Now().UnixNano(), randid)
+	ret.myId = fmt.Sprintf("%x-%v", time.Now().Unix(), base64.URLEncoding.EncodeToString(d[:]))
 	return ret
 }

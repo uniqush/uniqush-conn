@@ -277,7 +277,7 @@ func (self *serviceCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
 	var sc server.Conn
 	result := new(rpc.Result)
 	conns.Traverse(func(conn server.Conn) error {
-		if conn.UniqId() == req.ConnId {
+		if len(req.ConnId) == 0 || conn.UniqId() == req.ConnId {
 			sc = conn
 			result.Append(sc, nil)
 			return errors.New("done")
@@ -291,9 +291,10 @@ func (self *serviceCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
 		return result
 	}
 
-	if !req.DontPropagate {
+	if req.DontPropagate {
 		return result
 	}
+	req.DontPropagate = true
 	return self.peer.Redirect(req)
 }
 
@@ -304,9 +305,10 @@ func (self *serviceCenter) CheckUserStatus(req *rpc.UserStatusQuery) *rpc.Result
 		result.Append(conn, nil)
 		return nil
 	})
-	if !req.DontPropagate {
+	if req.DontPropagate {
 		return result
 	}
+	req.DontPropagate = true
 	r := self.peer.CheckUserStatus(req)
 	result.Join(r)
 	return result
