@@ -286,6 +286,7 @@ func (self *serviceCenter) Redirect(req *rpc.RedirectRequest) *rpc.Result {
 	})
 	if sc != nil {
 		self.conns.DelConn(sc)
+		sc.Redirect(req.CandidateSersers...)
 		sc.Close()
 		return result
 	}

@@ -427,15 +427,21 @@ func TestRedirectClients(t *testing.T) {
 		Message: randomMessage(),
 	}
 
-	go func() {
+	go func(N int) {
+		n := 0
 		for req := range redirChan {
 			for i, srv := range req.Addresses {
 				if redirServers[i] != srv {
 					t.Errorf("Received a redirect message to %v", srv)
 				}
 			}
+			n++
 		}
-	}()
+
+		if n != N {
+			t.Errorf("Received %v redirect requests", n)
+		}
+	}(len(usrs))
 
 	go func() {
 		for _, usr := range usrs {
@@ -462,4 +468,5 @@ func TestRedirectClients(t *testing.T) {
 			t.Errorf("Received error not EOF: %v", err)
 		}
 	}
+	close(redirChan)
 }
