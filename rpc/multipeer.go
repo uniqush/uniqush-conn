@@ -26,7 +26,7 @@ import (
 
 type MultiPeer struct {
 	peers []UniqushConnPeer
-	lock  sync.Mutex
+	lock  sync.RWMutex
 	id    string
 }
 
@@ -64,8 +64,8 @@ func (self *MultiPeer) do(f func(p UniqushConnPeer) *Result) *Result {
 		return nil
 	}
 	ret := new(Result)
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 
 	for _, p := range self.peers {
 		r := f(p)
