@@ -149,11 +149,27 @@ func (self *MessageCenter) Stop() {
 	close(self.fwdChan)
 }
 
+func (self *MessageCenter) NrConns(srv string) int {
+	center := self.getServiceCenter(srv)
+	if center == nil {
+		return 0
+	}
+	return center.NrConns()
+}
+
+func (self *MessageCenter) NrUsers(srv string) int {
+	center := self.getServiceCenter(srv)
+	if center == nil {
+		return 0
+	}
+	return center.NrUsers()
+}
+
 func (self *MessageCenter) do(srv string, f func(center *serviceCenter) *rpc.Result) *rpc.Result {
 	center := self.getServiceCenter(srv)
 	if center == nil {
 		ret := new(rpc.Result)
-		ret.SetError(fmt.Errorf("unknown service: %v", srv))
+		//ret.SetError(fmt.Errorf("unknown service: %v", srv))
 		return ret
 	}
 	return f(center)
