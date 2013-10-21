@@ -445,11 +445,14 @@ func TestConcurrentGetAddDelDup(t *testing.T) {
 				return nil
 			})
 
-			time.Sleep(time.Duration(rand.Int63n(2000)) * time.Millisecond)
-			cmap.DelConn(delConn)
 			if err != nil {
 				t.Errorf("%v", err)
 			}
+
+			time.Sleep(time.Duration(rand.Int63n(2000)) * time.Millisecond)
+			cmap.DelConn(delConn)
+			// Delete twice so that we can make sure it won't be a problem.
+			cmap.DelConn(delConn)
 		}(usr)
 	}
 	wg.Wait()
