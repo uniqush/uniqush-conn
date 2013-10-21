@@ -311,18 +311,16 @@ func TestConcurrentGetAddDel(t *testing.T) {
 			defer wg.Done()
 			time.Sleep(time.Duration(rand.Int63n(3)) * time.Second)
 			cs := cmap.GetConn(c.Username())
-			if cs.NrConn() == 1 {
-				err := cs.Traverse(func(c1 server.Conn) error {
-					if c1.Username() != c.Username() {
-						return fmt.Errorf("Bad for user %v", c.Username())
-					}
-					return nil
-				})
-				if err != nil {
-					t.Errorf("%v", err)
+			err := cs.Traverse(func(c1 server.Conn) error {
+				if c1.Username() != c.Username() {
+					return fmt.Errorf("Bad for user %v", c.Username())
 				}
-
+				return nil
+			})
+			if err != nil {
+				t.Errorf("%v", err)
 			}
+
 		}(c)
 	}
 	for _, c := range conns {
@@ -341,6 +339,119 @@ func TestConcurrentGetAddDel(t *testing.T) {
 		cs := cmap.GetConn(c.Username())
 		if cs.NrConn() != 0 {
 			t.Errorf("deletion failed. nr conn: %v", cs.NrConn())
+		}
+	}
+}
+
+func TestConcurrentGetAddDelDup(t *testing.T) {
+	N := 1000
+	M := 3
+	cmap := newTreeBasedConnMap(0, 0, 0)
+	g := new(connGenerator)
+	conns := make([]server.Conn, 0, M*N)
+	users := make([]string, 0, N)
+	for j := 0; j < N; j++ {
+		c := g.nextConn()
+
+		for i := 0; i < M; i++ {
+			u := c.Username()
+			fc := &fakeConn{username: u, n: i}
+			conns = append(conns, fc)
+		}
+		users = append(users, c.Username())
+	}
+
+	var wg sync.WaitGroup
+
+	for _, c := range conns {
+		wg.Add(1)
+		go func(c server.Conn) {
+			defer wg.Done()
+			err := cmap.AddConn(c)
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}(c)
+	}
+
+	wg.Wait()
+
+	for _, usr := range users {
+		wg.Add(1)
+		go func(usr string) {
+			defer wg.Done()
+			cs := cmap.GetConn(usr)
+			if cs.NrConn() != M {
+				t.Errorf("Bad for user %v: nr conns=%v", usr, cs.NrConn())
+				return
+			}
+			err := cs.Traverse(func(c1 server.Conn) error {
+				if c1.Username() != usr {
+					return fmt.Errorf("Bad for user %v: got an user with name %v", usr, c1.Username())
+				}
+				return nil
+			})
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}(usr)
+	}
+	wg.Wait()
+
+	for _, usr := range users {
+		wg.Add(1)
+		go func(usr string) {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Int63n(3000)) * time.Millisecond)
+			cs := cmap.GetConn(usr)
+			err := cs.Traverse(func(c1 server.Conn) error {
+				if c1.Username() != usr {
+					return fmt.Errorf("Bad for user %v: got an user with name %v", usr, c1.Username())
+				}
+				return nil
+			})
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}(usr)
+	}
+
+	for _, usr := range users {
+		wg.Add(1)
+		go func(usr string) {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Int63n(3000)) * time.Millisecond)
+			cs := cmap.GetConn(usr)
+			if cs.NrConn() != M {
+				t.Errorf("Bad for user %v: nr conns=%v", usr, cs.NrConn())
+				return
+			}
+			var delConn server.Conn
+			i := 0
+			err := cs.Traverse(func(c1 server.Conn) error {
+				if i == 0 {
+					delConn = c1
+				}
+				i++
+				if c1.Username() != usr {
+					return fmt.Errorf("Bad for user %v: got an user with name %v", usr, c1.Username())
+				}
+				return nil
+			})
+
+			time.Sleep(time.Duration(rand.Int63n(2000)) * time.Millisecond)
+			cmap.DelConn(delConn)
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}(usr)
+	}
+	wg.Wait()
+
+	for _, c := range conns {
+		cs := cmap.GetConn(c.Username())
+		if cs.NrConn() != M-1 {
+			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), cs.NrConn())
 		}
 	}
 }
