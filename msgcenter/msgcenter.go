@@ -67,6 +67,18 @@ func NewMessageCenter(ln net.Listener, privkey *rsa.PrivateKey, conf *config.Con
 	return ret
 }
 
+func (self *MessageCenter) ServiceNames() []string {
+	self.srvCentersLock.Lock()
+	defer self.srvCentersLock.Unlock()
+
+	ret := make([]string, 0, len(self.serviceCenterMap))
+
+	for srv, _ := range self.serviceCenterMap {
+		ret = append(ret, srv)
+	}
+	return ret
+}
+
 func (self *MessageCenter) getServiceCenter(srv string) *serviceCenter {
 	self.srvCentersLock.Lock()
 	defer self.srvCentersLock.Unlock()
