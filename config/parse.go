@@ -54,6 +54,28 @@ func parseString(node yaml.Node) (str string, err error) {
 	return
 }
 
+func parseStringOrList(node yaml.Node) (str []string, err error) {
+	str = make([]string, 0, 2)
+	if l, ok := node.(yaml.List); ok {
+		var s string
+		for _, n := range l {
+			s, err = parseString(n)
+			if err != nil {
+				return
+			}
+			str = append(str, s)
+		}
+	} else {
+		var s string
+		s, err = parseString(node)
+		if err != nil {
+			return
+		}
+		str = append(str, s)
+	}
+	return
+}
+
 func parseDuration(node yaml.Node) (t time.Duration, err error) {
 	if scalar, ok := node.(yaml.Scalar); ok {
 		t, err = time.ParseDuration(string(scalar))
@@ -64,7 +86,7 @@ func parseDuration(node yaml.Node) (t time.Duration, err error) {
 }
 
 type webhookInfo struct {
-	url          string
+	urls         []string
 	timeout      time.Duration
 	defaultValue string
 }
@@ -73,9 +95,9 @@ func parseWebHook(node yaml.Node) (hook *webhookInfo, err error) {
 	if kv, ok := node.(yaml.Map); ok {
 		hook = new(webhookInfo)
 		if url, ok := kv["url"]; ok {
-			hook.url, err = parseString(url)
+			hook.urls, err = parseStringOrList(url)
 			if err != nil {
-				err = fmt.Errorf("webhook's url should be a string")
+				err = fmt.Errorf("webhook's url should be a string or a list of string")
 				return
 			}
 		} else {
@@ -111,7 +133,7 @@ func setWebHook(hd webhook.WebHook, node yaml.Node, timeout time.Duration) error
 		hook.timeout = timeout
 	}
 	hd.SetTimeout(hook.timeout)
-	hd.SetURL(hook.url)
+	hd.SetURL(hook.urls...)
 	if hook.defaultValue == "allow" {
 		hd.SetDefault(200)
 	} else {

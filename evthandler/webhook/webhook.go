@@ -27,19 +27,19 @@ import (
 )
 
 type WebHook interface {
-	SetURL(url string)
+	SetURL(urls ...string)
 	SetTimeout(timeout time.Duration)
 	SetDefault(d int)
 }
 
 type webHook struct {
-	URL     string
+	URLs    []string
 	Timeout time.Duration
 	Default int
 }
 
-func (self *webHook) SetURL(url string) {
-	self.URL = url
+func (self *webHook) SetURL(urls ...string) {
+	self.URLs = urls
 }
 
 func (self *webHook) SetTimeout(timeout time.Duration) {
@@ -64,7 +64,21 @@ func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err er
 }
 
 func (self *webHook) post(data interface{}, out interface{}) int {
-	if len(self.URL) == 0 || self.URL == "none" {
+	ret := self.Default
+	for _, url := range self.URLs {
+		status := self.postSingle(url, data, out)
+		if status == 200 {
+			if out != nil {
+				return status
+			}
+			ret = status
+		}
+	}
+	return ret
+}
+
+func (self *webHook) postSingle(url string, data interface{}, out interface{}) int {
+	if len(url) == 0 || url == "none" {
 		return self.Default
 	}
 	jdata, err := json.Marshal(data)
@@ -76,7 +90,7 @@ func (self *webHook) post(data interface{}, out interface{}) int {
 			Dial: timeoutDialler(self.Timeout),
 		},
 	}
-	resp, err := c.Post(self.URL, "application/json", bytes.NewReader(jdata))
+	resp, err := c.Post(url, "application/json", bytes.NewReader(jdata))
 	if err != nil {
 		return self.Default
 	}

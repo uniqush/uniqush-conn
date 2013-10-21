@@ -24,6 +24,7 @@ import (
 )
 
 var configFileContent string = `
+# This is a comment
 http-addr: 127.0.0.1:8088
 handshake-timeout: 10s
 auth:
@@ -35,7 +36,10 @@ err:
   timeout: 3s
 default:
   msg:
-    url: http://localhost:8080/msg
+  # A web hook takes either a url or a list of url
+    url:
+      - http://localhost:8080/msg
+      - http://localhost:8081/msg
     timeout: 3s
   err: 
     url: http://localhost:8080/err
