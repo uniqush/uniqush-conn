@@ -81,8 +81,8 @@ func (self *connSet) NrConn() int {
 	if self == nil {
 		return 0
 	}
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
 
 	return self.nrConn()
 }
