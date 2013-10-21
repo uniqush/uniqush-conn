@@ -149,6 +149,14 @@ func (self *MessageCenter) Stop() {
 	close(self.fwdChan)
 }
 
+func (self *MessageCenter) AllUsernames(srv string) []string {
+	center := self.getServiceCenter(srv)
+	if center == nil {
+		return nil
+	}
+	return center.AllUsernames()
+}
+
 func (self *MessageCenter) NrConns(srv string) int {
 	center := self.getServiceCenter(srv)
 	if center == nil {

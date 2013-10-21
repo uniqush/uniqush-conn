@@ -331,6 +331,10 @@ func (self *serviceCenter) NrUsers() int {
 	return self.conns.NrUsers()
 }
 
+func (self *serviceCenter) AllUsernames() []string {
+	return self.conns.AllUsernames()
+}
+
 func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, peer rpc.UniqushConnPeer) *serviceCenter {
 	if conf == nil || fwdChan == nil {
 		return nil
