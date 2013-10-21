@@ -22,8 +22,11 @@ import (
 	"github.com/uniqush/uniqush-conn/msgcache"
 	"github.com/uniqush/uniqush-conn/proto/server"
 	"github.com/uniqush/uniqush-conn/rpc"
+	"math/rand"
 	"net"
+	"sync"
 	"testing"
+	"time"
 )
 
 type fakeConn struct {
@@ -249,6 +252,95 @@ func TestDeleteDupConnMap(t *testing.T) {
 		cs := cmap.GetConn(c.Username())
 		if cs.NrConn() != M-1 {
 			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), cs.NrConn())
+		}
+	}
+}
+
+func TestConcurrentGetAddDel(t *testing.T) {
+	N := 1000
+	cmap := newTreeBasedConnMap(0, 0, 0)
+	g := new(connGenerator)
+	conns := make([]server.Conn, N)
+	users := make([]string, N)
+	for i, _ := range conns {
+		c := g.nextConn()
+		conns[i] = c
+		users[i] = c.Username()
+	}
+
+	var wg sync.WaitGroup
+
+	for _, c := range conns {
+		wg.Add(1)
+		go func(c server.Conn) {
+			defer wg.Done()
+			err := cmap.AddConn(c)
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}(c)
+	}
+
+	wg.Wait()
+	for _, c := range conns {
+		wg.Add(1)
+		go func(c server.Conn) {
+			defer wg.Done()
+			cs := cmap.GetConn(c.Username())
+			if cs.NrConn() != 1 {
+				t.Errorf("Bad for user %v: nr conns=%v", c.Username(), cs.NrConn())
+				return
+			}
+
+			err := cs.Traverse(func(c1 server.Conn) error {
+				if c1.Username() != c.Username() {
+					return fmt.Errorf("Bad for user %v", c.Username())
+				}
+				return nil
+			})
+			if err != nil {
+				t.Errorf("%v", err)
+			}
+		}(c)
+	}
+	wg.Wait()
+	for _, c := range conns {
+		// This loop is only used to mimic concurrent read and write
+		wg.Add(1)
+		go func(c server.Conn) {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Int63n(3)) * time.Second)
+			cs := cmap.GetConn(c.Username())
+			if cs.NrConn() == 1 {
+				err := cs.Traverse(func(c1 server.Conn) error {
+					if c1.Username() != c.Username() {
+						return fmt.Errorf("Bad for user %v", c.Username())
+					}
+					return nil
+				})
+				if err != nil {
+					t.Errorf("%v", err)
+				}
+
+			}
+		}(c)
+	}
+	for _, c := range conns {
+		wg.Add(1)
+		go func(c server.Conn) {
+			defer wg.Done()
+			time.Sleep(time.Duration(rand.Int63n(3)) * time.Second)
+			deleted := cmap.DelConn(c)
+			if deleted == nil {
+				t.Errorf("should delete a connection")
+			}
+		}(c)
+	}
+	wg.Wait()
+	for _, c := range conns {
+		cs := cmap.GetConn(c.Username())
+		if cs.NrConn() != 0 {
+			t.Errorf("deletion failed. nr conn: %v", cs.NrConn())
 		}
 	}
 }

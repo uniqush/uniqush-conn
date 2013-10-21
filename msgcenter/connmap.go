@@ -26,6 +26,8 @@ import (
 )
 
 type connMap interface {
+	NrConns() int
+	NrUsers() int
 	AddConn(conn server.Conn) error
 	GetConn(username string) ConnSet
 	DelConn(conn server.Conn) server.Conn
@@ -38,12 +40,24 @@ type treeBasedConnMap struct {
 	maxNrConnsPerUser int
 
 	nrConn int
-	lock   sync.Mutex
+	lock   sync.RWMutex
+}
+
+func (self *treeBasedConnMap) NrConns() int {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	return self.nrConn
+}
+
+func (self *treeBasedConnMap) NrUsers() int {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	return self.tree.Len()
 }
 
 func (self *treeBasedConnMap) GetConn(user string) ConnSet {
-	self.lock.Lock()
-	defer self.lock.Unlock()
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 	cset := self.getConn(user)
 	return cset
 }

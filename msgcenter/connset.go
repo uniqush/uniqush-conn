@@ -30,7 +30,7 @@ type ConnSet interface {
 }
 
 type connSet struct {
-	mutex sync.Mutex
+	mutex sync.RWMutex
 	name  string
 	list  []server.Conn
 }
@@ -52,12 +52,13 @@ func (self *connSet) unlock() {
 
 // Never manipulate another connSet inside the function f.
 // It may lead to deadlock.
+// Only perform read-only operation (to the connSet, not the Conn) in the function f().
 func (self *connSet) Traverse(f func(c server.Conn) error) error {
 	if self == nil {
 		return nil
 	}
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
 
 	if self == nil {
 		return nil

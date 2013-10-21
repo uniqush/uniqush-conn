@@ -323,6 +323,14 @@ func (self *serviceCenter) processSubscription() {
 	}
 }
 
+func (self *serviceCenter) NrConns() int {
+	return self.conns.NrConns()
+}
+
+func (self *serviceCenter) NrUsers() int {
+	return self.conns.NrUsers()
+}
+
 func newServiceCenter(conf *config.ServiceConfig, fwdChan chan<- *rpc.ForwardRequest, peer rpc.UniqushConnPeer) *serviceCenter {
 	if conf == nil || fwdChan == nil {
 		return nil
