@@ -335,6 +335,13 @@ func TestConcurrentGetAddDel(t *testing.T) {
 		}(c)
 	}
 	wg.Wait()
+
+	if cmap.NrConns() > 0 {
+		t.Errorf("Has %v connections", cmap.NrConns())
+	}
+	if cmap.NrUsers() > 0 {
+		t.Errorf("Has %v users", cmap.NrUsers())
+	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
 		if cs.NrConn() != 0 {
@@ -373,7 +380,6 @@ func TestConcurrentGetAddDelDup(t *testing.T) {
 			}
 		}(c)
 	}
-
 	wg.Wait()
 
 	for _, usr := range users {
@@ -448,10 +454,48 @@ func TestConcurrentGetAddDelDup(t *testing.T) {
 	}
 	wg.Wait()
 
+	if cmap.NrConns() != N*(M-1) {
+		t.Errorf("Has %v connections", cmap.NrConns())
+	}
+	if cmap.NrUsers() != N {
+		t.Errorf("Has %v users", cmap.NrUsers())
+	}
 	for _, c := range conns {
 		cs := cmap.GetConn(c.Username())
 		if cs.NrConn() != M-1 {
 			t.Errorf("should delete one connection for user %v: nr conns=%v", c.Username(), cs.NrConn())
+		}
+	}
+}
+
+func TestGetAllUsernames(t *testing.T) {
+	N := 10
+	cmap := newTreeBasedConnMap(0, 0, 0)
+	g := new(connGenerator)
+	conns := make([]server.Conn, N)
+	for i, _ := range conns {
+		c := g.nextConn()
+		err := cmap.AddConn(c)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		conns[i] = c
+	}
+
+	users := cmap.AllUsernames()
+	if len(users) != len(conns) {
+		t.Errorf("Retrieved %v users", len(users))
+	}
+
+	for _, usr := range users {
+		found := false
+		for _, conn := range conns {
+			if conn.Username() == usr {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("cannot find user %v", usr)
 		}
 	}
 }

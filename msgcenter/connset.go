@@ -125,6 +125,13 @@ func (self *connSet) add(conn server.Conn, max int) error {
 	return nil
 }
 
+func (self *connSet) username() string {
+	if len(self.list) == 0 {
+		return self.name
+	}
+	return self.list[0].Username()
+}
+
 func (self *connSet) key() string {
 	if len(self.list) == 0 {
 		return self.name
@@ -135,6 +142,9 @@ func (self *connSet) key() string {
 func (self *connSet) Less(than llrb.Item) bool {
 	if self == nil {
 		return true
+	}
+	if than == nil {
+		return false
 	}
 	thanCs := than.(*connSet)
 	if thanCs == nil {

@@ -28,6 +28,7 @@ import (
 type connMap interface {
 	NrConns() int
 	NrUsers() int
+	AllUsernames() []string
 	AddConn(conn server.Conn) error
 	GetConn(username string) ConnSet
 	DelConn(conn server.Conn) server.Conn
@@ -41,6 +42,20 @@ type treeBasedConnMap struct {
 
 	nrConn int
 	lock   sync.RWMutex
+}
+
+func (self *treeBasedConnMap) AllUsernames() []string {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	ret := make([]string, 0, self.tree.Len())
+
+	self.tree.AscendGreaterOrEqual(nil, func(item llrb.Item) bool {
+		if cs, ok := item.(*connSet); ok {
+			ret = append(ret, cs.username())
+		}
+		return true
+	})
+	return ret
 }
 
 func (self *treeBasedConnMap) NrConns() int {
