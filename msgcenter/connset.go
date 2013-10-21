@@ -95,17 +95,17 @@ func (self *connSet) nrConn() int {
 }
 
 func (self *connSet) del(key string) server.Conn {
-	var c server.Conn
 	i := -1
-	for i, c = range self.list {
+	for j, c := range self.list {
 		if c.UniqId() == key {
+			i = j
 			break
 		}
 	}
 	if i < 0 || i >= len(self.list) {
 		return nil
 	}
-	c = self.list[i]
+	c := self.list[i]
 	self.list[i] = self.list[len(self.list)-1]
 	self.list = self.list[:len(self.list)-1]
 

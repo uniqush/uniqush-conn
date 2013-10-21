@@ -18,6 +18,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -26,6 +27,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+
+	"strings"
 	"time"
 
 	"github.com/uniqush/uniqush-conn/rpc"
@@ -138,7 +141,8 @@ func (self *HttpRequestProcessor) isMyself(addr string) (bool, error) {
 func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	switch r.URL.Path {
+	upath := strings.TrimSpace(r.URL.Path)
+	switch upath {
 	case rpc.SEND_MESSAGE_PATH:
 		sendReq := &rpc.SendRequest{}
 		self.processJsonRequest(w, r, sendReq, self.center, send)
@@ -155,7 +159,28 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		instance := &rpc.UniqushConnInstance{}
 		self.processJsonRequest(w, r, instance, self.center, addInstance)
 	case "/id":
-		fmt.Fprintf(w, "%v", self.myId)
+		fmt.Fprintf(w, "%v\r\n", self.myId)
+	default:
+		pathb := bytes.Trim([]byte(upath), "/")
+		elems := bytes.Split(pathb, []byte("/"))
+		var action string
+		var srv string
+		if len(elems) == 2 {
+			action = string(elems[0])
+			srv = string(elems[1])
+		}
+		switch action {
+		case "nr-conns":
+			fmt.Fprintf(w, "%v\r\n", self.center.NrConns(srv))
+		case "nr-users":
+			fmt.Fprintf(w, "%v\r\n", self.center.NrUsers(srv))
+		case "all-users":
+			usrs, err := json.Marshal(self.center.AllUsernames(srv))
+			if err != nil {
+				fmt.Fprintf(w, "[]\r\n")
+			}
+			fmt.Fprintf(w, "%v", string(usrs))
+		}
 	}
 }
 
