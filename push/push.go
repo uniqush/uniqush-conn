@@ -155,20 +155,48 @@ func (self *uniqushPush) Push(service, username, senderService, senderUsername s
 		}
 		data.Set(k, v)
 	}
-	data.Set("uniqush.id", id)
-	data.Set("uniqush.sz", fmt.Sprintf("%v", size))
-	data.Set("service", service)
-	data.Set("subscriber", username)
 
-	// This message is forwarded from another user.
+	// The format of the parameter string is:
+	// id,size,service,username,senderService,senderUsername
+	// The last two are optional if the message is sent from the server (not forwarded by another user)
+	// This id part is hex number --- so that we can save space.
+	param := make([]rune, 0, len(id)+len(service)+len(username)+len(senderService)+len(senderUsername)+32)
+
+	param = append(param, []rune(id)...)
+	param = append(param, rune(','))
+	param = append(param, []rune(fmt.Sprintf("%x", size))...)
+	param = append(param, []rune(service)...)
+	param = append(param, rune(','))
+	param = append(param, []rune(username)...)
 	if len(senderUsername) > 0 {
-		data.Set("uniqush.sr", senderUsername)
+		param = append(param, rune(','))
 		if len(senderService) > 0 {
-			data.Set("uniqush.ss", senderService)
+			param = append(param, []rune(senderService)...)
+			param = append(param, rune(','))
 		} else {
-			data.Set("uniqush.ss", service)
+			param = append(param, []rune(service)...)
+			param = append(param, rune(','))
 		}
+		param = append(param, []rune(senderUsername)...)
 	}
+	data.Set("uniqush.c", string(param))
+
+	/*
+		data.Set("uniqush.id", id)
+		data.Set("uniqush.sz", fmt.Sprintf("%v", size))
+		data.Set("service", service)
+		data.Set("subscriber", username)
+
+		// This message is forwarded from another user.
+		if len(senderUsername) > 0 {
+			data.Set("uniqush.sr", senderUsername)
+			if len(senderService) > 0 {
+				data.Set("uniqush.ss", senderService)
+			} else {
+				data.Set("uniqush.ss", service)
+			}
+		}
+	*/
 	err := self.post("push", data)
 	return err
 }
