@@ -164,7 +164,7 @@ func (self *uniqushPush) Push(service, username, senderService, senderUsername s
 
 	param = append(param, []rune(id)...)
 	param = append(param, rune(','))
-	param = append(param, []rune(fmt.Sprintf("%x", size))...)
+	param = append(param, []rune(fmt.Sprintf("%x,", size))...)
 	param = append(param, []rune(service)...)
 	param = append(param, rune(','))
 	param = append(param, []rune(username)...)
