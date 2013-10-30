@@ -148,9 +148,17 @@ func (self *uniqushPush) Unsubscribe(service, username string, info map[string]s
 }
 
 func (self *uniqushPush) Push(service, username, senderService, senderUsername string, info map[string]string, id string, size int) error {
+	if len(service) == 0 {
+		return fmt.Errorf("NoService")
+	}
+	if len(username) == 0 {
+		return fmt.Errorf("NoReceiver")
+	}
 	data := url.Values{}
 	for k, v := range info {
-		if strings.HasPrefix(k, "uniqush.") {
+		if strings.HasPrefix(strings.ToLower(k), "uq.") ||
+			strings.HasPrefix(strings.ToLower(k), "uniqush.") {
+			// reserved prefixes.
 			continue
 		}
 		data.Set(k, v)
@@ -179,24 +187,10 @@ func (self *uniqushPush) Push(service, username, senderService, senderUsername s
 		}
 		param = append(param, []rune(senderUsername)...)
 	}
-	data.Set("uniqush.c", string(param))
+	data.Set("uq.", string(param))
+	data.Set("service", service)
+	data.Set("subscriber", username)
 
-	/*
-		data.Set("uniqush.id", id)
-		data.Set("uniqush.sz", fmt.Sprintf("%v", size))
-		data.Set("service", service)
-		data.Set("subscriber", username)
-
-		// This message is forwarded from another user.
-		if len(senderUsername) > 0 {
-			data.Set("uniqush.sr", senderUsername)
-			if len(senderService) > 0 {
-				data.Set("uniqush.ss", senderService)
-			} else {
-				data.Set("uniqush.ss", service)
-			}
-		}
-	*/
 	err := self.post("push", data)
 	return err
 }

@@ -160,6 +160,15 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		self.processJsonRequest(w, r, instance, self.center, addInstance)
 	case "/id":
 		fmt.Fprintf(w, "%v\r\n", self.myId)
+	case "/services":
+		if r.Method == "GET" {
+			srvs, err := json.Marshal(self.center.AllServices())
+			if err != nil {
+				fmt.Fprintf(w, "[]\r\n")
+				return
+			}
+			fmt.Fprintf(w, "%v", string(srvs))
+		}
 	default:
 		pathb := bytes.Trim([]byte(upath), "/")
 		elems := bytes.Split(pathb, []byte("/"))
@@ -178,6 +187,7 @@ func (self *HttpRequestProcessor) ServeHTTP(w http.ResponseWriter, r *http.Reque
 			usrs, err := json.Marshal(self.center.AllUsernames(srv))
 			if err != nil {
 				fmt.Fprintf(w, "[]\r\n")
+				return
 			}
 			fmt.Fprintf(w, "%v", string(usrs))
 		}

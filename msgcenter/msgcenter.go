@@ -149,6 +149,16 @@ func (self *MessageCenter) Stop() {
 	close(self.fwdChan)
 }
 
+func (self *MessageCenter) AllServices() []string {
+	self.srvCentersLock.Lock()
+	defer self.srvCentersLock.Lock()
+	ret := make([]string, 0, len(self.serviceCenterMap))
+	for srv, _ := range self.serviceCenterMap {
+		ret = append(ret, srv)
+	}
+	return ret
+}
+
 func (self *MessageCenter) AllUsernames(srv string) []string {
 	center := self.getServiceCenter(srv)
 	if center == nil {
