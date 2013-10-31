@@ -383,6 +383,9 @@ func ParseFile(filename string) (config *Config, err error) {
 		return
 	}
 	config, err = parseConfigRootNode(file.Root)
+	if err != nil {
+		return
+	}
 	config.filename = filename
 	return
 }
