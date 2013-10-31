@@ -104,12 +104,14 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 	dsn := fmt.Sprintf("%v:%v@tcp(%v)/%v", username, password, address, dbname)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
+		err = fmt.Errorf("Data base error: %v", err)
 		return
 	}
 	c = new(mysqlMessageCache)
 	c.db = db
 	err = c.init()
 	if err != nil {
+		err = fmt.Errorf("Data base init error: %v", err)
 		return
 	}
 
@@ -119,6 +121,7 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 		(?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 	if err != nil {
+		err = fmt.Errorf("Data base prepare statement error: %v; insert stmt", err)
 		return
 	}
 
@@ -129,6 +132,7 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 		WHERE owner_service=? AND owner_name=? AND create_time>=? AND (deadline>=? OR deadline<=0) ORDER BY create_time;
 		`)
 	if err != nil {
+		err = fmt.Errorf("Data base prepare error: %v; select multi stmt", err)
 		return
 	}
 	c.getMultiMsgStmt = stmt
@@ -137,6 +141,7 @@ func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 		WHERE id=? AND (deadline>? OR deadline<=0);
 		`)
 	if err != nil {
+		err = fmt.Errorf("Data base prepare error: %v; select single stmt", err)
 		return
 	}
 	c.getSingleMsgStmt = stmt
@@ -193,6 +198,7 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 
 	result, err := self.cacheStmt.Exec(uniqid, id, service, username, mc.SenderService, mc.Sender, now.Unix(), deadline.Unix(), data)
 	if err != nil {
+		err = fmt.Errorf("Data base error: %v; insert error")
 		return
 	}
 	n, err := result.RowsAffected()
@@ -210,6 +216,7 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 	uniqid := getUniqMessageId(service, username, id)
 	row := self.getSingleMsgStmt.QueryRow(uniqid, time.Now().Unix())
 	if err != nil {
+		err = fmt.Errorf("Data base error: %v; query error")
 		return
 	}
 
@@ -237,6 +244,7 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 func (self *mysqlMessageCache) RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error) {
 	rows, err := self.getMultiMsgStmt.Query(service, username, since.Unix(), time.Now().Unix())
 	if err != nil {
+		err = fmt.Errorf("Data base error: %v; query multi-msg error")
 		return
 	}
 	defer rows.Close()
