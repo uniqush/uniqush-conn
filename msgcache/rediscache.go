@@ -421,3 +421,7 @@ func (self *redisMessageCache) RetrieveAllSince(service, username string, since 
 	msgs = msgShadow
 	return
 }
+
+func (self *redisMessageCache) Close() error {
+	return nil
+}

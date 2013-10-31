@@ -38,6 +38,7 @@ type Cache interface {
 	// XXX Is there any better way to support retrieve all feature?
 	Get(service, username, id string) (msg *rpc.MessageContainer, err error)
 	RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error)
+	Close() error
 }
 
 type CacheManager interface {
