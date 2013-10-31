@@ -24,6 +24,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/uniqush/uniqush-conn/rpc"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -52,6 +53,8 @@ func (self *mysqlCacheManager) GetCache(host, username, password, database strin
 }
 
 type mysqlMessageCache struct {
+	dsn              string
+	lock             sync.RWMutex
 	db               *sql.DB
 	cacheStmt        *sql.Stmt
 	getMultiMsgStmt  *sql.Stmt
@@ -97,22 +100,39 @@ func (self *mysqlMessageCache) init() error {
 	return nil
 }
 
-func newMySQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
-	if len(address) == 0 {
-		address = "127.0.0.1:3306"
+func (self *mysqlMessageCache) Close() error {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	if self.cacheStmt != nil {
+		self.cacheStmt.Close()
 	}
-	dsn := fmt.Sprintf("%v:%v@tcp(%v)/%v", username, password, address, dbname)
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		err = fmt.Errorf("Data base error: %v", err)
-		return
+	if self.getMultiMsgStmt != nil {
+		self.getMultiMsgStmt.Close()
 	}
-	c = new(mysqlMessageCache)
-	c.db = db
-	err = c.init()
+	if self.getSingleMsgStmt != nil {
+		self.getSingleMsgStmt.Close()
+	}
+	if self.db != nil {
+		self.db.Close()
+	}
+	return nil
+}
+
+func (self *mysqlMessageCache) reconnect() error {
+	self.Close()
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	if len(self.dsn) == 0 {
+		return fmt.Errorf("No DSN")
+	}
+	db, err := sql.Open("mysql", self.dsn)
 	if err != nil {
-		err = fmt.Errorf("Data base init error: %v", err)
-		return
+		return fmt.Errorf("Data base error: %v", err)
+	}
+	self.db = db
+	err = self.init()
+	if err != nil {
+		return fmt.Errorf("Data base init error: %v", err)
 	}
 
 	stmt, err := db.Prepare(`INSERT INTO messages
@@ -121,30 +141,37 @@ func newMySQLMessageCache(username, password, address, dbname string) (c *mysqlM
 		(?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`)
 	if err != nil {
-		err = fmt.Errorf("Data base prepare statement error: %v; insert stmt", err)
-		return
+		return fmt.Errorf("Data base prepare statement error: %v; insert stmt", err)
 	}
 
-	c.cacheStmt = stmt
+	self.cacheStmt = stmt
 
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
 		FROM messages
 		WHERE owner_service=? AND owner_name=? AND create_time>=? AND (deadline>=? OR deadline<=0) ORDER BY create_time;
 		`)
 	if err != nil {
-		err = fmt.Errorf("Data base prepare error: %v; select multi stmt", err)
-		return
+		return fmt.Errorf("Data base prepare error: %v; select multi stmt", err)
 	}
-	c.getMultiMsgStmt = stmt
+	self.getMultiMsgStmt = stmt
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
 		FROM messages
 		WHERE id=? AND (deadline>? OR deadline<=0);
 		`)
 	if err != nil {
-		err = fmt.Errorf("Data base prepare error: %v; select single stmt", err)
-		return
+		return fmt.Errorf("Data base prepare error: %v; select single stmt", err)
 	}
-	c.getSingleMsgStmt = stmt
+	self.getSingleMsgStmt = stmt
+	return nil
+}
+
+func newMySQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
+	c = new(mysqlMessageCache)
+	if len(address) == 0 {
+		address = "127.0.0.1:3306"
+	}
+	c.dsn = fmt.Sprintf("%v:%v@tcp(%v)/%v", username, password, address, dbname)
+	err = c.reconnect()
 	return
 }
 
@@ -195,6 +222,8 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 		// max possible value for int64
 		deadline = time.Unix(0, 0)
 	}
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 
 	result, err := self.cacheStmt.Exec(uniqid, id, service, username, mc.SenderService, mc.Sender, now.Unix(), deadline.Unix(), data)
 	if err != nil {
@@ -213,6 +242,8 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 }
 
 func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.MessageContainer, err error) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 	uniqid := getUniqMessageId(service, username, id)
 	row := self.getSingleMsgStmt.QueryRow(uniqid, time.Now().Unix())
 	if err != nil {
@@ -242,6 +273,8 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 }
 
 func (self *mysqlMessageCache) RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
 	rows, err := self.getMultiMsgStmt.Query(service, username, since.Unix(), time.Now().Unix())
 	if err != nil {
 		err = fmt.Errorf("Data base error: %v; query multi-msg error", err)
