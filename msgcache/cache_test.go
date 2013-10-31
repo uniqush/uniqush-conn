@@ -379,6 +379,27 @@ func testRetrieveAllReserveOrder(m cacheManager, t *testing.T) {
 	}
 }
 
+func testRecover(m cacheManager, t *testing.T) {
+	cache, err := m.GetCache()
+	if err != nil {
+		t.Errorf("%v", err)
+		return
+	}
+	msgs := multiRandomMessage(1)
+	msg := msgs[0]
+	defer m.ClearCache(cache)
+	srv := "myservice"
+	usr := "user2"
+	cache.Close()
+
+	// Should recover this connection even after a call on close()
+	_, err = cache.CacheMessage(srv, usr, msg, 0*time.Second)
+	if err != nil {
+		t.Errorf("set error: %v", err)
+		return
+	}
+}
+
 func testCacheImpl(m cacheManager, t *testing.T) {
 	testGetSetMessageWithId(m, t)
 	testGetSetMessages(m, t)
@@ -388,4 +409,5 @@ func testCacheImpl(m cacheManager, t *testing.T) {
 	testRetrieveAllMessagesSinceSometime(m, t)
 	testRetrieveAllMessagesTTL(m, t)
 	testRetrieveAllReserveOrder(m, t)
+	testRecover(m, t)
 }
