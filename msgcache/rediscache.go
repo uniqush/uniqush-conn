@@ -41,7 +41,7 @@ func (self *redisCacheManager) GetCache(host, username, password, database strin
 		}
 	}
 
-	return NewRedisMessageCache(host, password, port, db), nil
+	return newRedisMessageCache(host, password, port, db), nil
 }
 
 func (self *redisCacheManager) Engine() string {
@@ -52,7 +52,7 @@ type redisMessageCache struct {
 	pool *redis.Pool
 }
 
-func NewRedisMessageCache(host, password string, port, db int) Cache {
+func newRedisMessageCache(host, password string, port, db int) Cache {
 	if len(host) == 0 {
 		host = "localhost"
 	}

@@ -48,7 +48,7 @@ func (self *mysqlCacheManager) GetCache(host, username, password, database strin
 		port = 3306
 	}
 	addr := net.JoinHostPort(host, fmt.Sprintf("%v", port))
-	return NewMySQLMessageCache(username, password, addr, database)
+	return newMySQLMessageCache(username, password, addr, database)
 }
 
 type mysqlMessageCache struct {
@@ -97,7 +97,7 @@ func (self *mysqlMessageCache) init() error {
 	return nil
 }
 
-func NewMySQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
+func newMySQLMessageCache(username, password, address, dbname string) (c *mysqlMessageCache, err error) {
 	if len(address) == 0 {
 		address = "127.0.0.1:3306"
 	}
@@ -198,7 +198,7 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 
 	result, err := self.cacheStmt.Exec(uniqid, id, service, username, mc.SenderService, mc.Sender, now.Unix(), deadline.Unix(), data)
 	if err != nil {
-		err = fmt.Errorf("Data base error: %v; insert error")
+		err = fmt.Errorf("Data base error: %v; insert error", err)
 		return
 	}
 	n, err := result.RowsAffected()
@@ -216,7 +216,7 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 	uniqid := getUniqMessageId(service, username, id)
 	row := self.getSingleMsgStmt.QueryRow(uniqid, time.Now().Unix())
 	if err != nil {
-		err = fmt.Errorf("Data base error: %v; query error")
+		err = fmt.Errorf("Data base error: %v; query error", err)
 		return
 	}
 
@@ -244,7 +244,7 @@ func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.Messag
 func (self *mysqlMessageCache) RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error) {
 	rows, err := self.getMultiMsgStmt.Query(service, username, since.Unix(), time.Now().Unix())
 	if err != nil {
-		err = fmt.Errorf("Data base error: %v; query multi-msg error")
+		err = fmt.Errorf("Data base error: %v; query multi-msg error", err)
 		return
 	}
 	defer rows.Close()
