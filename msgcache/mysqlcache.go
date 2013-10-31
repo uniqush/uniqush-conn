@@ -179,19 +179,21 @@ func getUniqMessageId(service, username, id string) string {
 	return fmt.Sprintf("%v,%v,%v", service, username, id)
 }
 
-func (self *mysqlMessageCache) expBackoffRetry(N int, init time.Duration, f func() error) error {
-	s := init
+func (self *mysqlMessageCache) expBackoffRetry(N int, initWaitSec int, f func() error) error {
+	s := initWaitSec
 	var err error
 	for i := 0; i < N; i++ {
-		self.lock.RLock()
-		err = f()
-		self.lock.RUnlock()
 		if err == nil {
-			return nil
+			self.lock.RLock()
+			err = f()
+			self.lock.RUnlock()
+			if err == nil {
+				return nil
+			}
 		}
-		time.Sleep(s)
+		time.Sleep(time.Duration(s) * time.Second)
 		s = s * s
-		self.reconnect()
+		err = self.reconnect()
 	}
 	return err
 }
@@ -241,7 +243,7 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 	}
 	var result sql.Result
 
-	err = self.expBackoffRetry(3, 2*time.Second, func() error {
+	err = self.expBackoffRetry(3, 2, func() error {
 		result, err = self.cacheStmt.Exec(uniqid, id, service, username, mc.SenderService, mc.Sender, now.Unix(), deadline.Unix(), data)
 		return err
 	})
@@ -261,7 +263,7 @@ func (self *mysqlMessageCache) CacheMessage(service, username string, mc *rpc.Me
 }
 
 func (self *mysqlMessageCache) Get(service, username, id string) (mc *rpc.MessageContainer, err error) {
-	err = self.expBackoffRetry(3, 2*time.Second, func() error {
+	err = self.expBackoffRetry(3, 2, func() error {
 		mc, err = self.getOnce(service, username, id)
 		return err
 	})
@@ -298,7 +300,7 @@ func (self *mysqlMessageCache) getOnce(service, username, id string) (mc *rpc.Me
 }
 
 func (self *mysqlMessageCache) RetrieveAllSince(service, username string, since time.Time) (msgs []*rpc.MessageContainer, err error) {
-	err = self.expBackoffRetry(3, 2*time.Second, func() error {
+	err = self.expBackoffRetry(3, 2, func() error {
 		msgs, err = self.retrieveOnce(service, username, since)
 		return err
 	})
