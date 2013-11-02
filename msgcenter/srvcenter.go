@@ -83,6 +83,7 @@ func (self *serviceCenter) NewConn(conn server.Conn) {
 		return
 	}
 
+	self.config.OnLogin(conn)
 	go self.serveConn(conn)
 	return
 }
