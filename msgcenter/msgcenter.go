@@ -99,7 +99,13 @@ func (self *MessageCenter) getServiceCenter(srv string) *serviceCenter {
 
 func (self *MessageCenter) serveConn(c net.Conn) {
 	if tcpConn, ok := c.(*net.TCPConn); ok {
+		// Rather than keeping an application leve heart beat,
+		// we rely on TCP-level keep-alive.
+		// XXX Is this a good idea?
 		tcpConn.SetKeepAlive(true)
+
+		// Use Nagle.
+		tcpConn.SetNoDelay(false)
 	}
 	conn, err := server.AuthConn(c, self.privkey, self.config, self.config.HandshakeTimeout)
 	if err != nil {
