@@ -32,11 +32,11 @@ type singleUserAuth struct {
 	service, username, token string
 }
 
-func (self *singleUserAuth) Authenticate(srv, usr, connId, token, addr string) (bool, error) {
+func (self *singleUserAuth) Authenticate(srv, usr, connId, token, addr string) (bool, []string, error) {
 	if self.service == srv && self.username == usr && self.token == token {
-		return true, nil
+		return true, nil, nil
 	}
-	return false, nil
+	return false, nil, nil
 }
 
 func getClient(addr string, priv *rsa.PrivateKey, auth Authenticator, timeout time.Duration) (conn Conn, err error) {

@@ -249,14 +249,14 @@ type AuthHandler struct {
 	webHook
 }
 
-func (self *AuthHandler) Authenticate(srv, usr, connId, token, addr string) (pass bool, err error) {
+func (self *AuthHandler) Authenticate(srv, usr, connId, token, addr string) (pass bool, redir []string, err error) {
 	evt := new(authEvent)
 	evt.Service = srv
 	evt.Username = usr
 	evt.ConnId = connId
 	evt.Token = token
 	evt.Addr = addr
-	pass = self.post(evt, nil) == 200
+	pass = self.post(evt, redir) == 200
 	return
 }
 

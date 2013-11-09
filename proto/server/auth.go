@@ -78,24 +78,33 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	var d [16]byte
 	io.ReadFull(rand.Reader, d[:])
 	connId := fmt.Sprintf("%x-%v", time.Now().Unix(), base64.URLEncoding.EncodeToString(d[:]))
-	ok, err := auth.Authenticate(service, username, connId, token, conn.RemoteAddr().String())
+	ok, redir, err := auth.Authenticate(service, username, connId, token, conn.RemoteAddr().String())
 	if err != nil {
 		return
 	}
-	if !ok {
+	if len(redir) > 0 {
+		cmd.Type = proto.CMD_REDIRECT
+		cmd.Params = redir
+		cmd.Message = nil
+	} else if !ok {
 		err = ErrAuthFail
 		return
+	} else {
+		cmd.Type = proto.CMD_AUTHOK
+		cmd.Params = nil
+		cmd.Message = nil
+		cmd.Randomize()
 	}
-
-	cmd.Type = proto.CMD_AUTHOK
-	cmd.Params = nil
-	cmd.Message = nil
-	cmd.Randomize()
 	err = cmdio.WriteCommand(cmd, false)
 	if err != nil {
 		return
 	}
 	c = NewConn(cmdio, service, username, connId, conn)
-	err = nil
+
+	if len(redir) > 0 {
+		err = io.EOF
+	} else {
+		err = nil
+	}
 	return
 }
