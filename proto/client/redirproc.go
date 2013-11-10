@@ -26,6 +26,10 @@ type RedirectRequest struct {
 	Addresses []string
 }
 
+func (self *RedirectRequest) Error() string {
+	return "redirect"
+}
+
 type redirectProcessor struct {
 	redirChan chan<- *RedirectRequest
 }

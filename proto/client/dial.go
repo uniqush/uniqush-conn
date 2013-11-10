@@ -65,6 +65,11 @@ func Dial(conn net.Conn, pubkey *rsa.PublicKey, service, username, token string,
 	if err != nil {
 		return
 	}
+	if cmd.Type == proto.CMD_REDIRECT {
+		r := new(RedirectRequest)
+		r.Addresses = cmd.Params
+		return nil, r
+	}
 	if cmd.Type != proto.CMD_AUTHOK {
 		return
 	}
