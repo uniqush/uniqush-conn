@@ -18,7 +18,12 @@
 package server
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"io"
+
 	"github.com/uniqush/uniqush-conn/proto/client"
+	"net"
 
 	"testing"
 	"time"
@@ -65,4 +70,66 @@ func TestRedirectCommand(t *testing.T) {
 	}()
 	close(redirChan)
 	cliConn.Close()
+}
+
+type redirAuth struct {
+	servers []string
+}
+
+func (self *redirAuth) Authenticate(srv, usr, connId, token, addr string) (bool, []string, error) {
+	return false, self.servers, nil
+}
+
+func TestRedirectOnAuth(t *testing.T) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+	pub := &priv.PublicKey
+
+	servers := []string{"server1:1234", "server2:1234"}
+	addr := "127.0.0.1:8088"
+
+	ready := make(chan bool)
+
+	go func() {
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		ready <- true
+		c, err := ln.Accept()
+		if err != nil {
+			t.Errorf("Error: %v", err)
+			return
+		}
+		ln.Close()
+
+		auth := new(redirAuth)
+		auth.servers = servers
+		_, err = AuthConn(c, priv, auth, 3*time.Second)
+		if err != io.EOF {
+			t.Errorf("Error: should be EOF %v", err)
+			return
+		}
+	}()
+
+	<-ready
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+		return
+	}
+	_, err = client.Dial(c, pub, "service", "user", "token", 3*time.Second)
+	if e, ok := err.(*client.RedirectRequest); ok {
+		for i, a := range e.Addresses {
+			if a != servers[i] {
+				t.Errorf("%v is not %v", a, servers[i])
+			}
+		}
+	} else {
+		t.Errorf("Should be a redirect request")
+	}
 }

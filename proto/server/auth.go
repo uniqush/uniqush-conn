@@ -99,11 +99,12 @@ func AuthConn(conn net.Conn, privkey *rsa.PrivateKey, auth Authenticator, timeou
 	if err != nil {
 		return
 	}
-	c = NewConn(cmdio, service, username, connId, conn)
 
 	if len(redir) > 0 {
+		c = nil
 		err = io.EOF
 	} else {
+		c = NewConn(cmdio, service, username, connId, conn)
 		err = nil
 	}
 	return
