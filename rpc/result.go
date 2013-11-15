@@ -51,7 +51,7 @@ func (self *Result) NrSuccess() int {
 	return ret
 }
 
-func (self *Result) NrSuccessForUser(string service, string user) int {
+func (self *Result) NrSuccessForUser(service, user string) int {
 	if self == nil {
 		return 0
 	}
