@@ -51,6 +51,19 @@ func (self *Result) NrSuccess() int {
 	return ret
 }
 
+func (self *Result) NrSuccessForUser(string service, string user) int {
+	if self == nil {
+		return 0
+	}
+	ret := 0
+	for _, r := range self.Results {
+		if r.Service == service && r.Username == user && r.Error == "" {
+			ret += 1
+		}
+	}
+	return ret
+}
+
 func (self *Result) Join(r *Result) {
 	if self == nil {
 		return
