@@ -63,10 +63,10 @@ func timeoutDialler(ns time.Duration) func(net, addr string) (c net.Conn, err er
 	}
 }
 
-func (self *webHook) post(data interface{}, out interface{}) int {
+func (self *webHook) post(data interface{}, out interface{}, requireOut bool) int {
 	ret := self.Default
 	for _, url := range self.URLs {
-		status := self.postSingle(url, data, out)
+		status := self.postSingle(url, data, out, requireOut)
 		if status == 200 {
 			if out != nil {
 				return status
@@ -77,7 +77,7 @@ func (self *webHook) post(data interface{}, out interface{}) int {
 	return ret
 }
 
-func (self *webHook) postSingle(url string, data interface{}, out interface{}) int {
+func (self *webHook) postSingle(url string, data interface{}, out interface{}, requireOut bool) int {
 	if len(url) == 0 || url == "none" {
 		return self.Default
 	}
@@ -99,7 +99,7 @@ func (self *webHook) postSingle(url string, data interface{}, out interface{}) i
 	if out != nil {
 		e := json.NewDecoder(resp.Body)
 		err = e.Decode(out)
-		if err != nil {
+		if err != nil && requireOut {
 			return self.Default
 		}
 	}
@@ -118,7 +118,7 @@ type LoginHandler struct {
 }
 
 func (self *LoginHandler) OnLogin(service, username, connId, addr string) {
-	self.post(&loginEvent{service, username, connId, addr}, nil)
+	self.post(&loginEvent{service, username, connId, addr}, nil, false)
 }
 
 type logoutEvent struct {
@@ -144,7 +144,7 @@ func (self *LogoutHandler) OnLogout(service, username, connId, addr string, reas
 	if reason != nil {
 		evt.Reason = reason.Error()
 	}
-	self.post(evt, nil)
+	self.post(evt, nil, false)
 }
 
 type messageEvent struct {
@@ -165,7 +165,7 @@ func (self *MessageHandler) OnMessage(service, username, connId string, msg *rpc
 		ConnID:   connId,
 		Msg:      msg,
 	}
-	self.post(evt, nil)
+	self.post(evt, nil, false)
 }
 
 type errorEvent struct {
@@ -181,7 +181,7 @@ type ErrorHandler struct {
 }
 
 func (self *ErrorHandler) OnError(service, username, connId, addr string, reason error) {
-	self.post(&errorEvent{service, username, connId, addr, reason.Error()}, nil)
+	self.post(&errorEvent{service, username, connId, addr, reason.Error()}, nil, false)
 }
 
 type ForwardRequestHandler struct {
@@ -221,7 +221,7 @@ func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiver
 		PushInfo:      make(map[string]string, 10),
 	}
 
-	status := self.post(fwd, res)
+	status := self.post(fwd, res, true)
 	if status != 200 {
 		res.ShouldForward = false
 		res.ShouldPush = false
@@ -256,7 +256,7 @@ func (self *AuthHandler) Authenticate(srv, usr, connId, token, addr string) (pas
 	evt.ConnId = connId
 	evt.Token = token
 	evt.Addr = addr
-	pass = self.post(evt, redir) == 200
+	pass = self.post(evt, redir, false) == 200
 	return
 }
 
@@ -275,7 +275,7 @@ func (self *SubscribeHandler) ShouldSubscribe(service, username string, info map
 	evt.Service = service
 	evt.Username = username
 	evt.Info = info
-	return self.post(evt, nil) == 200
+	return self.post(evt, nil, false) == 200
 }
 
 type UnsubscribeHandler struct {
@@ -287,6 +287,6 @@ func (self *UnsubscribeHandler) OnUnsubscribe(service, username string, info map
 	evt.Service = service
 	evt.Username = username
 	evt.Info = info
-	self.post(evt, nil)
+	self.post(evt, nil, false)
 	return
 }
