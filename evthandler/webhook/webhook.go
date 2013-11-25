@@ -221,7 +221,7 @@ func (self *ForwardRequestHandler) ShouldForward(senderService, sender, receiver
 		PushInfo:      make(map[string]string, 10),
 	}
 
-	status := self.post(fwd, res, true)
+	status := self.post(fwd, res, false)
 	if status != 200 {
 		res.ShouldForward = false
 		res.ShouldPush = false
