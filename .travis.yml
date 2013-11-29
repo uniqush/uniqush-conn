@@ -6,3 +6,4 @@ services:
 script:
  #- go test -v -race github.com/uniqush/uniqush-conn/msgcache
  - go test -v -race github.com/uniqush/uniqush-conn/proto
+ - go test -v -race github.com/uniqush/uniqush-conn/config
