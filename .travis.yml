@@ -3,7 +3,9 @@ go:
  - 1.1 
 services:
  - redis-server
+before_script:
+ - mysql -e 'create database uniqush;'
 script:
- #- go test -v -race github.com/uniqush/uniqush-conn/msgcache
+ - go test -v -race github.com/uniqush/uniqush-conn/msgcache
  - go test -v -race github.com/uniqush/uniqush-conn/proto
  - go test -v -race github.com/uniqush/uniqush-conn/config
