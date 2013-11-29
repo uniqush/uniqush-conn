@@ -1,6 +1,4 @@
 language: go
-install:
- - go get labix.org/v2/mgo/bson
 go:
  - 1.1 
 services:
