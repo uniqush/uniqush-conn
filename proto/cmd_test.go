@@ -20,7 +20,7 @@ package proto
 import (
 	"fmt"
 	"github.com/uniqush/uniqush-conn/rpc"
-	//"labix.org/v2/mgo/bson"
+	"labix.org/v2/mgo/bson"
 	"testing"
 )
 
@@ -111,18 +111,17 @@ func BenchmarkCommandMarshalUnmarshal(b *testing.B) {
 	}
 }
 
-// We don't need this benchmark to run for all ci test.
-// func BenchmarkCommandMarshalUnmarshalBson(b *testing.B) {
-// 	b.StopTimer()
-// 	cmds := make([]*Command, b.N)
-// 	for i, _ := range cmds {
-// 		cmd := randomCommand()
-// 		cmds[i] = cmd
-// 	}
-// 	b.StartTimer()
-// 	for _, cmd := range cmds {
-// 		data, _ := bson.Marshal(cmd)
-// 		c := new(Command)
-// 		bson.Unmarshal(data, c)
-// 	}
-// }
+func BenchmarkCommandMarshalUnmarshalBson(b *testing.B) {
+	b.StopTimer()
+	cmds := make([]*Command, b.N)
+	for i, _ := range cmds {
+		cmd := randomCommand()
+		cmds[i] = cmd
+	}
+	b.StartTimer()
+	for _, cmd := range cmds {
+		data, _ := bson.Marshal(cmd)
+		c := new(Command)
+		bson.Unmarshal(data, c)
+	}
+}
