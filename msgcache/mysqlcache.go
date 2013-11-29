@@ -62,7 +62,7 @@ type mysqlMessageCache struct {
 }
 
 func (self *mysqlMessageCache) init() error {
-	createTblStmt := `CREATE TABLE IF NOT EXISTS messages
+	createTblStmt := `CREATE TABLE IF NOT EXISTS uniqush_messages
 	(
 		id CHAR(255) NOT NULL PRIMARY KEY,
 		mid CHAR(255),
@@ -77,7 +77,7 @@ func (self *mysqlMessageCache) init() error {
 		deadline BIGINT,
 		content BLOB
 	);`
-	createIdxStmt := `CREATE INDEX idx_owner_time ON messages (owner_service, owner_name, create_time, deadline);`
+	createIdxStmt := `CREATE INDEX idx_owner_time ON uniqush_messages (owner_service, owner_name, create_time, deadline);`
 
 	tx, err := self.db.Begin()
 	if err != nil {
