@@ -4,6 +4,7 @@ go:
 services:
  - redis-server
 before_script:
+ - go get labix.org/v2/mgo/bson
  - mysql -e 'create database uniqush;'
 script:
  - go test -v -race github.com/uniqush/uniqush-conn/msgcache
