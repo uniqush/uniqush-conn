@@ -32,7 +32,7 @@ func (self *mysqlTestCacheManager) GetCache() (Cache, error) {
 
 func (self *mysqlTestCacheManager) ClearCache(c Cache) {
 	if cache, ok := c.(*mysqlMessageCache); ok {
-		cache.db.Exec("DELETE FROM messages")
+		cache.db.Exec("DELETE FROM uniqush_messages")
 	}
 }
 

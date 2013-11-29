@@ -135,7 +135,7 @@ func (self *mysqlMessageCache) reconnect() error {
 		return fmt.Errorf("Data base init error: %v", err)
 	}
 
-	stmt, err := db.Prepare(`INSERT INTO messages
+	stmt, err := db.Prepare(`INSERT INTO uniqush_messages
 		(id, mid, owner_service, owner_name, sender_service, sender_name, create_time, deadline, content)
 		VALUES
 		(?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -147,7 +147,7 @@ func (self *mysqlMessageCache) reconnect() error {
 	self.cacheStmt = stmt
 
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
-		FROM messages
+		FROM uniqush_messages
 		WHERE owner_service=? AND owner_name=? AND create_time>=? AND (deadline>=? OR deadline<=0) ORDER BY create_time;
 		`)
 	if err != nil {
@@ -155,7 +155,7 @@ func (self *mysqlMessageCache) reconnect() error {
 	}
 	self.getMultiMsgStmt = stmt
 	stmt, err = db.Prepare(`SELECT mid, sender_service, sender_name, create_time, content
-		FROM messages
+		FROM uniqush_messages
 		WHERE id=? AND (deadline>? OR deadline<=0);
 		`)
 	if err != nil {
